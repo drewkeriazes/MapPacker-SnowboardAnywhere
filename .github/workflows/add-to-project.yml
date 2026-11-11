@@ -1,0 +1,21 @@
+# Puts every new MapPacker issue on the SnowboardAnywhere board (project 2).
+# FEAT-226, drewkeriazes/SnowboardAnywhere#527. The board's one Auto-add
+# workflow (Free plan) serves the game repo, so this repo uses the Action.
+# ADD_TO_PROJECT_PAT: classic token, `project` scope only, expires 2027-11-11.
+# Renewal steps: docs/BOARD.md in the game repo.
+name: Add issues to the board
+
+on:
+  issues:
+    types: [opened, reopened, transferred]
+
+permissions: {}
+
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@f2c1f1fa649a891be84948ea89b5dfba1526ef05 # v2.0.1
+        with:
+          project-url: https://github.com/users/drewkeriazes/projects/2
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
