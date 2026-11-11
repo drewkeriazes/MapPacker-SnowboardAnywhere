@@ -2,6 +2,29 @@
  "formatVersion": 1,
  "resorts": [
   {
+   "slug": "bigsky",
+   "name": "Big Sky",
+   "region": "Montana",
+   "country": "US",
+   "lonlat": [
+    -111.41058147668633,
+    45.28371220009889
+   ],
+   "tier": "gold",
+   "status": "preview",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261111T150705Z-8cc64e",
+    "built": "2026-11-11",
+    "pipeline": "428c65d",
+    "bytes": 224423225,
+    "sha256": "2e2689a79b3fee13926467bd86dc973da7de521600154ec714c8eb8517d0a064",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/bigsky-v1/bigsky.zip"
+   },
+   "report": null
+  },
+  {
    "slug": "breckenridge",
    "name": "Breckenridge",
    "region": "Colorado",
