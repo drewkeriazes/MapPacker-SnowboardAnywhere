@@ -2,6 +2,8 @@
 
 Resort data for [SnowboardAnywhere](https://github.com/drewkeriazes/SnowboardAnywhere): the recipe each resort pack is built from, the catalog of published packs, and the packs themselves as release assets.
 
+Issues here are tracked on the [SnowboardAnywhere board](https://github.com/users/drewkeriazes/projects/2): new issues are added to it automatically (`.github/workflows/add-to-project.yml`).
+
 ## Get a resort
 
 In a SnowboardAnywhere checkout:

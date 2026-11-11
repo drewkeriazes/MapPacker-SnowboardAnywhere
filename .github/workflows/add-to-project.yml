@@ -1,0 +1,15 @@
+# FEAT-226 (#6): put every new MapPacker issue on the SnowboardAnywhere board (project 2).
+# The Free plan allows one Auto-add workflow on the board and SnowboardAnywhere uses it.
+# Token: classic PAT, scope `project` only, saved here as the ADD_TO_PROJECT_PAT secret.
+name: Add issues to the board
+on:
+  issues:
+    types: [opened, reopened, transferred]
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@v2.0.0
+        with:
+          project-url: https://github.com/users/drewkeriazes/projects/2
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
