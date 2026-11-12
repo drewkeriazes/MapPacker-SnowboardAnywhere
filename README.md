@@ -27,7 +27,7 @@ Or open **Change resort** on the main menu (with `npm run dev` or `npm run host`
 | `reports/<slug>.md` | The build report, when there is one |
 | Releases `<slug>-v<N>` | `<slug>.zip` (the pack, stored), its `meta.json`, and the report |
 
-Packs live in releases, never in git history: a pack is 150 to 250 MB per build, and releases can be deleted when a build is replaced. Everything here is written by `pipeline/publish_pack.py` in the game repo; edit the configs there, not here (these are copies for now).
+Packs live in releases, never in git history: a pack is 150 to 250 MB per build, and releases can be deleted when a build is replaced. Everything here is written by `pipeline/publish_pack.py` in the game repo; edit the configs there, not here (these are copies for now). That changes with EPIC-16 (#9): the pipeline moves here and the game repo just plays packs. Plan: [`docs/pipeline-move.md`](docs/pipeline-move.md).
 
 `status` is `playable` when every DATA-022 check passes in the build report, else `preview`. `formatVersion` is the pack format; a game reads only its own format and shows an older pack as "needs rebuild".
 
