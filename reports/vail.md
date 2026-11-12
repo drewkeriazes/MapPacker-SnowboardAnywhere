@@ -1,6 +1,14 @@
 # Pack report: Vail (`vail`)
 
-Build `20261112T061112Z-4b325d`, pipeline `4dd05fc`, format 1. Report 2026-11-12T06:11:23Z by `pipeline/pack_report.py` (FEAT-175).
+Build `20261112T175000Z-85054c`, pipeline `6a5ec5e`, format 1. Report 2026-11-12T17:52:19Z by `pipeline/pack_report.py` (FEAT-175).
+
+**Tier: gold** (FEAT-225: the weakest layer's)
+
+| Layer | Source | Tier |
+|---|---|---|
+| terrain | 3DEP 1 m | gold |
+| trees | lidar crowns + stands | gold |
+| surface | NAIP | gold |
 
 **Playable**: every DATA-022 MVP line passes.
 
@@ -10,24 +18,24 @@ Build `20261112T061112Z-4b325d`, pipeline `4dd05fc`, format 1. Report 2026-11-12
 | 1 | Resort config | ✅ | EPSG:26913 (13N) |
 | 2 | Raw: DEMs, lidar, NAIP, Mapterhorn, OSM | ✅ | all present |
 | 3 | Raw: land cover and pistes_wide | ✅ | all present |
-| 4 | Raw: LANDFIRE | ✅ | EVT, EVC and EVH |
+| 4 | Raw: LANDFIRE | ✅ | EVT, EVC and EVH; 0.0% of the forest in EVT classes the species rules don't name (west rules) |
 | 5 | Heights fine, mid, far | ✅ | 2409 to 3603 m, void 0.00% inside the bounds |
 | 6 | Surface: mask, AO, directions, moguls, rocks | ✅ | rock 1.1% (reference 1.1%), canopy 66% |
 | 7 | Trees and shrubs with species | ✅ | 0.52 M crowns + 4.80 M stems = 39.2 k per km2 (100% of the reference) |
 | 8 | Far terrain: cover levels pack, mid, far | ✅ | three levels |
 | 8b | Far tree ring (lidar crowns round the resort) | ✅ | 1.31 M crowns in 363 cells |
-| 9 | features.json | ✅ | 33 lifts, 354 runs, 2000 buildings, 1406 roads, 42 water, 1281 peaks, 74 labels |
-| 10 | Default start on a run, on snow, clear of trees | ✅ | on Born Free |
+| 9 | features.json | ✅ | 33 lifts, 354 runs, 2000 buildings, 1406 roads, 42 water, 1315 peaks, 74 labels |
+| 10 | Default start on a run, on snow, clear of trees | ✅ | generated (gen_content.py) on Born Free, top of Born Free Express Lift |
 | 11 | In the resort picker | ✅ | in packs/index.json, in game/src/resorts.ts, in the catalog |
 | 12 | Time trial courses | ✅ | 185 runs of 300 m and 60 m drop or more |
-| 13 | Attribution for every data set | ✅ | 8 lines |
+| 13 | Attribution for every data set | ✅ | 9 lines |
 | 14 | Validated | ⚠️ | 4 advanced+ runs never over 15 deg; 15 compare spots measured; ride from the start and views from the top not checked here (shoot.mjs) |
 | | **Polish (not gated)** | | |
 | 15 | Grooming history | ✅ | 48% of runs with a grooming record, 42 reports in raw |
-| 16 | Place names | ✅ | raw/names present |
-| 17 | Main menu shot and ghosts | ✅ | game/public/attract/vail/shots.json |
+| 16 | Place names | ✅ | GNIS gnis.json; 1315 peaks, 74 town labels |
+| 17 | Main menu shot and ghosts | ✅ | hand-made, game/public/attract/vail/ |
 | 18 | Landmark | ✅ | in Landmarks.ts |
-| 19 | Compare spots against photos | ✅ | 15 spots in docs/compare/vail |
+| 19 | Compare spots against photos | ✅ | 15 spots with Street View in docs/compare/vail |
 | 20 | Values derived for the resort, not copied from Vail | ✅ | treeline 3550 m measured; canopy.grow_ndvi 0.15; canopy.leaf_ndvi 0.45; canopy.veg_ndvi 0.3; rock.bare_ndvi 0.3; rock.dark 60.0; rock.grey_sat 0.2; rock.ndvi 0.18; treeline 3550 |
 
 ## Numbers (reference: vail `20261111T145558Z-c2847e`)
