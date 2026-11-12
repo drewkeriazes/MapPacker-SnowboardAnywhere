@@ -62,6 +62,8 @@ git config sa.gpuBudgets true
 
 It needs the game clone next to this one with `npm ci` done in `game/`. Builds of the game's `main` and the synthetic packs are cached in `~/.cache/mappacker-ci` (`RB_CACHE`).
 
+**README update** (`readme-update.yml`, FEAT-250, the game's FEAT-227 workflow ported here) brings this README up to date with what shipped. It runs only by hand: Actions > Update README > Run workflow, or `gh workflow run readme-update.yml`, with an optional `since` (a commit, tag, branch or date; `-f since=2026-11-01`). Without it, it starts from the last change to `README.md` on `main`, or, when that change was a merged README update PR, from the `main` commit that PR was made from. It lists the PRs merged into `main` since then, the cards closed without one of those PRs (this repo and the game) and the commits pushed straight to `main`; Claude checks them against the code (and a clone of the game's `main`) and edits `README.md` only. The workflow then pushes `readme-update-YYYY-MM-DD`, opens a PR and starts the Checks and the Claude review on it. Nothing to change: the run's summary says so and no PR is opened. A run while a README update PR is open stops and links to it. It never pushes to `main`. One-time setup: Settings > Actions > General > Workflow permissions > tick "Allow GitHub Actions to create and approve pull requests"; without it the run pushes the branch and its summary links to open the PR by hand.
+
 ## What is here
 
 | Path | What |
