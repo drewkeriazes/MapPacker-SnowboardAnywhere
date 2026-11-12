@@ -682,9 +682,12 @@ class Report:
                 self.line(i, item, SKIP, why, mvp=False)
         derived = meta.get("derived") or {}
         tl = meta.get("treeline")
-        parts = [f"treeline {tl:.0f} m measured" if tl else "no measured treeline (client uses Colorado's 3,480 m)"]
-        parts += [f"{k} {v}" for k, v in sorted(derived.items())]
-        tuned = bool(tl) and {"rock", "canopy"} <= {k.split(".")[0] for k in derived}
+        tl_none = "treeline" in meta and tl is None   # FEAT-234: measured, the box is forest to the top
+        parts = [f"treeline {tl:.0f} m measured" if tl else
+                 "no treeline: forested to the top of the box (measured)" if tl_none else
+                 "no measured treeline (client uses Colorado's 3,480 m)"]
+        parts += [f"{k} {v}" for k, v in sorted(derived.items()) if v is not None]
+        tuned = (bool(tl) or tl_none) and {"rock", "canopy"} <= {k.split(".")[0] for k in derived}
         self.line("20", "Values derived for the resort, not copied from Vail", PASS if tuned else FAIL,
                   "; ".join(parts) + ("" if tuned else "; rock and canopy thresholds are Vail's (FEAT-175 step 2)"), mvp=False)
 
