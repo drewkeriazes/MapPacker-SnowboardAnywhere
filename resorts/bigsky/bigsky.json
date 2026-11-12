@@ -132,7 +132,12 @@
           5019900
         ]
       }
-    ]
+    ],
+    "far": {
+      "pad_m": 5000,
+      "max_depth": 9,
+      "nodes_file": "bigsky_ept_far_nodes.txt"
+    }
   },
   "attribution": [
     "Elevation: USGS 3DEP 1 m lidar DEM, public domain",
@@ -148,5 +153,14 @@
       "osm_way": 1461424414
     }
   ],
-  "notes": "Ski-area box from the OSM landuse=winter_sports way 1254863688 (Big Sky Resort), stretched to every public lift and run incl. Moonlight Basin (north to the One and Only gondola top, 45.321 N). Private neighbours: the Yellowstone Club's OSM polygon (way 1461424414) also covers Spanish Peaks Mountain Club, so the one `exclude` entry drops both clubs' runs and lifts (69 run and lift ways, checked 2026-11-10: the bird-named Spanish Peaks runs, the club's own and its connectors) and keeps every Big Sky lift; their lifts are tagged access=private too. MT_StatewideP4_5_B22 covers the box except an east strip (x > 470,900, 10 km2 of the ski area: lower Lone Moose, Highlands, Lewis and Clark), which MT_Statewide_P3_3_B21 fills (lidar.extra, clipped to x > 470,400). NAIP 2021 is the latest on Planetary Computer for Montana (STAC search 2026-11-10); 2021 has no 4511153_ne, so that quarter quad is 2019. UTM 12N."
+  "notes": "Ski-area box from the OSM landuse=winter_sports way 1254863688 (Big Sky Resort), stretched to every public lift and run incl. Moonlight Basin (north to the One and Only gondola top, 45.321 N). Private neighbours: the Yellowstone Club's OSM polygon (way 1461424414) also covers Spanish Peaks Mountain Club, so the one `exclude` entry drops both clubs' runs and lifts (69 run and lift ways, checked 2026-11-10: the bird-named Spanish Peaks runs, the club's own and its connectors) and keeps every Big Sky lift; their lifts are tagged access=private too. MT_StatewideP4_5_B22 covers the box except an east strip (x > 470,900, 10 km2 of the ski area: lower Lone Moose, Highlands, Lewis and Clark), which MT_Statewide_P3_3_B21 fills (lidar.extra, clipped to x > 470,400). NAIP 2021 is the latest on Planetary Computer for Montana (STAC search 2026-11-10); 2021 has no 4511153_ne, so that quarter quad is 2019. UTM 12N.",
+  "names": {
+    "states": [
+      "MT",
+      "ID",
+      "WY"
+    ],
+    "source": "USGS GNIS",
+    "towns": "US Census 2024 Gazetteer and population estimates"
+  }
 }

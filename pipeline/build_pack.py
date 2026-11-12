@@ -42,7 +42,17 @@ def log(*a):
     print(f"[{time.time()-T0:6.0f}s]", *a, flush=True)
 
 OX, OY = cfg["origin"]
-X0, Y0, X1, Y1 = cfg["utm_bbox"]           # UTM metres
+# FEAT-249: the raw data covers utm_bbox (FRAME); the pack is built on pack_bbox, the rideable area, which defaults
+# to the same box. The config's `relocate` moves (relocate.py) paste far areas into it. The DEM, lidar returns,
+# NAIP, LANDFIRE and OSM are composed first; everything after is built from them as for any resort.
+import relocate
+REL = relocate.Relocation(cfg)
+FRAME = [float(v) for v in cfg["utm_bbox"]]
+X0, Y0, X1, Y1 = cfg.get("pack_bbox") or cfg["utm_bbox"]           # UTM metres
+COMPOSED = bool(REL) or [X0, Y0, X1, Y1] != FRAME
+_bad = REL.check_inside(FRAME, [X0, Y0, X1, Y1])
+if _bad:
+    sys.exit("; ".join(_bad))
 W = X1 - X0; H = Y1 - Y0                   # 1 m grid size
 crs = cfg["crs"]
 to_ll = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
@@ -54,7 +64,8 @@ def read_tiff(path):
 
 # ------------------------------------------------------------------ 1. fine DEM (1 m)
 log("DEM mosaic")
-dem = np.full((H, W), np.nan, np.float32)   # row 0 = north
+FX0, FY0, FX1, FY1 = FRAME
+dem = np.full((int(FY1 - FY0), int(FX1 - FX0)), np.nan, np.float32)   # the fetched frame, row 0 = north
 for it in manifest["items"]:
     if not it["path"].startswith("dem1m/"):
         continue
@@ -69,7 +80,7 @@ for it in manifest["items"]:
     if a.shape != (h, w):
         log("  unexpected shape", it["path"], a.shape, (h, w))
         a = np.array(Image.fromarray(a).resize((w, h), Image.BILINEAR))
-    c0 = int(bx0 - X0); r0 = int(Y1 - by1)
+    c0 = int(bx0 - FX0); r0 = int(FY1 - by1)
     dem[r0:r0 + h, c0:c0 + w] = a
 void = np.isnan(dem)
 log(f"  dem {dem.shape}, void {void.mean()*100:.2f}%, range {np.nanmin(dem):.0f}..{np.nanmax(dem):.0f}")
@@ -77,7 +88,18 @@ if void.any():
     # fill small voids by nearest neighbour
     idx = ndimage.distance_transform_edt(void, return_distances=False, return_indices=True)
     dem = dem[tuple(idx)]
-dem_local = dem  # heights are absolute metres; x,y are local
+dem_f = None    # the frame's DEM, kept while the lidar returns are set on the composed ground
+REL_DZ = []
+if COMPOSED:
+    dem_f = dem
+    REL_DZ = [relocate.rim_dz(dem_f, FRAME, 1.0, m) for m in REL.moves]
+    for m, dz in zip(REL.moves, REL_DZ):
+        m.dz = dz
+        log(f"  relocate {m.name}: {m.src} -> centre {m.to}, turned {m.turn:+.0f} deg, seam {m.feather:.0f} m, "
+            f"height shift {dz:+.1f} m")
+    dem = relocate.compose_heights(dem_f, FRAME, 1.0, [X0, Y0, X1, Y1], REL, REL_DZ)
+    log(f"  pack box {X1 - X0:.0f} x {Y1 - Y0:.0f} m of the fetched {FX1 - FX0:.0f} x {FY1 - FY0:.0f} m, "
+        f"range {dem.min():.0f}..{dem.max():.0f}")
 fine_meta = write_height_set(out, "fine", dem, 1.0, X0 - OX, Y0 - OY)
 log("  fine written", fine_meta["tilesX"], "x", fine_meta["tilesY"])
 
@@ -149,6 +171,42 @@ dtm_l = np.full((H2, W2), 1e9, np.float32)
 n_pts = 0
 ept = json.load(open(os.path.join(raw, "ept/ept.json"), encoding="utf-8"))
 scale = None
+PACK_BOX = [X0, Y0, X1, Y1]
+
+
+def place_returns(ux, uy, zz, cls):
+    """FEAT-249: the returns of one node for the pack: at their own place where the ground there is drawn, at their
+    moved place inside a pasted patch (relocate.Relocation.select decides, as for every other layer). A return keeps
+    its height above the ground it was flown over, set on the composed ground."""
+    def inb(x, y):
+        return (x >= X0) & (x < X1) & (y >= Y0) & (y < Y1)
+    xs, ys, zs, cs = [], [], [], []
+    k = inb(ux, uy)
+    if k.any():
+        k[k] = REL.select(ux[k], uy[k]) == -1
+    if k.any():
+        x, y = ux[k], uy[k]
+        xs.append(x); ys.append(y); cs.append(cls[k])
+        zs.append(zz[k] - relocate.sample(dem_f, FRAME, 1.0, x, y) + relocate.sample(dem, PACK_BOX, 1.0, x, y))
+    for i, m in enumerate(REL.moves):
+        sx0, sy0, sx1, sy1 = m.src
+        k = (ux >= sx0) & (ux < sx1) & (uy >= sy0) & (uy < sy1)
+        if not k.any():
+            continue
+        sx, sy, sz, sc = ux[k], uy[k], zz[k], cls[k]
+        dx, dy = m.dest_of(sx, sy)
+        ok = inb(dx, dy)
+        ok[ok] = REL.select(dx[ok], dy[ok]) == i
+        if not ok.any():
+            continue
+        xs.append(dx[ok]); ys.append(dy[ok]); cs.append(sc[ok])
+        zs.append(sz[ok] - relocate.sample(dem_f, FRAME, 1.0, sx[ok], sy[ok]) + relocate.sample(dem, PACK_BOX, 1.0, dx[ok], dy[ok]))
+    if not xs:
+        return ux[:0], uy[:0], zz[:0], cls[:0]
+    return np.concatenate(xs), np.concatenate(ys), np.concatenate(zs), np.concatenate(cs)
+
+
+
 # ept/*.laz is the main dataset, ept/<dataset>/*.laz any extra one (cfg["lidar"]["extra"]); all EPSG:3857
 for p in sorted(glob.glob(os.path.join(raw, "ept", "*.laz")) + glob.glob(os.path.join(raw, "ept", "*", "*.laz"))):
     try:
@@ -159,6 +217,8 @@ for p in sorted(glob.glob(os.path.join(raw, "ept", "*.laz")) + glob.glob(os.path
     cls = np.asarray(las.classification)
     # EPT is in EPSG:3857; convert to UTM
     ux, uy = merc_to_utm.transform(x, y)
+    if COMPOSED:
+        ux, uy, zz, cls = place_returns(np.asarray(ux), np.asarray(uy), zz, cls)
     col = ((ux - X0) / R2).astype(int); row = ((Y1 - uy) / R2).astype(int)
     ok = (col >= 0) & (col < W2) & (row >= 0) & (row < H2) & (cls != 7) & (cls != 18)  # drop noise classes
     col, row, zz, cls = col[ok], row[ok], zz[ok], cls[ok]
@@ -170,6 +230,7 @@ for p in sorted(glob.glob(os.path.join(raw, "ept", "*.laz")) + glob.glob(os.path
     if g.any():
         np.minimum.at(dtm_l.ravel(), flat[g], zz[g].astype(np.float32))
 log(f"  {n_pts/1e6:.1f} M points, cells with data {np.mean(cnt>0)*100:.1f}%")
+del dem_f
 dsm[cnt == 0] = np.nan
 # cells with a lidar return (dilated by one cell): canopy is only believed where the lidar actually saw something
 has_pts = ndimage.binary_dilation(cnt > 0, iterations=1)
@@ -188,8 +249,9 @@ log(f"  CHM: {np.mean(chm>2)*100:.1f}% of cells > 2 m, p99 {np.percentile(chm, 9
 log("NAIP")
 # The Planetary Computer crop endpoint capped every crop at 2048 px, so the crops are ~2 m.
 # Work at the 2 m grid directly: resample each crop onto its bbox.
-naip2 = np.zeros((4, H2, W2), np.uint8)
-have2 = np.zeros((H2, W2), bool)
+FH2, FW2 = int(FY1 - FY0) // 2, int(FX1 - FX0) // 2      # the fetched frame at 2 m (FEAT-249)
+naip2 = np.zeros((4, FH2, FW2), np.uint8)
+have2 = np.zeros((FH2, FW2), bool)
 for it in manifest["items"]:
     if not it["path"].startswith("naip1m/"):
         continue
@@ -202,9 +264,9 @@ for it in manifest["items"]:
     bx0, by0, bx1, by1 = it["meta"]["bbox"]
     w2 = int(round((bx1 - bx0) / R2)); h2 = int(round((by1 - by0) / R2))
     bands = np.stack([np.array(Image.fromarray(a[..., b]).resize((w2, h2), Image.BILINEAR)) for b in range(4)], axis=-1)
-    c0 = int(round((bx0 - X0) / R2)); r0 = int(round((Y1 - by1) / R2))
+    c0 = int(round((bx0 - FX0) / R2)); r0 = int(round((FY1 - by1) / R2))
     c0c, r0c = max(c0, 0), max(r0, 0)
-    c1c, r1c = min(c0 + w2, W2), min(r0 + h2, H2)
+    c1c, r1c = min(c0 + w2, FW2), min(r0 + h2, FH2)
     if c1c <= c0c or r1c <= r0c:
         continue
     sub = bands[r0c - r0:r1c - r0, c0c - c0:c1c - c0]
@@ -213,6 +275,9 @@ for it in manifest["items"]:
     for b in range(4):
         dst[b][valid] = sub[..., b][valid]
     have2[r0c:r1c, c0c:c1c] |= valid
+if COMPOSED:
+    naip2 = relocate.compose_classes(naip2, FRAME, R2, PACK_BOX, REL)
+    have2 = relocate.compose_classes(have2, FRAME, R2, PACK_BOX, REL)
 log(f"  NAIP coverage {have2.mean()*100:.1f}%")
 red2 = naip2[0].astype(np.float32); grn2 = naip2[1].astype(np.float32); blu2 = naip2[2].astype(np.float32); nir2 = naip2[3].astype(np.float32)
 del naip2
@@ -339,16 +404,22 @@ class LfRaster:
         return np.clip(np.round((self.y0 - y_utm) / self.px).astype(np.int64), 0, self.data.shape[0] - 1)
 
     def at(self, x_utm, y_utm):
-        return self.data[self._row(y_utm), self._col(x_utm)]
+        return self.at_data(self.data, x_utm, y_utm)
 
     def on2(self, rows=slice(None), cols=slice(None), data=None):
         """the raster (or `data`, another raster on the same 30 m grid) on the 2 m grid, or the rows / columns of it
         given as slices, row 0 = north"""
         gx = X0 + (np.arange(W2)[cols] + 0.5) * R2; gy = Y1 - (np.arange(H2)[rows] + 0.5) * R2
-        return (self.data if data is None else data)[np.ix_(self._row(gy), self._col(gx))]
+        data = self.data if data is None else data
+        if REL:      # FEAT-249: a pasted patch reads its own place
+            GX, GY = np.meshgrid(gx, gy)
+            return self.at_data(data, GX, GY)
+        return data[np.ix_(self._row(gy), self._col(gx))]
 
     def at_data(self, data, x_utm, y_utm):
-        """`data` (a raster on the same 30 m grid) at the points"""
+        """`data` (a raster on the same 30 m grid) at the points (of the pack: a pasted patch reads its own place)"""
+        if REL:
+            x_utm, y_utm = REL.source_xy(x_utm, y_utm)
         return data[self._row(y_utm), self._col(x_utm)]
 
     def window(self):
@@ -457,6 +528,14 @@ import osm_filter
 ski, ski_dropped = osm_filter.filter_ski(ski, osm_filter.exclude_areas(cfg.get("exclude"), ski, lambda m: log("  " + m)))
 if ski_dropped:
     log("  private runs and lifts dropped: " + ", ".join(f"{k} {v}" for k, v in sorted(ski_dropped.items())))
+if REL:
+    # FEAT-249: after the filter, whose hand-drawn rings are in the real places. Runs and lifts move whole (a lift's
+    # nodes list must match its geometry); roads and streams split at the seam; the far peaks and places stay real.
+    ski, _mv = REL.osm(ski, to_utm, to_ll, whole=True)
+    built, _mb = REL.osm(built, to_utm, to_ll)
+    natural, _mn = REL.osm(natural, to_utm, to_ll)
+    for m in REL.moves:
+        log(f"  relocate {m.name}: {_mv[m.name]} ski, {_mb[m.name]} built and {_mn[m.name]} natural elements moved")
 
 def to_local(lon, lat):
     x, y = to_utm.transform(lon, lat)
@@ -625,6 +704,22 @@ for el in natural["elements"]:
 # streams and rivers (DATA-020): fir and willow sit near water; not written to features.json
 streams = [way_points(el) for el in natural["elements"]
            if el.get("type") == "way" and el.get("tags", {}).get("waterway") in ("stream", "river", "brook", "canal", "ditch")]
+def height_at(xl, yl, top=False):
+    """ground height at local coords from the finest set that holds them (1 m DEM, 16 m mid ring, 128 m far ring);
+    `top`: the highest ground near the point instead (a summit with no ele tag: within 30 m on the 1 m DEM, one
+    cell on the coarser sets). NaN off every set."""
+    c = int(xl + OX - X0); r = int(Y1 - (yl + OY))
+    k = 30 if top else 0
+    if k <= c < W - k and k <= r < H - k:
+        return float(np.nanmax(dem[r - k:r + k + 1, c - k:c + k + 1]))
+    k = 1 if top else 0
+    for arr, gx0, gy1, res in ((m16, mx0, my1, 16.0), (far, fx0, fy0 + nf * FR, FR)):
+        gc = int((xl + OX - gx0) / res); gr = int((gy1 - (yl + OY)) / res)
+        if k <= gc < arr.shape[1] - k and k <= gr < arr.shape[0] - k:
+            w = arr[gr - k:gr + k + 1, gc - k:gc + k + 1]
+            if np.isfinite(w).any():
+                return float(np.nanmax(w))
+    return float("nan")
 peaks = []
 for el in peaks_far["elements"] + natural["elements"]:
     if el.get("type") == "node" and el.get("tags", {}).get("natural") == "peak" and el["tags"].get("name"):
@@ -634,18 +729,42 @@ for el in peaks_far["elements"] + natural["elements"]:
         except ValueError:
             z = float("nan")
         if not math.isfinite(z):
-            z = ground(x, y)
-        peaks.append({"name": el["tags"]["name"], "x": x, "y": y, "z": z})
+            z = height_at(x, y, top=True)      # FEAT-235: was ground(), the resort's base height off the mid ring
+        if math.isfinite(z):
+            peaks.append({"name": el["tags"]["name"], "x": x, "y": y, "z": z})
 seen = set(); uniq = []
 for p in peaks:
     k = (p["name"], round(p["x"] / 50), round(p["y"] / 50))
     if k not in seen:
         seen.add(k); uniq.append(p)
 peaks = uniq
+# FEAT-235: place names from USGS GNIS (every state the far ring touches) and the Census (towns), in names/
+import placenames
+far_ll = placenames.far_box_ll(cfg)
+NAMES_ATTRIBUTION = "Place names: USGS GNIS; towns: US Census Bureau Gazetteer and population estimates, public domain"
+gnis_summits, gnis_states = placenames.load_gnis(raw, far_ll)
+census_towns = False
+gnis_peaks = []
+for f in gnis_summits:
+    x, y = to_local(f["lon"], f["lat"])
+    z = height_at(x, y, top=True)
+    if math.isfinite(z):
+        gnis_peaks.append({"name": f["name"], "x": x, "y": y, "z": z})
+added = placenames.merge_peaks(peaks, gnis_peaks)
+peaks += added
+log(f"  GNIS ({', '.join(gnis_states) or 'no names/ files'}): {len(gnis_summits)} summits in the far ring, {len(added)} not in OSM")
 labels = [{"name": el["tags"]["name"], "kind": el["tags"].get("place", "place"), "x": to_local(el["lon"], el["lat"])[0], "y": to_local(el["lon"], el["lat"])[1], "z": 0}
           for el in places_far["elements"] if el.get("type") == "node" and el.get("tags", {}).get("place") and el["tags"].get("name")]
+if not labels:      # no Overpass places_far (dropped from the manifest): the Census towns
+    towns = placenames.load_towns(raw, far_ll)
+    census_towns = bool(towns)
+    labels = [{"name": t["name"], "kind": t["kind"], "x": to_local(t["lon"], t["lat"])[0], "y": to_local(t["lon"], t["lat"])[1], "z": 0}
+              for t in towns]
+    log(f"  Census towns: {len(labels)} ({sum(1 for t in towns if t['kind'] == 'city')} cities, "
+        f"{sum(1 for t in towns if t['kind'] == 'town')} towns)")
 for l in labels:
-    l["z"] = ground(l["x"], l["y"])
+    z = height_at(l["x"], l["y"])
+    l["z"] = z if math.isfinite(z) else 0.0       # 0: the game samples the ground itself
 log(f"  buildings {len(buildings)} roads {len(roads)} water {len(water)} peaks {len(peaks)} labels {len(labels)}")
 def line_cells(pts):
     """distinct 2 m grid cells along a polyline, as (rows, cols) index arrays, clipped to the grid"""
@@ -1063,6 +1182,8 @@ meta = {"version": 1, "formatVersion": FORMAT_VERSION, "slug": slug, "name": cfg
         "zRange": [float(np.floor(Z_MIN / 100) * 100 - 100), float(np.ceil(Z_MAX / 100) * 100 + 100)],
         "terrain": {"fine": fine_meta, "mid": mid_meta, "far": far_meta}, "mask": mask_meta, "ao": ao_meta, "dir": dir_meta, "moguls": mog_meta, "instances": inst, "stands": stand_meta, "treeSpecies": spc.TREE_SPECIES_VERSION,
         "start": start, "sun": {"azimuth": 160, "elevation": 30}, "attribution": cfg["attribution"]}
+if (gnis_states or census_towns) and NAMES_ATTRIBUTION not in meta["attribution"]:   # FEAT-235
+    meta["attribution"] = meta["attribution"] + [NAMES_ATTRIBUTION]
 if lf_tifs and LANDFIRE_ATTRIBUTION not in meta["attribution"]:   # FEAT-175: pack_report.py line 13 checks every credit
     meta["attribution"] = meta["attribution"] + [LANDFIRE_ATTRIBUTION]
 if treeline_m:
@@ -1073,6 +1194,16 @@ elif treeline_none:
 meta["derived"] = {**{k: round(v, 4) for k, v in NT.items()},
                    **({"treeline": round(float(treeline_m))} if treeline_m and not cfg.get("treeline_m") else {}),
                    **({"treeline": None} if treeline_none else {})}
+if REL:
+    # FEAT-249: what was moved, and a credit line saying so (the terrain, trees and runs are the area's own; where
+    # it sits is not)
+    meta["derived"]["relocated"] = [m.record() for m in REL.moves]
+    for m in REL.moves:
+        dist = math.hypot(m.to[0] - m.c[0], m.to[1] - m.c[1]) / 1000
+        note = (f"{m.name} is moved {dist:.1f} km{f' and turned {abs(m.turn):.0f} degrees' if m.turn else ''} from its real "
+                "position to sit next to the rest of the resort; its terrain, trees, imagery and runs are its own")
+        if note not in meta["attribution"]:
+            meta["attribution"] = meta["attribution"] + [note]
 write_meta(out, meta)
 
 # ------------------------------------------------------------------ 9b. the far tree ring (BUG-081)

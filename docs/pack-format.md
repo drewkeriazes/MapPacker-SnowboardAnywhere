@@ -94,10 +94,11 @@ cleared strips (areas filled, lines at 0.6 of their corridor width; gladed runs 
 mask's rock, and the mean tree height per 16 m from the tree instances. The forest is then weighted by
 the pack's tree instances (BUG-069), so a sparse stand the lidar canopy reads as closed is not a dark patch
 around its few trees. R, the forest seen from far off, is weighted by the share of the ground under the
-crowns (averaged over 16 m, full weight from 0.2 up). The level's optional `stands` image (greyscale, same
+crowns, the generated stems' in expectation included (averaged over 16 m, full weight from 0.2 up). The level's optional `stands` image (greyscale, same
 grid, `cover/pack-stands.png`) is the forest seen from near, where single trees show: only closed stands
-keep it (the crown share averaged over 10 m passes 0.05 to 0.14, and the stand is at least 40 m across:
-smaller clumps are dropped, holes that size inside a stand filled). The shader shows `stands` to 1.2 km and
+keep it (the detected trees' crown share averaged over 10 m passes 0.05 to 0.14, and the stand is at least 40 m across:
+smaller clumps are dropped, holes that size inside a stand filled; BUG-101: the generated stems do not count here,
+the thresholds were tuned without them). The shader shows `stands` to 1.2 km and
 R from 2.8 km. With `"crowns": true` on the level the image is RGB and its G is where the drawn trees
 stand: the share of each cell under their crowns, each tree weighted by its height over 12 m (FEAT-168; the
 shader throws their shadows on the snow from it). A pack without tree instances keeps the canopy as is.
@@ -224,8 +225,8 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "buildings": [{ "name", "points": [[x,y],...], "zBase", "zMax", "height", "heightDefault", "kind" }],  // zMax: highest ground under the footprint, absent in packs before BUG-024; heightDefault: true when OSM had no height or levels and the pipeline used its 5.5 / 9 m fallback (absent in older packs, where the client guesses from those values)
   "roads":     [{ "name", "kind", "points": [[x,y,z],...], "width" }],
   "water":     [{ "name", "points": [[x,y],...], "z" }],
-  "peaks":     [{ "name", "x", "y", "z" }],
-  "labels":    [{ "name", "kind", "x", "y", "z" }]
+  "peaks":     [{ "name", "x", "y", "z" }],                 // OSM peaks, plus USGS GNIS summits OSM lacks (FEAT-235; z: the highest ground near it)
+  "labels":    [{ "name", "kind", "x", "y", "z" }]          // towns: OSM places_far, else US Census places (FEAT-235); kind city (100,000 people), town (10,000) or village
 }
 ```
 
@@ -238,7 +239,8 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "build": "20261110T171500Z-3fa2c1",                      // FEAT-177: new on every write by any stage (packwriter.stamp_build)
   "pipeline": "1e2e586",                                   // FEAT-175: commit of the pipeline that wrote it, "+dirty" with local changes; optional
   "crs": "EPSG:26913", "origin": [384300, 4384250], "lonlat": [-106.35, 39.60],
-  "bounds": { "minX", "minY", "maxX", "maxY" },           // resort area, local metres
+  "bounds": { "minX", "minY", "maxX", "maxY" },           // resort area, local metres: the config's pack_bbox (FEAT-249,
+                                                           // else utm_bbox) minus origin; need not be centred on it
   "zRange": [2300, 3700],
   "terrain": { "fine": {...}, "mid": {...}, "far": {...} },
   "mask": { "res": 2, "tileSize": 512, "minX", "minY", "tilesX", "tilesY" },
@@ -257,7 +259,9 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "treeline": 2700,                                       // optional, m (DATA-021): measured from the canopy; absent = 3,480 (Colorado);
                                                            // null = measured none (FEAT-234), see below
   "derived": { "rock.grey_sat": 0.093, "treeline": 2700, ... }, // optional (FEAT-175): values the build derived for this resort instead of
-                                                           // copying Vail's (naip_calib.py thresholds, treeline); a log, the client ignores it
+                                                           // copying Vail's (naip_calib.py thresholds, treeline); a log, the client ignores it.
+                                                           // "relocated": [{ "name", "from", "to", "turnDeg", "featherM", "dzM" }] lists
+                                                           // the areas moved next to the rest (FEAT-249, relocate.py), UTM metres
   "sun": { "azimuth": 160, "elevation": 32 },             // degrees, default lighting
   "attribution": ["..."]
 }

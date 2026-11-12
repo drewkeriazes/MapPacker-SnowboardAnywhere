@@ -62,7 +62,8 @@ TEMPLATE = "/the-mountain/mountain-conditions/terrain-and-lift-status.aspx"   # 
 # bytes per manifest item (or per pixel for the rasters), measured on Vail's raw data 2026-11-11
 # (LAZ: 8.8 bytes per point in both ept/ and ept_far/; per node only when the hierarchy was not walked)
 BYTES = {"dem1m_px": 4.22, "dem10m_px": 4.06, "naip1m_px": 1.97, "mapterhorn": 105e3, "ept_pt": 8.8,
-         "ept_node": 1.16e6, "ept_far_node": 1.32e6, "osm": 3.8e6, "worldcover": 89e6, "eth_canopy": 284e6}
+         "ept_node": 1.16e6, "ept_far_node": 1.32e6, "osm": 3.8e6, "worldcover": 89e6, "eth_canopy": 284e6,
+         "gnis": 1.5e6, "gazetteer": 1.2e6, "population": 7.1e6}   # names/ (FEAT-235): a state's GNIS zip, 2024 files
 LANDFIRE_BYTES = 2e6
 
 
@@ -645,6 +646,8 @@ def estimate_bytes(items, ept_points=None):
             b = 0 if it["path"].endswith("ept.json") else BYTES["ept_node"]
         elif top == "ept_far":
             b = BYTES["ept_far_node"]
+        elif top == "names":
+            b = BYTES["population"] if "sub-est" in it["path"] else BYTES["gazetteer"] if "_Gaz_" in it["path"] else BYTES["gnis"]
         else:
             b = BYTES.get(top, 0)
         out[top] = out.get(top, 0) + b
@@ -880,6 +883,10 @@ def plan(stub, hosts, walk_nodes=True, log=print):
     if stub.get("exclude"):
         cfg["exclude"] = stub["exclude"]
     cfg["openskidata"] = stub.get("openskidata")
+    import placenames                         # FEAT-235: the GNIS states the far ring touches, the resort's own first
+    names = placenames.plan_names(cfg)
+    if names:
+        cfg["names"] = names
     tier, why = tier_of(facts["layers"])
     cfg["tier"] = tier
     facts["tier"], facts["tier_why"] = tier, why
@@ -975,6 +982,8 @@ def plan_md(cfg, facts, walked=True):
     L.append(f"| Vegetation type | LANDFIRE EVT, EVC, EVH (`fetch_landfire.mjs`) | | 30 m | | {mb(LANDFIRE_BYTES)} | |")
     osm = cfg.get("osm", {})
     row("Runs, lifts, buildings", f"OSM via Overpass (Geofabrik extract: {osm.get('geofabrik', 'none')})", "", "", "osm", "")
+    if cfg.get("names"):
+        row("Place names", f"USGS GNIS summits ({', '.join(cfg['names']['states'])}), Census towns", "", "", "names", "")
     L.append(f"| Grooming | {cfg.get('terrain_status_url') or 'none'} | | | | | |")
     total = sum(b for _, b in m.values()) + LANDFIRE_BYTES
     L += ["", f"Total about **{mb(total)}**" + ("" if walked else " plus the lidar (node lists not walked: `--no-nodes`)") + ".",
@@ -1055,9 +1064,9 @@ def compare(derived, hand):
 # ------------------------------------------------------------------------------------------------ CLI
 
 def keep_hand_fields(new, old):
-    """fields a person set on the config (start_run, grooming aliases, notes, their own exclude entries) survive
-    a re-plan"""
-    for k in ("start_run", "grooming_aliases", "notes", "landcover"):
+    """fields a person set on the config (start_run, grooming aliases, notes, their own exclude entries, FEAT-249's
+    relocate moves and the pack box from them) survive a re-plan"""
+    for k in ("start_run", "grooming_aliases", "notes", "landcover", "relocate", "pack_bbox"):
         if old.get(k) is not None:
             new[k] = old[k]
     mine = {e["name"] for e in new.get("exclude", [])}
@@ -1078,12 +1087,84 @@ def cmd_resolve(a, hosts):
     return resolve_and_write(a, hosts)[0]
 
 
+def can_ask():
+    """BUG-103: a person at a console (add_resort.cmd) can answer resolve's questions; scripts and tests cannot"""
+    return sys.stdin.isatty()
+
+
+def ask(prompt):
+    return input(prompt)
+
+
+def earlier_choice(st, r, a):
+    """BUG-103: (id, with ids, alone) from the config an earlier run wrote for one of these ski areas, so a rerun
+    of add (the second add_resort.cmd run, after the plan) goes on without asking again; None when there is none"""
+    mains = [r["main"]] if st == "neighbours" else r["matches"]
+    found = []
+    for f in mains:
+        path = paths.config_path(a.slug or slugify(f["properties"]["name"]), a.resorts_dir)
+        ids = (load_json(path).get("openskidata") or {}).get("ids") if os.path.isfile(path) else None
+        if ids and ids[0] == f["properties"]["id"]:
+            found.append((ids[0], ids[1:], True, path))
+    return found[0] if len(found) == 1 else None
+
+
+def ask_number(prompt, n):
+    """1..n from the console, None for Enter or q; asks again on anything else"""
+    while True:
+        ans = ask(prompt).strip().lower()
+        if ans in ("", "q"):
+            return None
+        if ans.isdigit() and 1 <= int(ans) <= n:
+            return int(ans)
+        print(f"  a number from 1 to {n}, or Enter to stop")
+
+
+def ask_numbers(prompt, n):
+    """a set of 1..n from the console (commas or spaces between), empty for Enter; asks again on a bad answer"""
+    while True:
+        words = ask(prompt).replace(",", " ").split()
+        if all(w.isdigit() and 1 <= int(w) <= n for w in words):
+            return sorted({int(w) for w in words})
+        print(f"  numbers from 1 to {n} with commas between, or Enter for none")
+
+
 def resolve_and_write(a, hosts, keep_planned=False):
     """resolve and write resorts/<slug>/<slug>.json -> (exit code, slug). `keep_planned` (resort.py add): a config already
-    planned for the same ski areas is left as it is"""
+    planned for the same ski areas is left as it is, and (BUG-103) its choice of ski area and neighbours is taken
+    again instead of asking. Several matches or unanswered neighbours ask at a console, else stop with the flags
+    to pass."""
     feats = load_json(hosts.index("ski_areas.geojson"))["features"]
-    st, r = resolve(a.name, feats, hosts.index("lifts.geojson"), hosts.index("runs.geojson"),
-                    pick_id=a.id, with_=a.with_ or (), alone=a.alone)
+    pick_id, with_, alone = a.id, list(a.with_ or ()), a.alone
+    while True:
+        st, r = resolve(a.name, feats, hosts.index("lifts.geojson"), hosts.index("runs.geojson"),
+                        pick_id=pick_id, with_=with_, alone=alone)
+        if st not in ("many", "neighbours"):
+            break
+        prev = earlier_choice(st, r, a) if keep_planned and not (pick_id or with_ or alone) else None
+        if prev:
+            pick_id, with_, alone, path = prev
+            print(f"taking the ski areas and neighbours from {path} (--force resolve asks again)")
+            continue
+        if not can_ask():
+            break
+        if st == "many":
+            print(f"{len(r['matches'])} ski areas match {a.name!r}:")
+            print("\n".join(f"{k:>3}. {describe(f).strip()}" for k, f in enumerate(r["matches"], 1)))
+            k = ask_number("Number of the one to build (Enter to stop): ", len(r["matches"]))
+            if k is None:
+                return 2, None
+            pick_id = r["matches"][k - 1]["properties"]["id"]
+            continue
+        print(f"{r['main']['properties']['name']} has neighbours in its box or sold with it:")
+        print("\n".join(f"{k:>3}. {describe(f, r['ref']).strip()}" for k, (f, _) in enumerate(r["near"], 1)))
+        ks = ask_numbers("Numbers of the ones to build into the same pack, commas between (Enter for none): ",
+                         len(r["near"]))
+        pick_id = pick_id or r["main"]["properties"]["id"]
+        with_ += [r["near"][k - 1][0]["properties"]["id"] for k in ks]
+        alone = True
+        names = [short_name(r["near"][k - 1][0]["properties"]["name"]) for k in ks]
+        print("next time without asking: " + "".join(f'--with "{n}" ' for n in names) + "--alone")
     if st == "none":
         print(r.get("why") or f"no ski area called {a.name!r} in OpenSkiData")
         if r["closest"]:
