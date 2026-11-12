@@ -1078,12 +1078,84 @@ def cmd_resolve(a, hosts):
     return resolve_and_write(a, hosts)[0]
 
 
+def can_ask():
+    """BUG-103: a person at a console (add_resort.cmd) can answer resolve's questions; scripts and tests cannot"""
+    return sys.stdin.isatty()
+
+
+def ask(prompt):
+    return input(prompt)
+
+
+def earlier_choice(st, r, a):
+    """BUG-103: (id, with ids, alone) from the config an earlier run wrote for one of these ski areas, so a rerun
+    of add (the second add_resort.cmd run, after the plan) goes on without asking again; None when there is none"""
+    mains = [r["main"]] if st == "neighbours" else r["matches"]
+    found = []
+    for f in mains:
+        path = paths.config_path(a.slug or slugify(f["properties"]["name"]), a.resorts_dir)
+        ids = (load_json(path).get("openskidata") or {}).get("ids") if os.path.isfile(path) else None
+        if ids and ids[0] == f["properties"]["id"]:
+            found.append((ids[0], ids[1:], True, path))
+    return found[0] if len(found) == 1 else None
+
+
+def ask_number(prompt, n):
+    """1..n from the console, None for Enter or q; asks again on anything else"""
+    while True:
+        ans = ask(prompt).strip().lower()
+        if ans in ("", "q"):
+            return None
+        if ans.isdigit() and 1 <= int(ans) <= n:
+            return int(ans)
+        print(f"  a number from 1 to {n}, or Enter to stop")
+
+
+def ask_numbers(prompt, n):
+    """a set of 1..n from the console (commas or spaces between), empty for Enter; asks again on a bad answer"""
+    while True:
+        words = ask(prompt).replace(",", " ").split()
+        if all(w.isdigit() and 1 <= int(w) <= n for w in words):
+            return sorted({int(w) for w in words})
+        print(f"  numbers from 1 to {n} with commas between, or Enter for none")
+
+
 def resolve_and_write(a, hosts, keep_planned=False):
     """resolve and write resorts/<slug>/<slug>.json -> (exit code, slug). `keep_planned` (resort.py add): a config already
-    planned for the same ski areas is left as it is"""
+    planned for the same ski areas is left as it is, and (BUG-103) its choice of ski area and neighbours is taken
+    again instead of asking. Several matches or unanswered neighbours ask at a console, else stop with the flags
+    to pass."""
     feats = load_json(hosts.index("ski_areas.geojson"))["features"]
-    st, r = resolve(a.name, feats, hosts.index("lifts.geojson"), hosts.index("runs.geojson"),
-                    pick_id=a.id, with_=a.with_ or (), alone=a.alone)
+    pick_id, with_, alone = a.id, list(a.with_ or ()), a.alone
+    while True:
+        st, r = resolve(a.name, feats, hosts.index("lifts.geojson"), hosts.index("runs.geojson"),
+                        pick_id=pick_id, with_=with_, alone=alone)
+        if st not in ("many", "neighbours"):
+            break
+        prev = earlier_choice(st, r, a) if keep_planned and not (pick_id or with_ or alone) else None
+        if prev:
+            pick_id, with_, alone, path = prev
+            print(f"taking the ski areas and neighbours from {path} (--force resolve asks again)")
+            continue
+        if not can_ask():
+            break
+        if st == "many":
+            print(f"{len(r['matches'])} ski areas match {a.name!r}:")
+            print("\n".join(f"{k:>3}. {describe(f).strip()}" for k, f in enumerate(r["matches"], 1)))
+            k = ask_number("Number of the one to build (Enter to stop): ", len(r["matches"]))
+            if k is None:
+                return 2, None
+            pick_id = r["matches"][k - 1]["properties"]["id"]
+            continue
+        print(f"{r['main']['properties']['name']} has neighbours in its box or sold with it:")
+        print("\n".join(f"{k:>3}. {describe(f, r['ref']).strip()}" for k, (f, _) in enumerate(r["near"], 1)))
+        ks = ask_numbers("Numbers of the ones to build into the same pack, commas between (Enter for none): ",
+                         len(r["near"]))
+        pick_id = pick_id or r["main"]["properties"]["id"]
+        with_ += [r["near"][k - 1][0]["properties"]["id"] for k in ks]
+        alone = True
+        names = [short_name(r["near"][k - 1][0]["properties"]["name"]) for k in ks]
+        print("next time without asking: " + "".join(f'--with "{n}" ' for n in names) + "--alone")
     if st == "none":
         print(r.get("why") or f"no ski area called {a.name!r} in OpenSkiData")
         if r["closest"]:

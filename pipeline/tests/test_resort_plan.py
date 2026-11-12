@@ -131,6 +131,87 @@ def test_resolve_none_many_and_bad_with(ohio):
     assert st == "ok" and r["name"] == "Mills Peak"
 
 
+# BUG-103: add_resort.cmd runs in a console with no way to pass --id, --with or --alone, so resolve asks there
+class IndexHosts:
+    def __init__(self, tmp, ohio):
+        feats, self.lifts, self.runs = ohio
+        self.areas = os.path.join(tmp, "ski_areas.geojson")
+        with open(self.areas, "w", encoding="utf-8") as f:
+            json.dump({"features": feats}, f)
+
+    def index(self, name):
+        return {"ski_areas.geojson": self.areas, "lifts.geojson": self.lifts, "runs.geojson": self.runs}[name]
+
+
+def _resolve_args(tmp_path, name, **kw):
+    import argparse
+    return argparse.Namespace(name=name, id=kw.get("id"), with_=kw.get("with_"), alone=kw.get("alone", False),
+                              slug=None, force=False, resorts_dir=str(tmp_path / "resorts"))
+
+
+def _answers(monkeypatch, answers, console=True):
+    asked = []
+    it = iter(answers)
+
+    def ask(prompt):
+        asked.append(prompt)
+        return next(it)
+    monkeypatch.setattr(R, "can_ask", lambda: console)
+    monkeypatch.setattr(R, "ask", ask)
+    return asked
+
+
+def test_resolve_asks_about_neighbours_in_a_console(ohio, tmp_path, monkeypatch, capsys):
+    hosts = IndexHosts(tmp_path, ohio)
+    asked = _answers(monkeypatch, ["9", "2"])            # a bad number asks again; 2 is Brandywine
+    code, slug = R.resolve_and_write(_resolve_args(tmp_path, "Boston Mills"), hosts)
+    assert (code, slug) == (0, "boston-mills") and len(asked) == 2
+    cfg = json.load(open(tmp_path / "resorts" / "boston-mills" / "boston-mills.json", encoding="utf-8"))
+    assert cfg["openskidata"]["ids"] == ["bm", "bw"] and [e["name"] for e in cfg["exclude"]] == ["Peninsula Club"]
+    assert '--with "Brandywine" --alone' in capsys.readouterr().out      # what to pass to skip the question
+
+
+def test_resolve_enter_leaves_every_neighbour_out(ohio, tmp_path, monkeypatch):
+    _answers(monkeypatch, [""])
+    code, slug = R.resolve_and_write(_resolve_args(tmp_path, "Boston Mills"), IndexHosts(tmp_path, ohio))
+    cfg = json.load(open(tmp_path / "resorts" / "boston-mills" / "boston-mills.json", encoding="utf-8"))
+    assert code == 0 and cfg["openskidata"]["ids"] == ["bm"]
+    assert sorted(e["name"] for e in cfg["exclude"]) == ["Brandywine Ski Resort", "Peninsula Club"]
+
+
+def test_resolve_without_a_console_stops_as_before(ohio, tmp_path, monkeypatch):
+    _answers(monkeypatch, [], console=False)
+    hosts = IndexHosts(tmp_path, ohio)
+    assert R.resolve_and_write(_resolve_args(tmp_path, "Boston Mills"), hosts) == (3, None)
+    assert R.resolve_and_write(_resolve_args(tmp_path, "mills"), hosts) == (2, None)
+    assert not (tmp_path / "resorts").exists()
+
+
+def test_resolve_asks_which_of_several_matches(ohio, tmp_path, monkeypatch):
+    feats, lifts, runs = ohio
+    order = [f["properties"]["id"] for f in R.resolve("mills", feats, lifts, runs)[1]["matches"]]
+    asked = _answers(monkeypatch, [str(order.index("far") + 1)])
+    code, slug = R.resolve_and_write(_resolve_args(tmp_path, "mills"), IndexHosts(tmp_path, ohio))
+    assert (code, slug) == (0, "mills-peak") and len(asked) == 1
+    _answers(monkeypatch, ["q"])
+    assert R.resolve_and_write(_resolve_args(tmp_path, "mills"), IndexHosts(tmp_path, ohio)) == (2, None)
+
+
+def test_add_rerun_keeps_the_answer_without_asking(ohio, tmp_path, monkeypatch):
+    hosts = IndexHosts(tmp_path, ohio)
+    _answers(monkeypatch, ["2"])
+    R.resolve_and_write(_resolve_args(tmp_path, "Boston Mills"), hosts)
+    path = tmp_path / "resorts" / "boston-mills" / "boston-mills.json"
+    cfg = json.load(open(path, encoding="utf-8"))
+    cfg["crs"] = "EPSG:32617"                                            # planned since
+    path.write_text(json.dumps(cfg), encoding="utf-8")
+    _answers(monkeypatch, [])                                            # asking again would raise StopIteration
+    assert R.resolve_and_write(_resolve_args(tmp_path, "Boston Mills"), hosts, keep_planned=True) == (0, "boston-mills")
+    assert json.load(open(path, encoding="utf-8"))["crs"] == "EPSG:32617"   # left as it was
+    # several matches: the one with a config is the answer from last time
+    assert R.resolve_and_write(_resolve_args(tmp_path, "mills"), hosts, keep_planned=True) == (0, "boston-mills")
+
+
 def test_a_lifted_area_wins_over_an_abandoned_one_of_the_same_name(tmp_path):
     feats = [area("a", "Whistler Blackcomb", point(-122.9, 50.1), lifts=36),
              area("b", "Whistler's", point(-118.1, 52.9), lifts=0)]
