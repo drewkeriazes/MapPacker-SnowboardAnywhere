@@ -25,10 +25,12 @@ class Fake:
     def __init__(self, r, fail=None, fetch_code=0, osm=None, finds=True):
         self.r, self.fail, self.fetch_code, self.osm, self.finds = r, fail, fetch_code, osm, finds
         self.calls = []
+        self.envs = []
 
-    def __call__(self, cmd, cwd=None):
+    def __call__(self, cmd, cwd=None, env=None):
+        self.envs.append(env)
         script = os.path.basename(cmd[1] if cmd[0] != "powershell" else cmd[cmd.index("-File") + 1])
-        self.calls.append(script if "fetch_landfire" not in script else f"{script} {cmd[4]}")
+        self.calls.append(script if "fetch_landfire" not in script else f"{script} {cmd[3]}")
         if self.fail and self.fail in script:
             return 1
         r = self.r
@@ -52,7 +54,7 @@ class Fake:
                           open(os.path.join(r.raw, "osm", f"{q}.json"), "w"))
             open(os.path.join(r.raw, "FETCH_COMPLETE.txt"), "w").write("complete")
         elif script == "fetch_landfire.mjs":
-            d = dict(B.LANDFIRE)[cmd[4]]
+            d = dict(B.LANDFIRE)[cmd[3]]
             os.makedirs(os.path.join(r.raw, d), exist_ok=True)
             open(os.path.join(r.raw, d, "c.tif"), "w").write("x")
         elif script == "fetch_grooming.py":
@@ -446,3 +448,48 @@ def test_build_inputs_without_sources_are_the_formula_from_before(resort):
     groom = sorted(os.path.basename(p) for p in B.glob.glob(os.path.join(r.raw, "grooming", "*.json")))
     assert B.build_inputs(r) == B.sha(B.file_sha(r.cfg_path), B.manifest_items_sha(r), r.state.get("fetch"),
                                       r.state.get("landfire"), groom, B.pipeline_code(), r.out)
+
+
+def test_landfire_gets_the_email_in_its_environment_not_its_arguments(resort):
+    f = Fake(resort)
+    go(resort, f)
+    lf = [(c, e) for c, e in zip(f.calls, f.envs) if c.startswith("fetch_landfire")]
+    assert len(lf) == 3
+    assert all(e and e["LANDFIRE_EMAIL"] == "me@example.com" for _, e in lf)
+    assert not any("@" in c for c, _ in lf)
+
+
+def test_the_command_echo_never_holds_the_email(capsys):
+    env = {"LANDFIRE_EMAIL": "rider@example.com"}
+    B.run([sys.executable, "-c", "pass"], env=env)
+    out = capsys.readouterr().out
+    assert "$ " in out and "@" not in out
+
+
+def test_run_hands_the_child_the_extra_environment(tmp_path):
+    out = tmp_path / "o.txt"
+    code = "import os;open(r'%s','w').write(os.environ['LANDFIRE_EMAIL'])" % out
+    assert B.run([sys.executable, "-c", code], env={"LANDFIRE_EMAIL": "rider@example.com"}) == 0
+    assert out.read_text() == "rider@example.com"
+
+
+def _lf_args(*argv, env=None):
+    import subprocess
+    e = {k: v for k, v in os.environ.items() if k != "LANDFIRE_EMAIL"}
+    e.update(env or {})
+    src = ("import {parseArgs} from './pipeline/landfire_args.mjs';"
+           "console.log(JSON.stringify(parseArgs(process.argv.slice(1), process.env)))")
+    r = subprocess.run(["node", "--input-type=module", "-e", src, *argv], cwd=os.path.join(B.HERE, ".."),
+                       capture_output=True, text=True, env=e)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+@pytest.mark.skipif(not __import__("shutil").which("node"), reason="no node")
+def test_fetch_landfire_reads_the_email_from_the_environment_or_the_argument():
+    env = {"LANDFIRE_EMAIL": "rider@example.com"}
+    assert _lf_args("vail", env=env) == {"slug": "vail", "email": "rider@example.com", "layerArg": "EVT"}
+    assert _lf_args("vail", "EVC", env=env)["layerArg"] == "EVC"
+    assert _lf_args("vail", "rider@example.com", "EVH")["layerArg"] == "EVH"
+    assert _lf_args("vail", "rider@example.com")["email"] == "rider@example.com"
+    assert _lf_args("vail")["email"] is None

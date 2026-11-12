@@ -9,7 +9,9 @@
 // Source: LFPS user guide https://lfps.usgs.gov/LFProductsServiceUserGuide.pdf and the rlandfire
 // client (R/checkStatus.R reads resp$outputFile). Runs on Drew's PC (Node 18+, no installs).
 //
-// Usage: node pipeline/fetch_landfire.mjs <slug> <email> [EVT|EVC|EVH|<layer>] [--raw <raw_root>] [--force]
+// Usage: node pipeline/fetch_landfire.mjs <slug> [<email>] [EVT|EVC|EVH|<layer>] [--raw <raw_root>] [--force]
+// The email (LFPS asks for one for its statistics) is read from LANDFIRE_EMAIL; build_resort.py passes it that way so
+// no command line or log holds it (BUG-111). A hand run may still give it as the argument after <slug> (it has an @).
 // A product (EVT, the default, EVC or EVH) tries the newest year first and falls back; a full layer name
 // ("LF2024_EVC") asks for that one. --raw is the folder holding <slug>/ (default: SBA_RAW_ROOT, else raw/ in the repo).
 // Output: EVT into <raw_root>/<slug>/landfire/, EVC and EVH into landfire/evc/ and landfire/evh/ (build_pack.py
@@ -18,6 +20,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { parseArgs } from './landfire_args.mjs';
 
 const argv = process.argv.slice(2);
 const fi = argv.indexOf('--force');
@@ -27,9 +30,9 @@ const ri = argv.indexOf('--raw');
 const rawArg = ri >= 0 ? argv[ri + 1] : undefined;
 const rawRoot = rawArg ? path.resolve(rawArg) : null;
 if (ri >= 0) argv.splice(ri, 2);
-const [slug, email, layerArg = 'EVT'] = argv;
+const { slug, email, layerArg } = parseArgs(argv, process.env);
 if (!slug || !email || (ri >= 0 && !rawArg)) {
-  console.error('Usage: node pipeline/fetch_landfire.mjs <slug> <email> [EVT|EVC|EVH|<layer, e.g. LF2023_EVC>] [--raw <raw_root>] [--force]');
+  console.error('Set LANDFIRE_EMAIL (LFPS asks for an address) or pass it after <slug>.\nUsage: node pipeline/fetch_landfire.mjs <slug> [<email>] [EVT|EVC|EVH|<layer, e.g. LF2023_EVC>] [--raw <raw_root>] [--force]');
   process.exit(1);
 }
 const root = path.resolve(import.meta.dirname, '..');

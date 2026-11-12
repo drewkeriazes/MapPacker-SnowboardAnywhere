@@ -145,10 +145,11 @@ MOVED = {"from": "SnowboardAnywhere 2a0b12f",
 MOVED_WHY = "built before the move to MapPacker (FEAT-238), inputs unchanged"
 
 
-def run(cmd, cwd=REPO):
-    """run a stage's command with its output on the console; -> exit code"""
+def run(cmd, cwd=REPO, env=None):
+    """run a stage's command with its output on the console; -> exit code. `env` is added to the child's
+    environment and never echoed (BUG-111: the LANDFIRE email goes this way, not as an argument)"""
     print("  $ " + " ".join(cmd), flush=True)
-    return subprocess.run(cmd, cwd=cwd).returncode
+    return subprocess.run(cmd, cwd=cwd, env={**os.environ, **env} if env else None).returncode
 
 
 class Resort:
@@ -332,9 +333,9 @@ def landfire_run(r, ctx):
         raise Failed("LANDFIRE needs an email address for the LFPS service: --email <address> or set LANDFIRE_EMAIL")
     force = ctx.forced("landfire") or (r.state.get("landfire") not in (None, landfire_inputs(r)))
     for prod, _ in LANDFIRE:
-        cmd = ["node", os.path.join(HERE, "fetch_landfire.mjs"), r.slug, email, prod,
+        cmd = ["node", os.path.join(HERE, "fetch_landfire.mjs"), r.slug, prod,
                "--raw", os.path.dirname(os.path.normpath(r.raw))] + (["--force"] if force else [])
-        if ctx.run(cmd):
+        if ctx.run(cmd, env={"LANDFIRE_EMAIL": email}):
             raise Failed(f"fetch_landfire.mjs {prod} failed (LFPS jobs queue; run again later)")
 
 
