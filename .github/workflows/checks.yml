@@ -2,11 +2,11 @@
 # check on the PR. README > Checks says what runs where.
 #
 #   pipeline-tests    pytest pipeline/tests, without the game                     pipeline/ changed
-#   format-check      the tests marked `game` (pipeline/tests/conftest.py) against  pipeline/ changed
-#                     a checkout of the game's main: FORMAT_VERSION is the game's
-#                     PACK_FORMAT, and the other values the pipeline copies from the
-#                     game (species crowns, the course rule, get_pack.mjs). FEAT-239
-#                     moves the format spec here.
+#   format-check      the pack format contract (FEAT-239: pipeline/contract.py,      pipeline/ changed
+#                     docs/pack-format.md > Contract) against the game's main on
+#                     GitHub, then the tests marked `game` (pipeline/tests/conftest.py)
+#                     against a checkout of it: the contract tests, the course rule,
+#                     get_pack.mjs
 #   synth-pack        the synthetic pack (pipeline/synth_pack.py), cached on          pipeline/ changed
 #                     tools/ci/synth_key.sh
 #   render-budgets    the game's main, built once, draws the synthetic pack from      PRs, pipeline/ changed
@@ -84,8 +84,6 @@ jobs:
     if: needs.changes.outputs.pipeline == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      SBA_GAME_REPO: ${{ github.workspace }}/no-game # the game's tests run in format-check
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
@@ -94,7 +92,7 @@ jobs:
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
       - run: pip install -r pipeline/requirements.txt pytest
-      - name: pytest
+      - name: pytest (the game's tests run in format-check)
         run: python -m pytest pipeline/tests -v -m "not game"
 
   format-check:
@@ -102,9 +100,6 @@ jobs:
     if: needs.changes.outputs.pipeline == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      SBA_GAME_REPO: ${{ github.workspace }}/game-main
-      SBA_REQUIRE_GAME: '1'
     steps:
       - uses: actions/checkout@v6
       - uses: actions/checkout@v6
@@ -121,10 +116,16 @@ jobs:
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
       - run: pip install -r pipeline/requirements.txt pytest
-      - name: The game's main
-        run: echo "::notice::checked against $GAME_REPO main at $(git -C game-main rev-parse HEAD)"
-      - name: pytest -m game
-        run: python -m pytest pipeline/tests -v -m game
+      # exit 1 on a mismatch, 2 when GitHub can't be reached: either fails the job
+      - name: Pack format contract (pipeline/contract.py, the game's main on GitHub)
+        run: python pipeline/contract.py
+      - name: pytest -m game (the game's main, checked out)
+        env:
+          SBA_GAME_REPO: ${{ github.workspace }}/game-main
+          SBA_REQUIRE_GAME: '1'
+        run: |
+          echo "::notice::checked against $GAME_REPO main at $(git -C game-main rev-parse HEAD)"
+          python -m pytest pipeline/tests -v -m game
 
   # The synthetic pack (pipeline/synth_pack.py, about 2 min to build), cached on a hash of the pipeline's Python so it
   # is rebuilt only when the pipeline changes. render-budgets restores it with the same key.

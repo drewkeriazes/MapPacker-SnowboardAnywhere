@@ -1,8 +1,9 @@
 """Shared test helpers. The game is a separate repo now (FEAT-238): tests that compare with a game file read it from
 the SnowboardAnywhere checkout next to this one (pipeline/paths.py: SBA_GAME_REPO overrides) and skip without it.
 
-Those tests are marked `game` (FEAT-240): CI's format-check job runs them with `-m game` against a checkout of the
-game's main, and SBA_REQUIRE_GAME=1 turns a missing game file into a failure there instead of a skip."""
+Those tests, and test_contract.py's live checks (its `game` fixture), are marked `game` (FEAT-240): CI's
+format-check job runs them with `-m game` against a checkout of the game's main, and SBA_REQUIRE_GAME=1 turns a
+missing game file into a failure there instead of a skip."""
 import os
 import sys
 
@@ -13,12 +14,12 @@ import paths  # noqa: E402
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers", "game: compares with a file in the SnowboardAnywhere checkout (the game_file fixture)")
+    config.addinivalue_line("markers", "game: compares with a game file (the game_file fixture, or test_contract.py's game)")
 
 
 def pytest_collection_modifyitems(config, items):
     for item in items:
-        if "game_file" in getattr(item, "fixturenames", ()):
+        if {"game_file", "game"} & set(getattr(item, "fixturenames", ())):
             item.add_marker(pytest.mark.game)
 
 

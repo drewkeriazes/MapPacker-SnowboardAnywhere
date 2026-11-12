@@ -45,7 +45,7 @@ Every PR gets the jobs in `.github/workflows/checks.yml` (FEAT-240), each its ow
 | Check | Runs when | What |
 |---|---|---|
 | `pipeline-tests` | `pipeline/` changed | pytest, without the game |
-| `format-check` | `pipeline/` changed | the `game` tests against the game's `main`: `FORMAT_VERSION` is the game's `PACK_FORMAT`, and the species crowns, course rule and `get_pack.mjs` still agree |
+| `format-check` | `pipeline/` changed | the pack format contract (`python pipeline/contract.py`, [`docs/pack-format.md`](docs/pack-format.md) > Contract) against the game's `main`, then the `game` tests against a checkout of it: the contract tests, the course rule and `get_pack.mjs` |
 | `render-budgets` | PRs, `pipeline/` changed | the game's `main` draws the synthetic pack from this repo's `main` and from the PR (its `cishot.mjs`, on SwiftShader): shader compile and scene budgets, more than 10% over `main` fails. The report goes on the PR as a comment. Add the `stills` label for before / after stills |
 | `repo-rules` | every PR | no em dashes in added Markdown, plain commit messages; warns when a new script or flag comes with no docs change |
 | `public-guards` | every PR | no `.env` files, no packs, raw data or data files in git, files up to 2 MB, images up to 1 MB under `docs/` or `reports/`, gitleaks |
@@ -67,6 +67,7 @@ It needs the game clone next to this one with `npm ci` done in `game/`. Builds o
 |---|---|
 | `catalog.json` | Every published pack: slug, name, region, tier, status, and the release zip's version, pack format, size, sha256, URL and the pipeline commit that built it |
 | `pipeline/` | The pipeline: `resort.py` (name to config and data plan, and `add`), `build_resort.py`, `build_pack.py` and its stages, `pack_report.py`, `publish_pack.py`, the fetch scripts, tests in `pipeline/tests/`. Moved from the game repo with its history (FEAT-238) |
+| `docs/pack-format.md` | The pack format: the layout, the encodings, `formatVersion` and its bump rule, and the Contract, every value this repo and the game must agree on (FEAT-239) |
 | `resorts/<slug>/` | A folder per resort: `<slug>.json`, the config the pipeline reads, the EPT node lists it names (`nodes_file`, beside it) and the data plan (`<slug>-plan.md`) |
 | `manifests/<slug>.json` | The download manifest the raw data was fetched with |
 | `reports/<slug>.md` | The build report of the published pack |
@@ -75,7 +76,7 @@ It needs the game clone next to this one with `npm ci` done in `game/`. Builds o
 
 Packs live in releases, never in git history: a pack is 50 to 250 MB per build, and releases can be deleted when a build is replaced. A catalog entry's `pipeline` is the commit of this repo that built the pack; entries published before the pipeline moved here (FEAT-238) name a SnowboardAnywhere commit instead.
 
-`status` is `playable` when every DATA-022 check passes in the build report, else `preview`. `formatVersion` is the pack format; a game reads only its own format and shows an older pack as "needs rebuild".
+`status` is `playable` when every DATA-022 check passes in the build report, else `preview`. `formatVersion` is the pack format; a game reads only its own format and shows an older pack as "needs rebuild". A format change goes into the game first or together ([`docs/pack-format.md`](docs/pack-format.md) > formatVersion); `python pipeline/contract.py` compares this pipeline with the game's `main`.
 
 ## Data sources and licences
 
