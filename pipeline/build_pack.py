@@ -35,14 +35,46 @@ slug = sys.argv[1]
 raw = sys.argv[2]
 out = sys.argv[3]
 cfg = json.load(open(paths.config_path(slug), encoding="utf-8"))
-manifest = json.load(open(os.path.join(paths.MANIFESTS, f"{slug}.json"), encoding="utf-8"))
+if cfg.get("source_only"):
+    sys.exit(f"{slug} is a relocate source (source_only): it is fetched for another pack, not built")
+# FEAT-268: `raw_from` names the resort whose raw data and manifest this config builds on (Ohio Hills is Boston
+# Mills' data with Mad River moved in); `raw` is then that resort's raw folder
+DATA = cfg.get("raw_from") or slug
+manifest = json.load(open(os.path.join(paths.MANIFESTS, f"{DATA}.json"), encoding="utf-8"))
 os.makedirs(out, exist_ok=True)
 T0 = time.time()
 def log(*a):
     print(f"[{time.time()-T0:6.0f}s]", *a, flush=True)
 
 OX, OY = cfg["origin"]
-X0, Y0, X1, Y1 = cfg["utm_bbox"]           # UTM metres
+# FEAT-249: the raw data covers utm_bbox (FRAME); the pack is built on pack_bbox, the rideable area, which defaults
+# to the same box. The config's `relocate` moves (relocate.py) paste far areas into it. The DEM, lidar returns,
+# NAIP, LANDFIRE and OSM are composed first; everything after is built from them as for any resort.
+import relocate
+try:
+    # FEAT-268: a move with a `source` cuts from that place's own raw folder <raw root>/<source> and manifest
+    SRC_CFG = relocate.source_configs(cfg)
+except ValueError as e:
+    sys.exit(str(e))
+REL = relocate.Relocation(cfg, {s: c["utm_bbox"] for s, c in SRC_CFG.items()})
+SRC_RAW = {s: os.path.join(os.path.dirname(os.path.normpath(raw)), s) for s in SRC_CFG}
+SRC_MAN = {}
+for _s, _p in SRC_RAW.items():
+    _mp = os.path.join(paths.MANIFESTS, f"{_s}.json")
+    if not os.path.isfile(os.path.join(_p, "FETCH_COMPLETE.txt")) or not os.path.isfile(_mp):
+        sys.exit(f"relocate source {_s}: no fetched raw data in {_p} or no {_mp} "
+                 f"(python pipeline/build_resort.py {_s} --stop-after landfire)")
+    SRC_MAN[_s] = json.load(open(_mp, encoding="utf-8"))
+if DATA != slug:
+    _own = json.load(open(paths.config_path(DATA), encoding="utf-8"))
+    if _own.get("origin") != cfg.get("origin") or _own.get("utm_bbox") != cfg.get("utm_bbox"):
+        sys.exit(f"raw_from {DATA}: origin and utm_bbox must be {DATA}'s (the rings and the frame are its data)")
+FRAME = [float(v) for v in cfg["utm_bbox"]]
+X0, Y0, X1, Y1 = cfg.get("pack_bbox") or cfg["utm_bbox"]           # UTM metres
+COMPOSED = bool(REL) or [X0, Y0, X1, Y1] != FRAME
+_bad = REL.check_inside(FRAME, [X0, Y0, X1, Y1])
+if _bad:
+    sys.exit("; ".join(_bad))
 W = X1 - X0; H = Y1 - Y0                   # 1 m grid size
 crs = cfg["crs"]
 to_ll = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
@@ -54,32 +86,63 @@ def read_tiff(path):
 
 # ------------------------------------------------------------------ 1. fine DEM (1 m)
 log("DEM mosaic")
-dem = np.full((H, W), np.nan, np.float32)   # row 0 = north
-for it in manifest["items"]:
-    if not it["path"].startswith("dem1m/"):
-        continue
-    p = os.path.join(raw, it["path"])
-    if not os.path.exists(p):
-        log("  missing", it["path"]); continue
-    a = read_tiff(p).astype(np.float32)
-    if a.ndim == 3: a = a[..., 0]
-    a[a <= -9000] = np.nan
-    bx0, by0, bx1, by1 = it["meta"]["bbox"]
-    w, h = it["meta"]["size"]
-    if a.shape != (h, w):
-        log("  unexpected shape", it["path"], a.shape, (h, w))
-        a = np.array(Image.fromarray(a).resize((w, h), Image.BILINEAR))
-    c0 = int(bx0 - X0); r0 = int(Y1 - by1)
-    dem[r0:r0 + h, c0:c0 + w] = a
-void = np.isnan(dem)
-log(f"  dem {dem.shape}, void {void.mean()*100:.2f}%, range {np.nanmin(dem):.0f}..{np.nanmax(dem):.0f}")
-if void.any():
-    # fill small voids by nearest neighbour
-    idx = ndimage.distance_transform_edt(void, return_distances=False, return_indices=True)
-    dem = dem[tuple(idx)]
-dem_local = dem  # heights are absolute metres; x,y are local
+FX0, FY0, FX1, FY1 = FRAME
+
+
+def mosaic_dem(raw, manifest, frame):
+    """the 1 m DEM chunks of a raw folder on its fetched frame (row 0 = north), small voids filled"""
+    FX0, FY0, FX1, FY1 = frame
+    dem = np.full((int(FY1 - FY0), int(FX1 - FX0)), np.nan, np.float32)
+    for it in manifest["items"]:
+        if not it["path"].startswith("dem1m/"):
+            continue
+        p = os.path.join(raw, it["path"])
+        if not os.path.exists(p):
+            log("  missing", it["path"]); continue
+        a = read_tiff(p).astype(np.float32)
+        if a.ndim == 3: a = a[..., 0]
+        a[a <= -9000] = np.nan
+        bx0, by0, bx1, by1 = it["meta"]["bbox"]
+        w, h = it["meta"]["size"]
+        if a.shape != (h, w):
+            log("  unexpected shape", it["path"], a.shape, (h, w))
+            a = np.array(Image.fromarray(a).resize((w, h), Image.BILINEAR))
+        c0 = int(bx0 - FX0); r0 = int(FY1 - by1)
+        dem[r0:r0 + h, c0:c0 + w] = a
+    void = np.isnan(dem)
+    log(f"  dem {dem.shape}, void {void.mean()*100:.2f}%, range {np.nanmin(dem):.0f}..{np.nanmax(dem):.0f}")
+    if void.any():
+        # fill small voids by nearest neighbour
+        idx = ndimage.distance_transform_edt(void, return_distances=False, return_indices=True)
+        dem = dem[tuple(idx)]
+    return dem
+
+
+dem = mosaic_dem(raw, manifest, FRAME)
+# FEAT-268: {move index: (DEM, frame)} for the moves cut from another place's raw data
+SRC_DEM = {}
+for _s in REL.source_slugs():
+    log(f"  relocate source {_s}")
+    _g = (mosaic_dem(SRC_RAW[_s], SRC_MAN[_s], SRC_CFG[_s]["utm_bbox"]), [float(v) for v in SRC_CFG[_s]["utm_bbox"]])
+    SRC_DEM.update({k: _g for k, m in enumerate(REL.moves) if m.source == _s})
+dem_f = None    # the frame's DEM, kept while the lidar returns are set on the composed ground
+REL_DZ = []
+if COMPOSED:
+    dem_f = dem
+    REL_DZ = [relocate.rim_dz(dem_f, FRAME, 1.0, m, SRC_DEM.get(k)) for k, m in enumerate(REL.moves)]
+    for m, dz in zip(REL.moves, REL_DZ):
+        m.dz = dz
+        log(f"  relocate {m.name}: {m.src}{f' of {m.source}' if m.source else ''} -> centre {m.to}, turned "
+            f"{m.turn:+.0f} deg, seam {m.feather:.0f} m, height shift {dz:+.1f} m")
+    dem = relocate.compose_heights(dem_f, FRAME, 1.0, [X0, Y0, X1, Y1], REL, REL_DZ, SRC_DEM)
+    log(f"  pack box {X1 - X0:.0f} x {Y1 - Y0:.0f} m of the fetched {FX1 - FX0:.0f} x {FY1 - FY0:.0f} m, "
+        f"range {dem.min():.0f}..{dem.max():.0f}")
 fine_meta = write_height_set(out, "fine", dem, 1.0, X0 - OX, Y0 - OY)
 log("  fine written", fine_meta["tilesX"], "x", fine_meta["tilesY"])
+# FEAT-229: the 4 m set the 4 and 8 m chunks read instead of the 1 m tiles (coarse_set.py)
+from coarse_set import write_coarse
+coarse_meta = write_coarse(out, dem, X0 - OX, Y0 - OY)
+log("  coarse written", coarse_meta["tilesX"], "x", coarse_meta["tilesY"])
 
 # ------------------------------------------------------------------ 2. mid (16 m from the 10 m export)
 log("mid ring")
@@ -149,16 +212,59 @@ dtm_l = np.full((H2, W2), 1e9, np.float32)
 n_pts = 0
 ept = json.load(open(os.path.join(raw, "ept/ept.json"), encoding="utf-8"))
 scale = None
-# ept/*.laz is the main dataset, ept/<dataset>/*.laz any extra one (cfg["lidar"]["extra"]); all EPSG:3857
-for p in sorted(glob.glob(os.path.join(raw, "ept", "*.laz")) + glob.glob(os.path.join(raw, "ept", "*", "*.laz"))):
+PACK_BOX = [X0, Y0, X1, Y1]
+
+
+def place_returns(ux, uy, zz, cls, src=None):
+    """FEAT-249: the returns of one node for the pack: at their own place where the ground there is drawn, at their
+    moved place inside a pasted patch (relocate.Relocation.select decides, as for every other layer). A return keeps
+    its height above the ground it was flown over, set on the composed ground. `src` (FEAT-268): the node is from
+    that relocate source's lidar, so only its moves take returns and the rest of the node is dropped."""
+    def inb(x, y):
+        return (x >= X0) & (x < X1) & (y >= Y0) & (y < Y1)
+    xs, ys, zs, cs = [], [], [], []
+    k = inb(ux, uy) if src is None else np.zeros(ux.shape, bool)
+    if k.any():
+        k[k] = REL.select(ux[k], uy[k]) == -1
+    if k.any():
+        x, y = ux[k], uy[k]
+        xs.append(x); ys.append(y); cs.append(cls[k])
+        zs.append(zz[k] - relocate.sample(dem_f, FRAME, 1.0, x, y) + relocate.sample(dem, PACK_BOX, 1.0, x, y))
+    for i, m in enumerate(REL.moves):
+        if m.source != src:
+            continue
+        g, gf = SRC_DEM.get(i, (dem_f, FRAME))
+        sx0, sy0, sx1, sy1 = m.src
+        k = (ux >= sx0) & (ux < sx1) & (uy >= sy0) & (uy < sy1)
+        if not k.any():
+            continue
+        sx, sy, sz, sc = ux[k], uy[k], zz[k], cls[k]
+        dx, dy = m.dest_of(sx, sy)
+        ok = inb(dx, dy)
+        ok[ok] = REL.select(dx[ok], dy[ok]) == i
+        if not ok.any():
+            continue
+        xs.append(dx[ok]); ys.append(dy[ok]); cs.append(sc[ok])
+        zs.append(sz[ok] - relocate.sample(g, gf, 1.0, sx[ok], sy[ok]) + relocate.sample(dem, PACK_BOX, 1.0, dx[ok], dy[ok]))
+    if not xs:
+        return ux[:0], uy[:0], zz[:0], cls[:0]
+    return np.concatenate(xs), np.concatenate(ys), np.concatenate(zs), np.concatenate(cs)
+
+
+
+def add_laz(p, src=None):
+    """one EPT node's returns into the 2 m DSM (`src`: a relocate source's node, FEAT-268)"""
+    global n_pts
     try:
         las = laspy.read(p)
     except Exception as e:
-        log("  bad laz", p, e); continue
+        log("  bad laz", p, e); return
     x = np.asarray(las.x); y = np.asarray(las.y); zz = np.asarray(las.z)
     cls = np.asarray(las.classification)
     # EPT is in EPSG:3857; convert to UTM
     ux, uy = merc_to_utm.transform(x, y)
+    if COMPOSED:
+        ux, uy, zz, cls = place_returns(np.asarray(ux), np.asarray(uy), zz, cls, src)
     col = ((ux - X0) / R2).astype(int); row = ((Y1 - uy) / R2).astype(int)
     ok = (col >= 0) & (col < W2) & (row >= 0) & (row < H2) & (cls != 7) & (cls != 18)  # drop noise classes
     col, row, zz, cls = col[ok], row[ok], zz[ok], cls[ok]
@@ -169,7 +275,22 @@ for p in sorted(glob.glob(os.path.join(raw, "ept", "*.laz")) + glob.glob(os.path
     g = cls == 2
     if g.any():
         np.minimum.at(dtm_l.ravel(), flat[g], zz[g].astype(np.float32))
+
+
+def laz_files(raw):
+    """ept/*.laz is the main dataset, ept/<dataset>/*.laz any extra one (cfg["lidar"]["extra"]); all EPSG:3857"""
+    return sorted(glob.glob(os.path.join(raw, "ept", "*.laz")) + glob.glob(os.path.join(raw, "ept", "*", "*.laz")))
+
+
+for p in laz_files(raw):
+    add_laz(p)
+for _s in REL.source_slugs():
+    _n0 = n_pts
+    for p in laz_files(SRC_RAW[_s]):
+        add_laz(p, _s)
+    log(f"  relocate source {_s}: {(n_pts - _n0) / 1e6:.1f} M points")
 log(f"  {n_pts/1e6:.1f} M points, cells with data {np.mean(cnt>0)*100:.1f}%")
+del dem_f, SRC_DEM
 dsm[cnt == 0] = np.nan
 # cells with a lidar return (dilated by one cell): canopy is only believed where the lidar actually saw something
 has_pts = ndimage.binary_dilation(cnt > 0, iterations=1)
@@ -188,31 +309,50 @@ log(f"  CHM: {np.mean(chm>2)*100:.1f}% of cells > 2 m, p99 {np.percentile(chm, 9
 log("NAIP")
 # The Planetary Computer crop endpoint capped every crop at 2048 px, so the crops are ~2 m.
 # Work at the 2 m grid directly: resample each crop onto its bbox.
-naip2 = np.zeros((4, H2, W2), np.uint8)
-have2 = np.zeros((H2, W2), bool)
-for it in manifest["items"]:
-    if not it["path"].startswith("naip1m/"):
-        continue
-    p = os.path.join(raw, it["path"])
-    if not os.path.exists(p):
-        continue
-    a = read_tiff(p)
-    if a.ndim == 3 and a.shape[0] in (4, 5) and a.shape[0] < a.shape[2]:
-        a = np.moveaxis(a, 0, -1)
-    bx0, by0, bx1, by1 = it["meta"]["bbox"]
-    w2 = int(round((bx1 - bx0) / R2)); h2 = int(round((by1 - by0) / R2))
-    bands = np.stack([np.array(Image.fromarray(a[..., b]).resize((w2, h2), Image.BILINEAR)) for b in range(4)], axis=-1)
-    c0 = int(round((bx0 - X0) / R2)); r0 = int(round((Y1 - by1) / R2))
-    c0c, r0c = max(c0, 0), max(r0, 0)
-    c1c, r1c = min(c0 + w2, W2), min(r0 + h2, H2)
-    if c1c <= c0c or r1c <= r0c:
-        continue
-    sub = bands[r0c - r0:r1c - r0, c0c - c0:c1c - c0]
-    valid = sub.sum(axis=-1) > 0
-    dst = naip2[:, r0c:r1c, c0c:c1c]
-    for b in range(4):
-        dst[b][valid] = sub[..., b][valid]
-    have2[r0c:r1c, c0c:c1c] |= valid
+def mosaic_naip(raw, manifest, frame):
+    """the NAIP crops of a raw folder on its fetched frame at 2 m (FEAT-249): (bands, covered)"""
+    FX0, FY0, FX1, FY1 = frame
+    FH2, FW2 = int(FY1 - FY0) // 2, int(FX1 - FX0) // 2
+    naip2 = np.zeros((4, FH2, FW2), np.uint8)
+    have2 = np.zeros((FH2, FW2), bool)
+    for it in manifest["items"]:
+        if not it["path"].startswith("naip1m/"):
+            continue
+        p = os.path.join(raw, it["path"])
+        if not os.path.exists(p):
+            continue
+        a = read_tiff(p)
+        if a.ndim == 3 and a.shape[0] in (4, 5) and a.shape[0] < a.shape[2]:
+            a = np.moveaxis(a, 0, -1)
+        bx0, by0, bx1, by1 = it["meta"]["bbox"]
+        w2 = int(round((bx1 - bx0) / R2)); h2 = int(round((by1 - by0) / R2))
+        bands = np.stack([np.array(Image.fromarray(a[..., b]).resize((w2, h2), Image.BILINEAR)) for b in range(4)], axis=-1)
+        c0 = int(round((bx0 - FX0) / R2)); r0 = int(round((FY1 - by1) / R2))
+        c0c, r0c = max(c0, 0), max(r0, 0)
+        c1c, r1c = min(c0 + w2, FW2), min(r0 + h2, FH2)
+        if c1c <= c0c or r1c <= r0c:
+            continue
+        sub = bands[r0c - r0:r1c - r0, c0c - c0:c1c - c0]
+        valid = sub.sum(axis=-1) > 0
+        dst = naip2[:, r0c:r1c, c0c:c1c]
+        for b in range(4):
+            dst[b][valid] = sub[..., b][valid]
+        have2[r0c:r1c, c0c:c1c] |= valid
+    return naip2, have2
+
+
+naip2, have2 = mosaic_naip(raw, manifest, FRAME)
+if COMPOSED:
+    SRC_NAIP, SRC_HAVE = {}, {}     # FEAT-268: {move index: (grid, frame)} for the sourced moves
+    for _s in REL.source_slugs():
+        _f = [float(v) for v in SRC_CFG[_s]["utm_bbox"]]
+        _n, _h = mosaic_naip(SRC_RAW[_s], SRC_MAN[_s], _f)
+        for k, m in enumerate(REL.moves):
+            if m.source == _s:
+                SRC_NAIP[k], SRC_HAVE[k] = (_n, _f), (_h, _f)
+    naip2 = relocate.compose_classes(naip2, FRAME, R2, PACK_BOX, REL, SRC_NAIP)
+    have2 = relocate.compose_classes(have2, FRAME, R2, PACK_BOX, REL, SRC_HAVE)
+    del SRC_NAIP, SRC_HAVE
 log(f"  NAIP coverage {have2.mean()*100:.1f}%")
 red2 = naip2[0].astype(np.float32); grn2 = naip2[1].astype(np.float32); blu2 = naip2[2].astype(np.float32); nir2 = naip2[3].astype(np.float32)
 del naip2
@@ -261,7 +401,12 @@ del has_pts, crown, grown
 # put Big Sky's bare upper bowls in forest); cfg["treeline_m"] overrides, None when the box never leaves the forest
 import treeline as _tl
 treeline_m = cfg.get("treeline_m") or _tl.derive_treeline(dem2, canopy, have2)
-if treeline_m is None:
+# FEAT-234: forest from the bottom of the box to the top is a measured "no treeline" (meta treeline: null), so the
+# client draws no snow-ghost band and opens the forest by slope and land cover only
+treeline_none = treeline_m is None and _tl.forested_to_top(dem2, canopy, have2)
+if treeline_none:
+    log("  treeline none: forested to the top of the box (meta treeline null, no snow-ghost band)")
+elif treeline_m is None:
     log("  treeline none found (no forest belt in the box); the client uses its 3,480 m default")
 else:
     log(f"  treeline {treeline_m} m ({'config' if cfg.get('treeline_m') else 'from the canopy by elevation'})")
@@ -326,6 +471,24 @@ class LfRaster:
         self.name = os.path.basename(path)
         self.data = img if fn is None else spc.lf_value_lut(self.table, int(img.max()) + 1, fn)[np.clip(img, 0, None)]
         self.x0, self.y0, self.px = tfw[4], tfw[5], tfw[0]   # top-left pixel centre and pixel size (m)
+        h, w = self.data.shape
+        self.box = [self.x0 - self.px / 2, self.y0 - (h - 0.5) * self.px, self.x0 + (w - 0.5) * self.px,
+                    self.y0 + self.px / 2]
+
+    def paste(self, k, other):
+        """FEAT-268: relocate move k's patch, cut from `other` (the source's clip of the same product), pasted into
+        this raster on its own 30 m grid, so everything derived from it (natural classes, the fit cores) sees the
+        patch as it is drawn; its class table is merged in"""
+        d = REL.moves[k].dest_box()
+        if not (d[0] >= self.box[0] and d[1] >= self.box[1] and d[2] <= self.box[2] and d[3] <= self.box[3]):
+            sys.exit(f"LANDFIRE {self.name} does not cover {REL.moves[k].name}'s pasted patch {d}")
+        if self.table or other.table:
+            try:
+                self.table = relocate.merge_class_tables(self.table, other.table)
+            except ValueError as e:
+                sys.exit(f"relocate {REL.moves[k].name}: {e}")
+        self.data = relocate.compose_classes(self.data, self.box, self.px, self.box, REL,
+                                             {k: (other.data.astype(self.data.dtype), other.box, other.px)}, [k])
 
     def _col(self, x_utm):
         return np.clip(np.round((x_utm - self.x0) / self.px).astype(np.int64), 0, self.data.shape[1] - 1)
@@ -334,16 +497,22 @@ class LfRaster:
         return np.clip(np.round((self.y0 - y_utm) / self.px).astype(np.int64), 0, self.data.shape[0] - 1)
 
     def at(self, x_utm, y_utm):
-        return self.data[self._row(y_utm), self._col(x_utm)]
+        return self.at_data(self.data, x_utm, y_utm)
 
     def on2(self, rows=slice(None), cols=slice(None), data=None):
         """the raster (or `data`, another raster on the same 30 m grid) on the 2 m grid, or the rows / columns of it
         given as slices, row 0 = north"""
         gx = X0 + (np.arange(W2)[cols] + 0.5) * R2; gy = Y1 - (np.arange(H2)[rows] + 0.5) * R2
-        return (self.data if data is None else data)[np.ix_(self._row(gy), self._col(gx))]
+        data = self.data if data is None else data
+        if REL:      # FEAT-249: a pasted patch reads its own place
+            GX, GY = np.meshgrid(gx, gy)
+            return self.at_data(data, GX, GY)
+        return data[np.ix_(self._row(gy), self._col(gx))]
 
     def at_data(self, data, x_utm, y_utm):
-        """`data` (a raster on the same 30 m grid) at the points"""
+        """`data` (a raster on the same 30 m grid) at the points (of the pack: a pasted patch reads its own place)"""
+        if REL:      # FEAT-268: a sourced patch is pasted into the raster (paste), so it reads where it is
+            x_utm, y_utm = REL.source_xy(x_utm, y_utm, REL.in_frame(REL.select(x_utm, y_utm)) if REL.sourced else None)
         return data[self._row(y_utm), self._col(x_utm)]
 
     def window(self):
@@ -358,8 +527,22 @@ class LfRaster:
 evt = None
 lf_tifs = sorted(glob.glob(os.path.join(raw, "landfire", "*.tif")))
 LANDFIRE_ATTRIBUTION = "Vegetation type: LANDFIRE, USGS and U.S. Forest Service (public domain)"
+def paste_sources(lyr, sub, fn=None):
+    """FEAT-268: every sourced move's patch of a LANDFIRE product (landfire/<sub>/ of its raw folder) into `lyr`"""
+    for k, m in enumerate(REL.moves):
+        if not m.source:
+            continue
+        tifs = sorted(glob.glob(os.path.join(SRC_RAW[m.source], "landfire", sub, "*.tif")))
+        if not tifs:
+            sys.exit(f"relocate {m.name}: no LANDFIRE {sub or 'EVT'} in {SRC_RAW[m.source]} "
+                     f"(python pipeline/build_resort.py {m.source} --stop-after landfire)")
+        lyr.paste(k, LfRaster(tifs[-1], fn))
+        log(f"  LANDFIRE {sub or 'EVT'}: {m.name}'s patch from {m.source}/{os.path.basename(tifs[-1])}")
+    return lyr
+
+
 if lf_tifs:
-    evt_lf = LfRaster(lf_tifs[-1])
+    evt_lf = paste_sources(LfRaster(lf_tifs[-1]), "")
     evt_img, table = evt_lf.data, evt_lf.table
     # per class (species.classify_evt, DATA-020): tree group, aspen fraction, forest (Tree life form, not
     # urban), alpine (turf, dwarf-shrubland, bedrock and scree, wet meadow), riparian, sagebrush, Gambel oak
@@ -377,6 +560,16 @@ if lf_tifs:
     top = sorted(zip(cnts, vals), reverse=True)[:5]
     log(f"  LANDFIRE {evt_lf.name} {evt_img.shape}: " + ", ".join(f"{names.get(int(v), v)[:28]} {c/cnts.sum()*100:.0f}%" for c, v in top))
     log(f"  LANDFIRE forest on the 2 m grid {lf_forest2.mean()*100:.1f}%, open {lf_open2.mean()*100:.1f}%, aspen classes {sum(c for c, v in zip(cnts, vals) if aspen_lut[min(v, lut_n-1)] > 0)/cnts.sum()*100:.1f}%")
+    # FEAT-233: the forest under the pack by group, and its share in classes species.classify_evt doesn't name (they
+    # fall to its catch-all group; over species.UNKNOWN_WARN is worth a card, pack_report.py line 4)
+    win_ = evt_lf.window()
+    evt_unknown = spc.unknown_forest_share(win_, lut)
+    evt_groups = spc.group_shares(win_, lut)
+    wv, wc = np.unique(np.clip(win_, 0, lut_n - 1), return_counts=True)
+    unk = sorted((c, v) for c, v in zip(wc, wv) if lut["forest"][v] and not lut["known"][v])[::-1]
+    log("  LANDFIRE forest under the pack by group: " + ", ".join(f"{spc.GROUP_NAMES[g]} {evt_groups[g] * 100:.0f}%" for g in range(len(evt_groups)) if evt_groups[g] >= 0.005)
+        + f"; classes the species rules don't name {evt_unknown * 100:.1f}% of it" + (": " + ", ".join(names.get(int(v), str(v))[:40] for _, v in unk[:4]) if unk else ""))
+    del win_, wv, wc, unk
     # DATA-015: Vail's runs and lift lines are `Developed-*` and its in-resort forest `Urban Evergreen Forest`, which
     # name no species. Those pixels take a natural forest class from the stands around them (species.natural_evt);
     # the tree species read evt_nat, everything else (forest gate, shrubs) keeps the real class.
@@ -403,6 +596,7 @@ if lf_tifs:
     del natural, g30, a30, asp30, con30, lp30, sf30
 else:
     log("  no LANDFIRE clip (raw/<slug>/landfire/*.tif); species from elevation, aspect and NAIP colour (species.py fallback)")
+    evt_unknown = evt_groups = None
     tb, tn = spc.ASPEN_DEFAULT; fit = {"fitted": False, "aspen": 0, "conifer": 0}
 aspen_like = canopy & (bright_s2 > tb) & (nir_s2 > tn)
 del bright_s2, nir_s2
@@ -427,7 +621,7 @@ elif evt is not None:
 # canopy rules (BUG-028) read them with LfRaster (stage 5b) per 2 m cell (.on2()) or per point (.at()).
 def load_lf_layer(sub, fn):
     tifs = sorted(glob.glob(os.path.join(raw, "landfire", sub, "*.tif")))
-    return LfRaster(tifs[-1], fn) if tifs else None
+    return paste_sources(LfRaster(tifs[-1], fn), sub, fn) if tifs else None
 
 lf_cover = load_lf_layer("evc", spc.lf_tree_cover)
 lf_height = load_lf_layer("evh", spc.lf_tree_height)
@@ -441,7 +635,7 @@ for lyr, what, unit, k in ((lf_cover, "EVC tree cover", "%", 100), (lf_height, "
 
 # ------------------------------------------------------------------ 6. OSM features
 log("OSM")
-def load_osm(name):
+def load_osm(name, raw=raw):
     p = os.path.join(raw, "osm", f"{name}.json")
     if not os.path.exists(p):
         log("  missing osm", name); return {"elements": []}
@@ -452,6 +646,28 @@ import osm_filter
 ski, ski_dropped = osm_filter.filter_ski(ski, osm_filter.exclude_areas(cfg.get("exclude"), ski, lambda m: log("  " + m)))
 if ski_dropped:
     log("  private runs and lifts dropped: " + ", ".join(f"{k} {v}" for k, v in sorted(ski_dropped.items())))
+if REL:
+    # FEAT-249: after the filter, whose hand-drawn rings are in the real places. Runs and lifts move whole (a lift's
+    # nodes list must match its geometry); roads and streams split at the seam; the far peaks and places stay real.
+    ski, _mv = REL.osm(ski, to_utm, to_ll, whole=True)
+    built, _mb = REL.osm(built, to_utm, to_ll)
+    natural, _mn = REL.osm(natural, to_utm, to_ll)
+    for _s in REL.source_slugs():
+        # FEAT-268: a sourced move's runs, lifts, buildings and streams are in its own raw folder: only what its
+        # patch takes is kept, moved, and added to the docs
+        _sk = load_osm("ski", SRC_RAW[_s])
+        _sk, _d = osm_filter.filter_ski(_sk, osm_filter.exclude_areas(SRC_CFG[_s].get("exclude"), _sk, lambda m: log("  " + m)))
+        _parts = [(REL.osm(_sk, to_utm, to_ll, whole=True, source=_s), "ski"),
+                  (REL.osm(load_osm("built", SRC_RAW[_s]), to_utm, to_ll, source=_s), "built"),
+                  (REL.osm(load_osm("natural", SRC_RAW[_s]), to_utm, to_ll, source=_s), "natural")]
+        for (_doc, _cnt), _which in _parts:
+            _into = {"ski": ski, "built": built, "natural": natural}[_which]
+            _into["elements"] = _into["elements"] + _doc["elements"]
+            _tot = {"ski": _mv, "built": _mb, "natural": _mn}[_which]
+            for _k, _v in _cnt.items():
+                _tot[_k] = _tot.get(_k, 0) + _v
+    for m in REL.moves:
+        log(f"  relocate {m.name}: {_mv[m.name]} ski, {_mb[m.name]} built and {_mn[m.name]} natural elements moved")
 
 def to_local(lon, lat):
     x, y = to_utm.transform(lon, lat)
@@ -620,6 +836,22 @@ for el in natural["elements"]:
 # streams and rivers (DATA-020): fir and willow sit near water; not written to features.json
 streams = [way_points(el) for el in natural["elements"]
            if el.get("type") == "way" and el.get("tags", {}).get("waterway") in ("stream", "river", "brook", "canal", "ditch")]
+def height_at(xl, yl, top=False):
+    """ground height at local coords from the finest set that holds them (1 m DEM, 16 m mid ring, 128 m far ring);
+    `top`: the highest ground near the point instead (a summit with no ele tag: within 30 m on the 1 m DEM, one
+    cell on the coarser sets). NaN off every set."""
+    c = int(xl + OX - X0); r = int(Y1 - (yl + OY))
+    k = 30 if top else 0
+    if k <= c < W - k and k <= r < H - k:
+        return float(np.nanmax(dem[r - k:r + k + 1, c - k:c + k + 1]))
+    k = 1 if top else 0
+    for arr, gx0, gy1, res in ((m16, mx0, my1, 16.0), (far, fx0, fy0 + nf * FR, FR)):
+        gc = int((xl + OX - gx0) / res); gr = int((gy1 - (yl + OY)) / res)
+        if k <= gc < arr.shape[1] - k and k <= gr < arr.shape[0] - k:
+            w = arr[gr - k:gr + k + 1, gc - k:gc + k + 1]
+            if np.isfinite(w).any():
+                return float(np.nanmax(w))
+    return float("nan")
 peaks = []
 for el in peaks_far["elements"] + natural["elements"]:
     if el.get("type") == "node" and el.get("tags", {}).get("natural") == "peak" and el["tags"].get("name"):
@@ -629,18 +861,42 @@ for el in peaks_far["elements"] + natural["elements"]:
         except ValueError:
             z = float("nan")
         if not math.isfinite(z):
-            z = ground(x, y)
-        peaks.append({"name": el["tags"]["name"], "x": x, "y": y, "z": z})
+            z = height_at(x, y, top=True)      # FEAT-235: was ground(), the resort's base height off the mid ring
+        if math.isfinite(z):
+            peaks.append({"name": el["tags"]["name"], "x": x, "y": y, "z": z})
 seen = set(); uniq = []
 for p in peaks:
     k = (p["name"], round(p["x"] / 50), round(p["y"] / 50))
     if k not in seen:
         seen.add(k); uniq.append(p)
 peaks = uniq
+# FEAT-235: place names from USGS GNIS (every state the far ring touches) and the Census (towns), in names/
+import placenames
+far_ll = placenames.far_box_ll(cfg)
+NAMES_ATTRIBUTION = "Place names: USGS GNIS; towns: US Census Bureau Gazetteer and population estimates, public domain"
+gnis_summits, gnis_states = placenames.load_gnis(raw, far_ll)
+census_towns = False
+gnis_peaks = []
+for f in gnis_summits:
+    x, y = to_local(f["lon"], f["lat"])
+    z = height_at(x, y, top=True)
+    if math.isfinite(z):
+        gnis_peaks.append({"name": f["name"], "x": x, "y": y, "z": z})
+added = placenames.merge_peaks(peaks, gnis_peaks)
+peaks += added
+log(f"  GNIS ({', '.join(gnis_states) or 'no names/ files'}): {len(gnis_summits)} summits in the far ring, {len(added)} not in OSM")
 labels = [{"name": el["tags"]["name"], "kind": el["tags"].get("place", "place"), "x": to_local(el["lon"], el["lat"])[0], "y": to_local(el["lon"], el["lat"])[1], "z": 0}
           for el in places_far["elements"] if el.get("type") == "node" and el.get("tags", {}).get("place") and el["tags"].get("name")]
+if not labels:      # no Overpass places_far (dropped from the manifest): the Census towns
+    towns = placenames.load_towns(raw, far_ll)
+    census_towns = bool(towns)
+    labels = [{"name": t["name"], "kind": t["kind"], "x": to_local(t["lon"], t["lat"])[0], "y": to_local(t["lon"], t["lat"])[1], "z": 0}
+              for t in towns]
+    log(f"  Census towns: {len(labels)} ({sum(1 for t in towns if t['kind'] == 'city')} cities, "
+        f"{sum(1 for t in towns if t['kind'] == 'town')} towns)")
 for l in labels:
-    l["z"] = ground(l["x"], l["y"])
+    z = height_at(l["x"], l["y"])
+    l["z"] = z if math.isfinite(z) else 0.0       # 0: the game samples the ground itself
 log(f"  buildings {len(buildings)} roads {len(roads)} water {len(water)} peaks {len(peaks)} labels {len(labels)}")
 def line_cells(pts):
     """distinct 2 m grid cells along a polyline, as (rows, cols) index arrays, clipped to the grid"""
@@ -892,6 +1148,7 @@ if evt is not None:
     v = np.clip(evt(px_, py_), 0, lut_n - 1)
     vn = np.clip(evt_n(px_, py_), 0, lut_n - 1)     # DATA-015: built classes filled from the natural forest
     group, a_frac, alpine, naip_dec = group_lut[vn], aspen_lut[vn], alpine_lut[v], lut["built"][v]
+    hw_frac = lut["hardwood"][vn]                    # FEAT-233: the eastern classes' bare broadleaf share
     group = spc.naip_conifer_group(group, lp_at(px_, py_), None if lodgepole_like is None else lodgepole_like[rows, cols], naip_dec)
     wet = np.maximum(wet, lut["riparian"][vn].astype(np.float64))
     # inside aspen classes: aspen with that probability; elsewhere keep NAIP-detected groves at 50 %; on built
@@ -900,7 +1157,11 @@ if evt is not None:
     del v, vn, ang, rad, px_, py_
 else:
     group = np.zeros(n_t, np.int8); a_frac = np.zeros(n_t, np.float32); alpine = np.zeros(n_t, bool); roll = np.ones(n_t)
-    naip_dec = None
+    naip_dec = None; hw_frac = None
+# FEAT-233: the region the fallbacks pick species by (no LANDFIRE, a class with no group): Colorado's rules in the
+# west, bare hardwood and hemlock east of species.EAST_LON
+region = spc.region_for(*to_ll.transform(OX, OY))
+log(f"  species region {region.name}" + (f", eastern spruce-fir above {region.boreal:.0f} m" if region.east else ""))
 # krummholz (BUG-025) stays: only a tree the lidar measured as short (1 to 4 m) near treeline or in an alpine
 # LANDFIRE class. Colorado treeline is about 3,500 to 3,600 m; subalpine spruce-fir at Vail is tall right
 # up to the summits, so elevation alone never makes a tree krummholz, and no lidar height is capped.
@@ -909,7 +1170,7 @@ else:
 elev_shift = (treeline_m - spc.COLORADO_TREELINE) if treeline_m else 0.0
 log(f"  species elevation bands shifted {elev_shift:+.0f} m for the treeline")
 species = spc.assign_species(tx, ty, elev - elev_shift, chm_at, group, a_frac, alpine, aspen_like[rows, cols], northeast, wet, ridge, roll, evt is not None,
-                             naip_dec)
+                             naip_dec, hw_frac, region.shifted(elev_shift))
 species[is_snag] = spc.SNAG
 crown = spc.crown_radius(species, hgt)
 trees = np.stack([tx, ty, tz, hgt, crown, species.astype(np.float32)], axis=1).astype(np.float32)
@@ -917,19 +1178,23 @@ CELL = 1000.0
 cells_x = int(math.ceil(W / CELL)); cells_y = int(math.ceil(H / CELL))
 inst = {"cellSize": CELL, "minX": X0 - OX, "minY": Y0 - OY, "cellsX": cells_x, "cellsY": cells_y}
 inst["treeCount"] = write_instances(out, "trees", trees, CELL, X0 - OX, Y0 - OY, cells_x, cells_y)
-cnt = np.bincount(species.astype(np.int64), minlength=8)
-log(f"  trees {inst['treeCount']}: " + ", ".join(f"{spc.SPECIES_NAMES[i]} {cnt[i]} ({cnt[i] / n_t * 100:.1f}%)" for i in range(8)))
+cnt = np.bincount(species.astype(np.int64), minlength=spc.N_SPECIES)
+log(f"  trees {inst['treeCount']}: " + ", ".join(f"{spc.SPECIES_NAMES[i]} {cnt[i]} ({cnt[i] / n_t * 100:.1f}%)" for i in range(spc.N_SPECIES)))
 lp = species == spc.LODGEPOLE
 log(f"  spruce + fir {(cnt[spc.SPRUCE] + cnt[spc.FIR]) / n_t * 100:.1f}%, lodgepole below 3,100 m {np.mean(elev[lp] < 3100) * 100 if lp.any() else 0:.0f}%, "
     f"krummholz above 3,350 m {np.mean(elev[species == spc.KRUMMHOLZ] > 3350) * 100 if cnt[spc.KRUMMHOLZ] else 0:.0f}%, snags {cnt[spc.SNAG] / n_t * 100:.1f}%, "
     f"median height above 3,350 m {np.median(hgt[elev > 3350]) if (elev > 3350).any() else 0:.1f} m")
 for line in spc.band_report(species, elev):
     log("   ", line)
+log("  species by LANDFIRE group (built classes filled from the forest around):")   # FEAT-233
+for line in spc.group_report(species, group):
+    log("   ", line)
+tree_species = {spc.SPECIES_NAMES[i]: round(float(cnt[i] / max(n_t, 1)), 4) for i in range(spc.N_SPECIES) if cnt[i]}
 os.makedirs(os.path.join(out, "debug"), exist_ok=True)
 spc.debug_png(os.path.join(out, "debug", "species.png"), tx, ty, species,
               group_lut[np.clip(evt_lf.on2(data=evt_nat), 0, lut_n - 1)] if evt is not None else None, X0 - OX, Y1 - OY, W, H)
 log("  debug/species.png: species per 10 m (left), LANDFIRE group with the built classes filled (right)")
-del northeast, wet, ridge, group, a_frac, alpine, roll, naip_dec, trees, crown, is_snag
+del northeast, wet, ridge, group, a_frac, alpine, roll, naip_dec, hw_frac, trees, crown, is_snag
 
 # FEAT-074: stand density per 4 m cell (stands.py): the chance of a generated stem, the stand height and species,
 # and the ground height, per 1 km tree cell. The detected crowns nearby count against the stand.
@@ -959,15 +1224,15 @@ ridge4 = (tpi_s2[r2_, c2_] > 1.5) & (tpi_l2[r2_, c2_] > 15)
 if evt is not None:
     v4 = np.clip(evt(sx4 + OX, sy4 + OY), 0, lut_n - 1)
     vn4 = np.clip(evt_n(sx4 + OX, sy4 + OY), 0, lut_n - 1)
-    g4, af4, al4, nd4 = group_lut[vn4], aspen_lut[vn4], alpine_lut[v4], lut["built"][v4]
+    g4, af4, al4, nd4, hw4 = group_lut[vn4], aspen_lut[vn4], alpine_lut[v4], lut["built"][v4], lut["hardwood"][vn4]
     g4 = spc.naip_conifer_group(g4, lp_at(sx4 + OX, sy4 + OY), None if lodgepole_like is None else lodgepole_like[r2_, c2_], nd4)
     wet4 = np.maximum(wet4, lut["riparian"][vn4].astype(np.float64))
     del v4, vn4
 else:
-    g4 = np.zeros(len(si), np.int8); af4 = np.zeros(len(si), np.float32); al4 = np.zeros(len(si), bool); nd4 = None
+    g4 = np.zeros(len(si), np.int8); af4 = np.zeros(len(si), np.float32); al4 = np.zeros(len(si), bool); nd4 = hw4 = None
 sp4[si, sj] = spc.assign_species(sx4, sy4, z4[si, sj] - elev_shift, h4[si, sj], g4, af4, al4, aspen_like[r2_, c2_], ne4, wet4, ridge4,
-                                 spc.hash01(sx4, sy4, 9), evt is not None, nd4)
-del si, sj, r2_, c2_, sx4, sy4, ne4, wet4, ridge4, g4, af4, al4, nd4
+                                 spc.hash01(sx4, sy4, 9), evt is not None, nd4, hw4, region.shifted(elev_shift))
+del si, sj, r2_, c2_, sx4, sy4, ne4, wet4, ridge4, g4, af4, al4, nd4, hw4
 del lodgepole_like
 p4 = stands.stem_chance(canopy4, h4, sp4, det4)
 p4[canopy4 <= 0] = 0
@@ -995,7 +1260,7 @@ if evt is not None:
     g2 = group_lut[evt2]
     riparian = lut["riparian"][evt2]; sage = lut["sage"][evt2]; oak = lut["oak"][evt2]
     spruce_fir = g2 == spc.G_SPRUCE_FIR
-    conifer = lf_forest2 & (g2 != spc.G_ASPEN)
+    conifer = lf_forest2 & ~np.isin(g2, (spc.G_ASPEN, spc.G_HARDWOOD))   # FEAT-233: no young conifers round bare hardwood
     del g2
 else:
     riparian = sage = oak = np.zeros((H2, W2), bool)
@@ -1056,15 +1321,39 @@ if seg is not None:
 meta = {"version": 1, "formatVersion": FORMAT_VERSION, "slug": slug, "name": cfg["name"], "crs": crs, "origin": [OX, OY], "lonlat": [lon_c, lat_c],
         "bounds": {"minX": X0 - OX, "minY": Y0 - OY, "maxX": X1 - OX, "maxY": Y1 - OY},
         "zRange": [float(np.floor(Z_MIN / 100) * 100 - 100), float(np.ceil(Z_MAX / 100) * 100 + 100)],
-        "terrain": {"fine": fine_meta, "mid": mid_meta, "far": far_meta}, "mask": mask_meta, "ao": ao_meta, "dir": dir_meta, "moguls": mog_meta, "instances": inst, "stands": stand_meta, "treeSpecies": spc.TREE_SPECIES_VERSION,
+        "terrain": {"fine": fine_meta, "coarse": coarse_meta, "mid": mid_meta, "far": far_meta}, "mask": mask_meta, "ao": ao_meta, "dir": dir_meta, "moguls": mog_meta, "instances": inst, "stands": stand_meta, "treeSpecies": spc.TREE_SPECIES_VERSION,
         "start": start, "sun": {"azimuth": 160, "elevation": 30}, "attribution": cfg["attribution"]}
+# FEAT-233: what the species rules made of the forest, for pack_report.py line 4 (the client doesn't read it)
+meta["vegetation"] = {"region": region.name, "treeSpecies": tree_species,
+                      **({"evtUnknown": round(evt_unknown, 4),
+                          "evtGroups": {spc.GROUP_NAMES[g]: round(float(evt_groups[g]), 4) for g in range(len(evt_groups)) if evt_groups[g] >= 0.0005}}
+                         if evt_unknown is not None else {})}
+if (gnis_states or census_towns) and NAMES_ATTRIBUTION not in meta["attribution"]:   # FEAT-235
+    meta["attribution"] = meta["attribution"] + [NAMES_ATTRIBUTION]
 if lf_tifs and LANDFIRE_ATTRIBUTION not in meta["attribution"]:   # FEAT-175: pack_report.py line 13 checks every credit
     meta["attribution"] = meta["attribution"] + [LANDFIRE_ATTRIBUTION]
 if treeline_m:
     meta["treeline"] = round(float(treeline_m))
+elif treeline_none:
+    meta["treeline"] = None   # FEAT-234: measured, none; absent still means an older pack (or no forest to measure)
 # FEAT-175: the values this build derived for the resort instead of copying Vail's (pack_report.py line 20)
 meta["derived"] = {**{k: round(v, 4) for k, v in NT.items()},
-                   **({"treeline": round(float(treeline_m))} if treeline_m and not cfg.get("treeline_m") else {})}
+                   **({"treeline": round(float(treeline_m))} if treeline_m and not cfg.get("treeline_m") else {}),
+                   **({"treeline": None} if treeline_none else {})}
+if REL:
+    # FEAT-249: what was moved, and a credit line saying so (the terrain, trees and runs are the area's own; where
+    # it sits is not)
+    meta["derived"]["relocated"] = [m.record() for m in REL.moves]
+    for m in REL.moves:
+        dist = math.hypot(m.to[0] - m.c[0], m.to[1] - m.c[1]) / 1000
+        note = (f"{m.name} is moved {dist:.1f} km{f' and turned {abs(m.turn):.0f} degrees' if m.turn else ''} from its real "
+                "position to sit next to the rest of the resort; its terrain, trees, imagery and runs are its own")
+        if m.source:     # FEAT-268: another resort, moved in for a custom map
+            note = (f"{m.name} is moved {dist:.0f} km{f' and turned {abs(m.turn):.0f} degrees' if m.turn else ''} from "
+                    "its real position to sit next to the other hills on this custom map; its terrain, trees, imagery "
+                    "and runs are its own")
+        if note not in meta["attribution"]:
+            meta["attribution"] = meta["attribution"] + [note]
 write_meta(out, meta)
 
 # ------------------------------------------------------------------ 9b. the far tree ring (BUG-081)

@@ -39,3 +39,33 @@ def test_valid_mask_and_nan_are_ignored():
     elev = elev.copy(); elev[:1000] = np.nan
     valid = np.ones(elev.size, bool); valid[1000:2000] = False
     assert tl.derive_treeline(elev, forest, valid) is not None
+
+
+def test_forest_to_the_top_is_a_measured_none():
+    """FEAT-234: Boston Mills is forest from the valley to the top; that is no treeline, not Colorado's"""
+    rng = np.random.default_rng(4)
+    elev = rng.uniform(190, 312, 400_000)
+    forest = rng.random(elev.size) < np.clip(0.6 + 0.25 * np.sin((elev - 190) / 40), 0, 1)
+    assert tl.derive_treeline(elev, forest) is None
+    assert tl.forested_to_top(elev, forest)
+
+
+def test_a_treeline_or_no_forest_is_not_forested_to_the_top():
+    for line in (2950, 3480):
+        elev, forest = mountain(line)
+        assert not tl.forested_to_top(elev, forest)
+    elev = np.linspace(2000, 3400, 100_000)
+    assert not tl.forested_to_top(elev, np.zeros(elev.size, bool))   # no forest: unknown, the client keeps its default
+    assert not tl.forested_to_top(elev[:500], np.ones(500, bool))      # too small to say
+
+
+def test_forested_to_top_is_exactly_where_derive_finds_none():
+    """the two never disagree: a box with forest either has a treeline or is forested to the top"""
+    rng = np.random.default_rng(5)
+    for _ in range(40):
+        lo = rng.uniform(100, 3000); hi = lo + rng.uniform(150, 1500); line = rng.uniform(lo, hi + 300)
+        elev = rng.uniform(lo, hi, 60_000)
+        forest = rng.random(elev.size) < np.clip(0.7 * (1 - (elev - line) / 100), 0.0, 0.7)
+        got = tl.derive_treeline(elev, forest, min_cells=500)
+        top = tl.forested_to_top(elev, forest, min_cells=500)
+        assert not (got is not None and top), (lo, hi, line, got)

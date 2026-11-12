@@ -9,7 +9,7 @@ stands/<cx>_<cy>.png: RGB, SIZE wide and 2 * SIZE tall, row 0 = north.
   rows 0 .. SIZE-1, one pixel per 4 m cell:
     R  chance of one generated stem in the cell, 0..255 = 0..1
     G  stand height, H_STEP m per step
-    B  species id 0..7 (species.py)
+    B  species id 0..9 (species.py)
   rows SIZE .. 2*SIZE-1: the ground height at the cell centre, (z - zBase) * Z_SCALE as 16 bits, R high and G low,
     where a stem can stand and one cell round it; 0 elsewhere (no data). zBase is the pack's lowest ground, so
     a pack spans at most 2,048 m of relief.
@@ -28,7 +28,7 @@ Z_SCALE = 32.0
 K_CLOSE = 1.0
 # the client's crown radius / height per species id (game/src/world/trees/species.ts SPECIES[].radius;
 # tests/test_contract.py checks it against the game's main)
-CROWN_RATIO = np.array([0.13, 0.17, 1.1, 0.1, 0.09, 0.17, 0.35, 0.05])
+CROWN_RATIO = np.array([0.13, 0.17, 1.1, 0.1, 0.09, 0.17, 0.35, 0.05, 0.26, 0.16])
 # detected crowns count against the stand over this radius (m), so stems fill gaps instead of doubling clumps
 DETECTED_SIGMA = 6.0
 
@@ -114,7 +114,7 @@ def expected_crowns(pack_dir, meta, res, w, h, shadow_h):
         c = ((x - b["minX"]) / res).astype(int); r = ((b["maxY"] - y) / res).astype(int)
         ok = (c >= 0) & (c < w) & (r >= 0) & (r < h)
         pp, hv = p[i, j][ok], hh[i, j][ok]
-        a = pp * np.pi * (CROWN_RATIO[np.clip(sp[i, j][ok], 0, 7)] * hv * 0.875) ** 2   # mean height 0.875 x the stand's
+        a = pp * np.pi * (CROWN_RATIO[np.clip(sp[i, j][ok], 0, len(CROWN_RATIO) - 1)] * hv * 0.875) ** 2   # mean height 0.875 x the stand's
         np.add.at(area, (r[ok], c[ok]), a)
         np.add.at(shade, (r[ok], c[ok]), a * np.clip(hv * 0.875 / shadow_h, 0, 1.5))
         np.add.at(hsum, (r[ok], c[ok]), pp * hv * 0.875); np.add.at(hcnt, (r[ok], c[ok]), pp)

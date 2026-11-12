@@ -79,5 +79,6 @@ def test_every_resort_has_its_own_folder_with_the_node_lists_it_names():
         assert cfg["slug"] == slug
         L = cfg.get("lidar") or {}
         for src in [L] + list(L.get("extra", [])) + [L.get("far") or {}]:
-            if src.get("nodes_file"):
-                assert os.path.isfile(os.path.join(paths.resort_dir(slug), src["nodes_file"])), (slug, src["nodes_file"])
+            if src.get("nodes_file"):     # FEAT-268: a raw_from config's lists are that resort's
+                home = paths.resort_dir(cfg.get("raw_from") or slug)
+                assert os.path.isfile(os.path.join(home, src["nodes_file"])), (slug, src["nodes_file"])

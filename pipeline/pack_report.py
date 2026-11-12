@@ -34,6 +34,7 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from canopy_spots import run_half_width  # noqa: E402
 from packwriter import FORMAT_VERSION, decode_terrarium  # noqa: E402
+from species import UNKNOWN_WARN  # noqa: E402
 import paths  # noqa: E402
 
 REPO = paths.REPO
@@ -514,16 +515,22 @@ class Report:
                       "mid and far cover levels built from them (pass --raw to check pistes_wide)" if ok else
                       "no mid / far cover levels, so the land cover was missing at build time")
 
-        # 4 LANDFIRE
+        # 4 LANDFIRE, and (FEAT-233) the share of the forest in EVT classes the species rules don't name
+        veg = meta.get("vegetation") or {}
+        unk = veg.get("evtUnknown")
+        unk_note = "" if unk is None else (f"; {unk:.1%} of the forest in EVT classes the species rules don't name ({veg.get('region', '?')} rules)"
+                                           + (f": over {UNKNOWN_WARN:.0%}, map them in species.classify_evt" if unk > UNKNOWN_WARN else ""))
+        unk_warn = unk is not None and unk > UNKNOWN_WARN
         if raw:
             evt = self.raw_has("landfire", pattern="*.tif")
             evc, evh = self.raw_has("landfire", "evc", pattern="*.tif"), self.raw_has("landfire", "evh", pattern="*.tif")
-            self.line("4", "Raw: LANDFIRE", PASS if evt and evc and evh else (WARN if evt else FAIL),
-                      "EVT, EVC and EVH" if evt and evc and evh else
-                      (f"EVT only, no {' or '.join(x for x, h in (('EVC', evc), ('EVH', evh)) if not h)} (stand heights fall back "
-                       "to the lidar)" if evt else "none: species from elevation and aspect only (fetch_landfire)"))
+            st = PASS if evt and evc and evh else (WARN if evt else FAIL)
+            self.line("4", "Raw: LANDFIRE", WARN if st == PASS and unk_warn else st,
+                      ("EVT, EVC and EVH" if evt and evc and evh else
+                       (f"EVT only, no {' or '.join(x for x, h in (('EVC', evc), ('EVH', evh)) if not h)} (stand heights fall back "
+                        "to the lidar)" if evt else "none: species from elevation and aspect only (fetch_landfire)")) + unk_note)
         elif "LANDFIRE" in attribution:
-            self.line("4", "Raw: LANDFIRE", PASS, "LANDFIRE in the attribution")
+            self.line("4", "Raw: LANDFIRE", WARN if unk_warn else PASS, "LANDFIRE in the attribution" + unk_note)
         else:
             self.line("4", "Raw: LANDFIRE", SKIP, "no LANDFIRE line in the attribution; pass --raw to check")
 
@@ -667,8 +674,16 @@ class Report:
         self.line("15", "Grooming history", PASS if g else FAIL,
                   f"{g:.0%} of runs with a grooming record" + ("" if graw is None else f", {graw} reports in raw"), mvp=False)
         if raw:
-            self.line("16", "Place names", PASS if self.raw_has("names") else FAIL,
-                      "raw/names present" if self.raw_has("names") else "no raw/names", mvp=False)
+            # FEAT-235: GNIS for the resort's states (names/DomesticNames_<ST>_Text.zip, or Vail's gnis.json) and
+            # the names in features.json
+            gn = sorted(os.path.basename(p).split("_")[1] for p in glob.glob(os.path.join(raw, "names", "DomesticNames_*_Text.zip")))
+            if self.raw_has("names", "gnis.json"):
+                gn.append("gnis.json")
+            np_, nl = len(self.features.get("peaks", [])), len(self.features.get("labels", []))
+            ok = bool(gn) and np_ + nl > 0
+            self.line("16", "Place names", PASS if ok else FAIL,
+                      (f"GNIS {', '.join(gn)}" if gn else "no GNIS file in raw/names") + f"; {np_} peaks, {nl} town labels",
+                      mvp=False)
         else:
             self.line("16", "Place names", SKIP, "pass --raw", mvp=False)
         self.line("17", "Main menu shot and ghosts", *self.check_menu(), mvp=False)
@@ -687,9 +702,14 @@ class Report:
                 self.line(i, item, SKIP, why, mvp=False)
         derived = meta.get("derived") or {}
         tl = meta.get("treeline")
-        parts = [f"treeline {tl:.0f} m measured" if tl else "no measured treeline (client uses Colorado's 3,480 m)"]
-        parts += [f"{k} {v}" for k, v in sorted(derived.items())]
-        tuned = bool(tl) and {"rock", "canopy"} <= {k.split(".")[0] for k in derived}
+        tl_none = "treeline" in meta and tl is None   # FEAT-234: measured, the box is forest to the top
+        parts = [f"treeline {tl:.0f} m measured" if tl else
+                 "no treeline: forested to the top of the box (measured)" if tl_none else
+                 "no measured treeline (client uses Colorado's 3,480 m)"]
+        parts += [f"{k} {v}" for k, v in sorted(derived.items()) if k != "relocated" and v is not None]
+        parts += [f"{r['name']} relocated (turned {r.get('turnDeg', 0):+.0f} deg, height shift {r.get('dzM') or 0:+.1f} m)"
+                  for r in derived.get("relocated", [])]     # FEAT-249
+        tuned = (bool(tl) or tl_none) and {"rock", "canopy"} <= {k.split(".")[0] for k in derived}
         self.line("20", "Values derived for the resort, not copied from Vail", PASS if tuned else FAIL,
                   "; ".join(parts) + ("" if tuned else "; rock and canopy thresholds are Vail's (FEAT-175 step 2)"), mvp=False)
 

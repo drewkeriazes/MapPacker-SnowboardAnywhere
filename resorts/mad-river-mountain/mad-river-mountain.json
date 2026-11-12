@@ -1,0 +1,118 @@
+{
+  "slug": "mad-river-mountain",
+  "name": "Mad River Mountain",
+  "source_only": true,
+  "country": "US",
+  "region": "Ohio",
+  "osm_ski_area_way": 1263732880,
+  "crs": "EPSG:26917",
+  "utm_zone": "17N",
+  "lonlat_bbox": [
+    -83.6819407,
+    40.3112513,
+    -83.6698124,
+    40.3198407
+  ],
+  "buffer_m": 500,
+  "utm_bbox": [
+    271500,
+    4465200,
+    273700,
+    4467300
+  ],
+  "origin": [
+    272600,
+    4466250
+  ],
+  "elevation_range_m": [
+    300,
+    450
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "3DEP ImageServer",
+    "res_m": 1,
+    "chunk_px": 1500
+  },
+  "naip": {
+    "source": "Planetary Computer naip 2023 30cm",
+    "res_m": 1,
+    "max_px": 4000,
+    "items": [
+      "oh_m_4008343_ne_17_030_20230526_20231018",
+      "oh_m_4008343_nw_17_030_20230518_20231018",
+      "oh_m_4008343_se_17_030_20230526_20231018",
+      "oh_m_4008343_sw_17_030_20230518_20231018"
+    ],
+    "item_bboxes_ll": {
+      "oh_m_4008343_ne_17_030_20230526_20231018": [
+        -83.691,
+        40.31,
+        -83.621,
+        40.377
+      ],
+      "oh_m_4008343_nw_17_030_20230518_20231018": [
+        -83.754,
+        40.31,
+        -83.684,
+        40.377
+      ],
+      "oh_m_4008343_se_17_030_20230526_20231018": [
+        -83.691,
+        40.248,
+        -83.621,
+        40.315
+      ],
+      "oh_m_4008343_sw_17_030_20230518_20231018": [
+        -83.754,
+        40.248,
+        -83.684,
+        40.315
+      ]
+    }
+  },
+  "lidar": {
+    "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/OH_StatewideP3_4_B21/",
+    "dataset": "OH_StatewideP3_4_B21",
+    "max_depth_resort": 7,
+    "max_depth_outside": 7,
+    "nodes_file": "mad-river-mountain_ept_nodes.txt"
+  },
+  "attribution": [
+    "Elevation: USGS 3DEP 1 m lidar DEM (OH_Statewide_Phase3_2021_B21), public domain",
+    "Canopy: USGS 3DEP lidar point cloud OH_StatewideP3_4_B21 via AWS usgs-lidar-public, public domain",
+    "Imagery: USDA NAIP 2023 via Microsoft Planetary Computer, public domain",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "osm": {
+    "geofabrik": "us/ohio",
+    "pbf": "https://download.geofabrik.de/north-america/us/ohio-latest.osm.pbf"
+  },
+  "openskidata": {
+    "ids": [
+      "305c84e41152110f9e0e01dc6cc33932fc1579b7"
+    ],
+    "names": [
+      "Mad River Mountain"
+    ],
+    "iso3166_2": "US-OH",
+    "websites": [
+      "https://www.skimadriver.com/"
+    ],
+    "lifts": 11,
+    "runs": 10
+  },
+  "tier": "gold",
+  "landcover": {
+    "enabled": false
+  }
+}

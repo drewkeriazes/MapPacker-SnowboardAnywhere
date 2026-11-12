@@ -30,6 +30,11 @@ changes the manifest's fingerprint, so the fetch runs again and downloads only w
 After the fetch and the build come the pack-build skill's checks: every raw layer present, the OSM files real
 JSON and not an Overpass error page, the pack's meta.json in this pipeline's format.
 
+FEAT-268: a config with `"raw_from": "<slug>"` builds on that resort's raw data and manifest (Ohio Hills on Boston
+Mills'): its data stages are that resort's to run, and only its state file is in <raw root>/<slug>/. A
+`"source_only": true` config (a relocate source such as Mad River Mountain) runs the data stages and stops there; a
+pack whose relocate moves name a `source` checks that source's raw data before it builds, and rebuilds when it changes.
+
 `--from` and `--stop-after` limit the run to a range of stages, `--force` runs a stage even when it looks done
 (`--force all` runs every one), `--dry-run` prints what would run and why. Exit status: 0 done, 1 a stage failed
 (the message says which and what to do), 2 bad arguments. `build_resort.cmd` is the launcher on Drew's PC.
@@ -130,17 +135,20 @@ def run(cmd, cwd=REPO):
 
 
 class Resort:
-    """the paths and config one run works on"""
+    """the paths and config one run works on. `raw_dir` is the folder the data is in: with `raw_from` in the config
+    (FEAT-268), that resort's, and the state file goes in <raw_dir>/../<slug>/ instead"""
 
     def __init__(self, slug, raw_dir, out_dir, resorts_dir=None, manifests_dir=None):
         self.slug, self.raw, self.out = slug, os.path.abspath(raw_dir), os.path.abspath(out_dir)
         self.resorts = resorts_dir or paths.RESORTS
         self.manifests = manifests_dir or paths.MANIFESTS
         self.cfg_path = paths.config_path(slug, self.resorts)
-        self.man_path = os.path.join(self.manifests, f"{slug}.json")
         with open(self.cfg_path, encoding="utf-8") as f:
             self.cfg = json.load(f)
-        self.state_path = os.path.join(self.raw, STATE)
+        self.data = self.cfg.get("raw_from") or slug
+        self.man_path = os.path.join(self.manifests, f"{self.data}.json")
+        self.state_path = os.path.join(self.raw if self.data == slug else
+                                       os.path.join(os.path.dirname(self.raw), slug), STATE)
         try:
             with open(self.state_path, encoding="utf-8") as f:
                 self.state = json.load(f)
@@ -148,7 +156,7 @@ class Resort:
             self.state = {}
 
     def save(self):
-        os.makedirs(self.raw, exist_ok=True)
+        os.makedirs(os.path.dirname(self.state_path), exist_ok=True)
         with open(self.state_path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(self.state, f, indent=1, sort_keys=True)
             f.write("\n")
@@ -158,7 +166,17 @@ class Resort:
         files = [s["nodes_file"] for s in [L] + list(L.get("extra", [])) if s.get("nodes_file")]
         if L.get("far"):
             files.append(L["far"]["nodes_file"])
-        return [os.path.join(paths.resort_dir(self.slug, self.resorts), f) for f in files]
+        return [os.path.join(paths.resort_dir(self.data, self.resorts), f) for f in files]
+
+    def sources(self):
+        """FEAT-268: Resorts for the relocate sources the config's moves cut from (their raw folders beside this
+        one's)"""
+        slugs = list(dict.fromkeys(m["source"] for m in self.cfg.get("relocate") or [] if m.get("source")))
+        for s in slugs:
+            if not os.path.isfile(paths.config_path(s, self.resorts)):
+                raise Failed(f"relocate source {s} has no config ({paths.config_path(s, self.resorts)})")
+        return [Resort(s, os.path.join(os.path.dirname(self.raw), s), self.out, self.resorts, self.manifests)
+                for s in slugs]
 
 
 # ------------------------------------------------------------------------------------------------ stages
@@ -236,7 +254,7 @@ def check_raw(r):
     """the pack-build skill's raw checks: every layer there, the OSM files real JSON (an Overpass error page is
     HTML or a JSON "remark" with no elements). Land cover and pistes_wide are required unless the config turns
     land cover off (DATA-022 item 8: cover.py skips the far levels without them, and the far terrain reads as camo),
-    and the far ring's lidar when the config has lidar.far (item 8b)"""
+    the far ring's lidar when the config has lidar.far (item 8b), and place names in the US (FEAT-235)"""
     miss = []
     need = dict(RAW_NEED)
     osm_need = list(OSM_NEED)
@@ -246,6 +264,10 @@ def check_raw(r):
         osm_need.append("pistes_wide")
     if (r.cfg.get("lidar") or {}).get("far"):
         need["far ring lidar (ept_far)"] = ("ept_far", None)
+    import placenames
+    if placenames.states_of(r.cfg) and not r.cfg.get("source_only"):   # FEAT-235: GNIS and Census towns (US only;
+        # FEAT-268: a relocate source's names are never read)
+        need["place names (GNIS)"] = ("names", None)
     for name, (d, f) in need.items():
         p = os.path.join(r.raw, d)
         if not os.path.isdir(p) or not os.listdir(p) or (f and not os.path.isfile(os.path.join(p, f))):
@@ -314,8 +336,11 @@ def grooming_run(r, ctx):
 
 def build_inputs(r, code=None, out=None):
     groom = sorted(os.path.basename(p) for p in glob.glob(os.path.join(r.raw, "grooming", "*.json")))
-    return sha(file_sha(r.cfg_path), manifest_items_sha(r), r.state.get("fetch"), r.state.get("landfire"), groom,
-               code or pipeline_code(), out or r.out)
+    parts = [file_sha(r.cfg_path), manifest_items_sha(r), r.state.get("fetch"), r.state.get("landfire"), groom,
+             code or pipeline_code(), out or r.out]
+    for s in r.sources():      # FEAT-268: a relocate source's data is an input too (none: the formula as before)
+        parts.append([s.slug, file_sha(s.cfg_path), manifest_items_sha(s), s.state.get("fetch"), s.state.get("landfire")])
+    return sha(*parts)
 
 
 def built_before_move(r, seen):
@@ -355,8 +380,23 @@ def build_adoptable(r):
     return build_present(r) and same_code(meta(r).get("pipeline"))
 
 
+def check_sources(r):
+    """FEAT-268: every relocate source fetched (raw layers, LANDFIRE) before the pack that pastes it builds"""
+    for s in r.sources():
+        if not s.cfg.get("source_only"):
+            raise Failed(f"relocate source {s.slug} is not marked \"source_only\": true in {s.cfg_path}")
+        if not fetch_present(s) or not os.path.isfile(s.man_path):
+            raise Failed(f"relocate source {s.slug} is not fetched ({s.raw}): python pipeline/build_resort.py "
+                         f"{s.slug} --stop-after landfire")
+        check_raw(s)
+        if landfire_needed(s) and not landfire_present(s):
+            raise Failed(f"relocate source {s.slug} has no LANDFIRE clips: python pipeline/build_resort.py "
+                         f"{s.slug} --stop-after landfire")
+
+
 def build_run(r, ctx):
     from packwriter import FORMAT_VERSION
+    check_sources(r)
     t = time.time()
     if ctx.run([sys.executable, os.path.join(HERE, "build_pack.py"), r.slug, r.raw, r.out]):
         raise Failed("build_pack.py failed: the log above names the stage (pack-build skill, Common failures)")
@@ -507,9 +547,21 @@ class Context:
         return "all" in self.force or stage in self.force
 
 
+DATA_STAGES = ("nodes", "manifest", "fetch", "landfire", "grooming")
+SOURCE_WHY = "source only (a relocate source for another pack, not a pack)"
+
+
+def raw_from_why(r):
+    return f"the raw data is from {r.data} (python pipeline/build_resort.py {r.data} fetches it)"
+
+
 def decide(r, stage, ctx):
     """(run?, why) for one stage"""
     inputs, present, _ = STAGE_FN[stage]
+    if r.cfg.get("source_only") and stage not in DATA_STAGES:
+        return False, SOURCE_WHY
+    if r.data != r.slug and stage in DATA_STAGES:
+        return False, raw_from_why(r)
     if stage in GAME_TOOL and not game_tool(GAME_TOOL[stage]):
         return False, f"no {GAME_TOOL[stage]} in a game checkout at {paths.game_repo()} (SBA_GAME_REPO)"
     if ctx.forced(stage):
@@ -551,6 +603,8 @@ def build(r, ctx, first=None, last=None, dry=False, out=print):
             check_raw(r)             # data fetched earlier gets the same checks before it is built
         if stage in ("nodes", "manifest", "fetch", "build"):
             r.cfg = json.load(open(r.cfg_path, encoding="utf-8"))
+        if why == SOURCE_WHY:
+            continue
         fp = inputs(r)
         if fp is not None and (go or r.state.get(stage) is None or why == MOVED_WHY):
             r.state[stage] = fp
@@ -577,7 +631,9 @@ def main(argv=None):
     if a.first and a.last and STAGES.index(a.first) > STAGES.index(a.last):
         print("--from comes after --stop-after")
         return 2
-    raw = a.raw_dir or os.path.join(default_raw_root(), a.slug)
+    with open(paths.config_path(a.slug), encoding="utf-8") as f:
+        data = json.load(f).get("raw_from") or a.slug       # FEAT-268: the resort whose raw data this builds on
+    raw = a.raw_dir or os.path.join(default_raw_root(), data)
     out = a.out_dir or os.path.join(paths.PACKS, a.slug)
     r = Resort(a.slug, raw, out)
     print(f"{r.cfg.get('name', a.slug)}: raw {r.raw}, pack {r.out}")

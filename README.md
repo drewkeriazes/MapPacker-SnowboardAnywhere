@@ -29,7 +29,35 @@ python pipeline\resort.py add --help
 
 Every stage is skipped when its inputs have not changed, so both are safe to re-run. The first `add_resort.cmd` run for a new resort stops after the data plan (`resorts/<slug>/<slug>-plan.md`) so it can be read before a 1+ GB fetch.
 
+### Add a resort yourself, step by step
+
+Without Claude, on Windows, US resorts (the gold tier needs USGS lidar):
+
+1. **Set up once.**
+   - Install Python 3.13 and run `pip install -r pipeline\requirements.txt`, then install Node.
+   - Clone the game next to this repo (`..\SnowboardAnywhere`) and run `npm install` in its `game\` folder; the ride stage builds the game.
+   - Optional: set `SBA_RAW_ROOT` to a drive with room (a resort's raw data is a few GB) and `LANDFIRE_EMAIL` to skip the LANDFIRE email question.
+   - To publish you need `gh auth login` with push access to this repo. Without it, add `--no-publish` (step 5).
+2. **Find the name.** Use the resort's name as [OpenSkiMap](https://openskimap.org) shows it ("Boston Mills", "Park City"); case and accents don't matter.
+3. **First run: resolve and plan.** Double-click `add_resort.cmd` and type the name, or run `add_resort.cmd "Park City"`. It may ask two things (BUG-103):
+   - *Several ski areas match*: type the number of the one you mean.
+   - *Neighbours in its box or sold with it* (Park City lists Deer Valley, Solitude, Brighton, Alta): type the numbers of any to build into the same pack, commas between, or press Enter to leave their runs and lifts out. It prints the flags that give the same answer (`--with "<name>"`, `--alone`) for scripts.
+
+   It then writes `resorts\<slug>\<slug>.json` and the data plan `resorts\<slug>\<slug>-plan.md`, and stops.
+4. **Read the plan.** It shows the box, the tier (gold needs 1 m terrain and lidar over the box), each layer's source, year and size, and the total download. If the tier or the box looks wrong, stop here and open an issue.
+5. **Second run: everything else.** Run `add_resort.cmd` again with the same name. It does not ask again: the config remembers your answers (`--force resolve` asks again). Then:
+   - It fetches (the long part; resumable).
+   - It asks the LANDFIRE email once.
+   - It builds the pack into `packs\<slug>\` (about 10 minutes for Vail).
+   - It writes the scorecard `packs\<slug>\report.md`, rides the pack headless in the game, and publishes the release.
+
+   After the report it prints the DATA-022 gate: *playable* when every MVP line passes, else *preview* with the lines that hold it back. Add `--no-publish` to stop before the release.
+6. **When a stage stops,** the message says which stage and what to do. Fix that and run the same command again: finished stages are skipped. `add_resort.cmd "<name>" --force <stage>` reruns one stage, and `python pipeline\resort.py add --help` lists the rest.
+7. **Ride it.** In the game: `cd game`, then `npm run get <slug>` once it is published, or `npm run get -- --from ..\..\MapPacker-SnowboardAnywhere\packs\<slug>` for the local build. Then `npm run dev` and open `/?pack=<slug>`.
+
 - **Raw data** goes to `SBA_RAW_ROOT`, else `raw\` in the main checkout (worktrees share it). It is gitignored and never committed. On Drew's PC `SBA_RAW_ROOT` points at the raw data still in the game's clone, `C:\Users\Drew\git\SnowboardAnywhere\raw`, until it is moved here.
+- **Moving an area** (FEAT-249): a config's `relocate` list cuts an area out and pastes it next to the rest (Brandywine beside Boston Mills), and `pack_bbox` is the box the pack is built on while `utm_bbox` stays the box the raw data was fetched for, so moving an area needs no new download. `python pipeline\relocate.py <slug> [--write]` works out `pack_bbox` from the runs and lifts after the move (`--write` puts it in the config).
+- **Moving in another resort** (FEAT-268): a move with `"source": "<slug>"` cuts its area from that place's own raw data, a config marked `"source_only": true` (fetched with `build_resort.py <slug> --stop-after landfire`, never built or published), so a custom map can put hills from far apart side by side. `"raw_from": "<slug>"` builds a config on another resort's raw data and manifest, with its own state file. Ohio Hills (`resorts/ohio-hills/`) is Boston Mills' data with Mad River Mountain (`resorts/mad-river-mountain/`) moved in north of it.
 - **The game** must be cloned next to this repo (`..\SnowboardAnywhere`) for the headless ride, the game-side lines of the build report and a few tests. `--game-repo <path>` or `SBA_GAME_REPO` points elsewhere; without it those parts say so and stop or skip.
 - **Publishing** (`pipeline\publish_pack.py`, the last stage of `add_resort.cmd`) runs in the main checkout on `main`: it makes the release `<slug>-v<N>` and commits `catalog.json` with the resort's config, node lists, plan, manifest and report straight to `main`.
 - **To ride a pack before publishing it**, in the game: `cd game && npm run get -- --from ..\..\MapPacker-SnowboardAnywhere\packs\<slug>` (FEAT-242; it copies the pack in as the release zip would carry it, and again after a rebuild). Don't junction or symlink it into a game worktree: `git worktree remove` follows the link and empties the pack.
@@ -47,7 +75,7 @@ Every PR gets the jobs in `.github/workflows/checks.yml` (FEAT-240), each its ow
 |---|---|---|
 | `pipeline-tests` | `pipeline/` changed | pytest, without the game |
 | `format-check` | `pipeline/` changed | the pack format contract (`python pipeline/contract.py`, [`docs/pack-format.md`](docs/pack-format.md) > Contract) against the game's `main`, then the `game` tests against a checkout of it: the contract tests, the course rule and `get_pack.mjs` |
-| `render-budgets` | PRs, `pipeline/` changed | the game's `main` draws the synthetic pack from this repo's `main` and from the PR (its `cishot.mjs`, on SwiftShader): shader compile and scene budgets, more than 10% over `main` fails. The report goes on the PR as a comment. Add the `stills` label for before / after stills |
+| `render-budgets` | PRs, `pipeline/` changed | the game's `main` draws the synthetic pack from this repo's `main` and from the PR (its `cishot.mjs`, on SwiftShader): shader compile and scene budgets, more than 10% over `main` fails. The report goes on the PR as a comment. Add the `stills` label for before / after stills. Nothing is drawn when the PR builds the same synthetic pack as `main` (by content, `tools/ci/pack_content_key.py`), or when an earlier commit of the PR passed with the same two packs, game commit and tools: that run's report is reused, with a line saying so (FEAT-251) |
 | `repo-rules` | every PR | no em dashes in added Markdown, plain commit messages; warns when a new script or flag comes with no docs change |
 | `public-guards` | every PR | no `.env` files, no packs, raw data or data files in git, files up to 2 MB, images up to 1 MB under `docs/` or `reports/`, gitleaks |
 
@@ -61,6 +89,8 @@ git config sa.gpuBudgets true
 ```
 
 It needs the game clone next to this one with `npm ci` done in `game/`. Builds of the game's `main` and the synthetic packs are cached in `~/.cache/mappacker-ci` (`RB_CACHE`).
+
+**README update** (`readme-update.yml`, FEAT-250, the game's FEAT-227 workflow ported here) brings this README up to date with what shipped. It runs only by hand: Actions > Update README > Run workflow, or `gh workflow run readme-update.yml`, with an optional `since` (a commit, tag, branch or date; `-f since=2026-11-01`). Without it, it starts from the last change to `README.md` on `main`, or, when that change was a merged README update PR, from the `main` commit that PR was made from. It lists the PRs merged into `main` since then, the cards closed without one of those PRs (this repo and the game) and the commits pushed straight to `main`; Claude checks them against the code (and a clone of the game's `main`) and edits `README.md` only. The workflow then pushes `readme-update-YYYY-MM-DD`, opens a PR and starts the Checks and the Claude review on it. Nothing to change: the run's summary says so and no PR is opened. A run while a README update PR is open stops and links to it. It never pushes to `main`. One-time setup: Settings > Actions > General > Workflow permissions > tick "Allow GitHub Actions to create and approve pull requests"; without it the run pushes the branch and its summary links to open the PR by hand.
 
 ## What is here
 
@@ -88,7 +118,7 @@ The packs are built from these sources. OpenStreetMap-derived parts of a pack (`
 - Terrain tiles: Mapterhorn, built from USGS 3DEP
 - Imagery: USDA NAIP via Microsoft Planetary Computer (public domain)
 - Vegetation type, cover and height: LANDFIRE, USGS and U.S. Forest Service (public domain)
-- Geographic names: USGS GNIS (public domain)
+- Geographic names: USGS GNIS (public domain); town names and sizes: US Census Bureau Gazetteer and population estimates (public domain)
 - Map data © OpenStreetMap contributors, ODbL; ski area data: OpenSkiMap.org
 - Land cover: © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium (CC BY 4.0)
 - Canopy height: Lang, Jetz, Schindler, Wegner, "A high-resolution canopy height model of the Earth", Nature Ecology & Evolution 7, 1778-1789 (2023), ETH Global Sentinel-2 10 m Canopy Height 2020 (CC BY 4.0)

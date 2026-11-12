@@ -1,11 +1,13 @@
-"""Tree species ids 0..7 and the shrub set (DATA-020).
+"""Tree species ids 0..9 and the shrub set (DATA-020, FEAT-233).
 
 Pure helpers for `build_pack.py` stage 8, kept here so they can be tested without a pack build.
 
-Species ids (Float32 field 5 of `trees/<tx>_<ty>.bin`, `meta.treeSpecies` = 2):
+Species ids (Float32 field 5 of `trees/<tx>_<ty>.bin`, `meta.treeSpecies` = 3):
   0 Engelmann spruce, 1 aspen, 2 krummholz, 3 subalpine fir, 4 lodgepole pine, 5 Douglas-fir,
-  6 limber pine, 7 snag (standing dead). Packs before DATA-020 use only 0..2 with the same meaning
-  (0 = any conifer), so a reader keyed on these ids loads both.
+  6 limber pine, 7 snag (standing dead), 8 bare hardwood (eastern oak, beech, maple; FEAT-233),
+  9 eastern hemlock (FEAT-233). Packs before DATA-020 use only 0..2 with the same meaning (0 = any
+  conifer) and `treeSpecies` 2 packs only 0..7, so a reader keyed on these ids loads all of them. A client
+  from before FEAT-233 draws 8 and 9 as spruce (its speciesFor sends an id outside its table to 0).
 
 Shrub kinds (field 5 of `shrubs/<tx>_<ty>.bin`, records x, y, z, height, radius, kind):
   0 willow, 1 juniper, 2 sagebrush, 3 young conifer, 4 Gambel oak.
@@ -15,21 +17,63 @@ import numpy as np
 from scipy import ndimage
 from PIL import Image
 
-SPRUCE, ASPEN, KRUMMHOLZ, FIR, LODGEPOLE, DOUGLAS, LIMBER, SNAG = range(8)
+SPRUCE, ASPEN, KRUMMHOLZ, FIR, LODGEPOLE, DOUGLAS, LIMBER, SNAG, HARDWOOD, HEMLOCK = range(10)
 # the treeline (m) the elevation bands below were tuned for (Vail; game/src/pack/treeline.ts DEFAULT_TREELINE);
 # build_pack.py passes elevations relative to a resort's own treeline (DATA-021)
 COLORADO_TREELINE = 3480.0
-SPECIES_NAMES = ["spruce", "aspen", "krummholz", "fir", "lodgepole", "douglas-fir", "limber", "snag"]
-TREE_SPECIES_VERSION = 2
-# crown radius / height per species (the card's table); lodgepole carries its crown in the top third
-CROWN_K = np.array([0.13, 0.20, 0.50, 0.10, 0.09, 0.17, 0.35, 0.05], np.float32)
+SPECIES_NAMES = ["spruce", "aspen", "krummholz", "fir", "lodgepole", "douglas-fir", "limber", "snag", "hardwood", "hemlock"]
+N_SPECIES = len(SPECIES_NAMES)
+TREE_SPECIES_VERSION = 3
+# crown radius / height per species (the card's table); lodgepole carries its crown in the top third; a forest
+# grown oak or maple spreads about a quarter of its height, hemlock a little wider than spruce
+CROWN_K = np.array([0.13, 0.20, 0.50, 0.10, 0.09, 0.17, 0.35, 0.05, 0.28, 0.17], np.float32)
 
 WILLOW, JUNIPER, SAGE, YOUNG_CONIFER, OAK = range(5)
 SHRUB_NAMES = ["willow", "juniper", "sagebrush", "young conifer", "gambel oak"]
 
 # LANDFIRE EVT groups, matched by name (LF 2.4 / 2.5 renumbered the codes)
-G_NONE, G_SPRUCE_FIR, G_ASPEN, G_LODGEPOLE, G_DOUGLAS, G_LIMBER = range(6)
-GROUP_NAMES = ["none", "spruce-fir", "aspen", "lodgepole", "douglas-fir", "limber"]
+G_NONE, G_SPRUCE_FIR, G_ASPEN, G_LODGEPOLE, G_DOUGLAS, G_LIMBER, G_HARDWOOD, G_HEMLOCK = range(8)
+GROUP_NAMES = ["none", "spruce-fir", "aspen", "lodgepole", "douglas-fir", "limber", "hardwood", "hemlock"]
+
+# FEAT-233: the eastern LANDFIRE classes, told apart from the western ones by the region in their name
+# ("North-Central Interior Beech-Maple Forest", "Northern & Central Native Ruderal Forest", "Appalachian
+# (Hemlock)-Northern Hardwood Forest"). "Southern" alone is not one: it also starts "Southern Rocky Mountain".
+EASTERN_WORDS = ("North-Central", "Northeastern", "Appalachian", "Laurentian", "Acadian", "Eastern ", "Northern & Central",
+                 "Central Interior", "South-Central", "Southern Interior", "Atlantic", "Ozark", "Ouachita", "Piedmont",
+                 "Great Lakes", "Allegheny", "Southeastern", "Coastal Plain")
+# the broadleaf classes of the east, all bare in winter: a tree class naming none of these (or spruce-fir, hemlock,
+# pine, a plantation) is `known` False
+HARDWOOD_WORDS = ("Oak", "Beech", "Maple", "Hickory", "Hardwood", "Basswood", "Birch", "Ruderal", "Floodplain", "Swamp",
+                  "Flatwoods", "Mesophytic", "Deciduous", "Orchard", "Bottomland", "Ash", "Tulip", "Peatland")
+# a class's hemlock share, the first word that matches (cool ravines in beech-maple, a few where old fields went
+# to woods); the rest of the stand is bare hardwood
+EAST_HEMLOCK = (("Hemlock", 0.6), ("Beech", 0.12), ("Mesophytic", 0.12), ("Ruderal Forest", 0.08), ("Mixed", 0.15),
+                ("Peatland", 0.1), ("Swamp", 0.08), ("Floodplain", 0.04), ("Oak", 0.04), ("Orchard", 0.0))
+EAST_HEMLOCK_DEFAULT = 0.05
+
+
+def is_eastern(name):
+    """FEAT-233: an EVT class of the eastern US (its name carries an eastern region)"""
+    return any(w in name for w in EASTERN_WORDS)
+
+
+def classify_east(name, c):
+    """FEAT-233: an eastern tree class's group and broadleaf share (`hardwood`, 0..1; the rest of the stand is the
+    group's conifer, hemlock for the hardwood and hemlock groups). A class none of the rules name is bare hardwood,
+    the most common eastern forest, and `known` False."""
+    hem = next((k for w, k in EAST_HEMLOCK if w in name), EAST_HEMLOCK_DEFAULT)
+    if "Spruce" in name or "Fir" in name:            # Acadian-Appalachian montane spruce-fir: red spruce, balsam fir
+        c["group"], c["hardwood"] = G_SPRUCE_FIR, (0.4 if "Hardwood" in name else 0.0)
+    elif "Hemlock" in name:
+        c["group"], c["hardwood"] = G_HEMLOCK, 1.0 - hem
+    elif "Pine" in name:                              # pitch, white and Virginia pine: the nearest pine model
+        c["group"], c["hardwood"] = G_LODGEPOLE, (0.4 if "Oak" in name or "Hardwood" in name else 0.1)
+    elif "Plantation" in name or "Evergreen" in name or "Conifer" in name:
+        c["group"] = G_SPRUCE_FIR                     # red pine and Norway spruce plantations, urban evergreen
+    else:
+        c["group"], c["hardwood"] = G_HARDWOOD, 1.0 - hem
+        c["known"] = any(w in name for w in HARDWOOD_WORDS) or c["built"]
+    return c
 
 
 def classify_evt(name, lifeform):
@@ -44,14 +88,19 @@ def classify_evt(name, lifeform):
     plausible species.
     `built` (DATA-015): the class names no species (urban evergreen forest, developed, urban herb and shrub), so
     natural_evt() takes the tree group from the natural forest around it and NAIP alone decides aspen. Urban
-    deciduous forest is not `built`: "deciduous" already is the aspen answer."""
+    deciduous forest is not `built`: "deciduous" already is the aspen answer (bare hardwood in the east).
+    `hardwood` (FEAT-233): the class's share of bare broadleaf trees, eastern classes only (classify_east).
+    `known` (FEAT-233): False for a tree class the rules don't name, which falls to the catch-all group;
+    build_pack.py logs that share of the forest and pack_report.py line 4 warns over UNKNOWN_WARN."""
     tree = lifeform == "Tree"
     built = lifeform == "Developed" or "Urban" in name or "Developed" in name
     c = {"group": G_NONE, "aspen": 0.0, "forest": tree, "open": not tree and not built and lifeform != "",
          "alpine": "Alpine" in name, "riparian": "Riparian" in name, "sage": "Sagebrush" in name, "oak": "Gambel Oak" in name,
-         "built": built and not (tree and "Deciduous" in name)}
+         "built": built and not (tree and "Deciduous" in name), "hardwood": 0.0, "known": True}
     if not tree:
         return c
+    if is_eastern(name):
+        return classify_east(name, c)
     if "Aspen-Mixed" in name:
         c["group"], c["aspen"] = G_SPRUCE_FIR, 0.5
     elif "Aspen" in name:
@@ -72,13 +121,36 @@ def classify_evt(name, lifeform):
         c["group"], c["aspen"] = G_SPRUCE_FIR, 0.5
     else:                                                 # spruce-fir, urban and developed evergreen
         c["group"] = G_SPRUCE_FIR
+        c["known"] = "Spruce" in name or "Fir" in name or "Evergreen" in name or "Plantation" in name or c["built"]
     return c
+
+
+# pack_report.py line 4: more of the forest than this in classes classify_evt doesn't name is worth a card
+# (DATA-023 set 20 % as the bar for FEAT-233)
+UNKNOWN_WARN = 0.2
+
+
+def unknown_forest_share(window, lut):
+    """the share of the tree class pixels in `window` (EVT values under the pack) whose class the rules don't name"""
+    v = np.clip(np.asarray(window), 0, len(lut["forest"]) - 1)
+    f = lut["forest"][v]
+    return float((f & ~lut["known"][v]).sum() / max(int(f.sum()), 1))
+
+
+def group_shares(window, lut):
+    """the share of the tree class pixels in `window` per group (GROUP_NAMES), for the log and meta"""
+    v = np.clip(np.asarray(window), 0, len(lut["forest"]) - 1)
+    f = lut["forest"][v]
+    g = np.bincount(lut["group"][v][f].astype(np.int64), minlength=len(GROUP_NAMES))
+    return g / max(int(f.sum()), 1)
 
 
 def evt_luts(table, n):
     """per-value lookup arrays (length n) from the .vat.dbf rows"""
     lut = {k: np.zeros(n, dt) for k, dt in (("group", np.int8), ("aspen", np.float32), ("forest", bool), ("open", bool), ("alpine", bool),
-                                            ("riparian", bool), ("sage", bool), ("oak", bool), ("built", bool))}
+                                            ("riparian", bool), ("sage", bool), ("oak", bool), ("built", bool),
+                                            ("hardwood", np.float32), ("known", bool))}
+    lut["known"][:] = True            # values with no row in the table are not a class anyone named
     for r in table:
         v = int(float(r.get("VALUE", "0") or 0))
         if 0 <= v < n:
@@ -270,8 +342,70 @@ def lodgepole_share_no_evt(elev, dry):
     return np.clip(0.65 * smoothstep(3250, 2950, elev) * (1 + 0.3 * np.asarray(dry)), 0, 0.9)
 
 
+# FEAT-233: the region a pack's fallbacks (no LANDFIRE, or a tree on a class with no group) pick species by.
+# The west keeps the Colorado rules above (elevation bands, lodgepole low); east of this longitude (the plains
+# and everything past them) the forest is bare hardwood with hemlock, and spruce-fir only above the boreal line.
+EAST_LON = -100.0
+# the elevation (m) eastern spruce-fir takes over, by latitude: about 1,650 m in the southern Appalachians (35 N),
+# about 850 m in the Adirondacks and the White Mountains (44 N); it blends in over BOREAL_BLEND m below
+BOREAL_AT = ((35.0, 1650.0), (44.0, 850.0))
+BOREAL_BLEND = 150.0
+
+
+class Region:
+    """`name` "west" or "east"; `boreal` the eastern spruce-fir line (m) in the elevation frame assign_species sees"""
+    def __init__(self, name, boreal=None):
+        self.name, self.boreal = name, boreal
+
+    @property
+    def east(self):
+        return self.name == "east"
+
+    def shifted(self, elev_shift):
+        """the same region for elevations given `elev_shift` m lower (build_pack.py's treeline shift, DATA-021)"""
+        return self if self.boreal is None else Region(self.name, self.boreal - elev_shift)
+
+    def __repr__(self):
+        return f"Region({self.name!r}, {self.boreal!r})"
+
+
+WEST = Region("west")
+
+
+def boreal_line(lat):
+    (la0, z0), (la1, z1) = BOREAL_AT
+    return float(np.interp(lat, [la0, la1], [z0, z1]))
+
+
+def region_for(lon, lat):
+    """the Region of a pack centred at lon, lat (WEST when either is None)"""
+    if lon is None or lat is None or lon <= EAST_LON:
+        return WEST
+    return Region("east", boreal_line(lat))
+
+
+def hemlock_share_east(hardwood_frac, northeast, wet):
+    """P(hemlock) for a tree of an eastern hardwood or hemlock stand: the class's conifer share (1 - hardwood),
+    half as much again on north and east aspects and near water (hemlock keeps to cool ravines), less on the warm
+    side"""
+    con = 1.0 - np.asarray(hardwood_frac, np.float64)
+    return np.clip(con * (1 + 0.5 * np.asarray(northeast) + 0.5 * np.asarray(wet)), 0, 0.9)
+
+
+EAST_NO_EVT_HEMLOCK = 0.12
+
+
+def east_no_evt(sp, elev, northeast, wet, region, b, v):
+    """FEAT-233: eastern species where nothing names the stand (no LANDFIRE, or a class with no group): spruce-fir
+    (already in `sp`) above the boreal line, below it bare hardwood with hemlock on cool aspects and near water
+    (EAST_NO_EVT_HEMLOCK of the stand on flat dry ground). b, v: the tree's boreal blend and hemlock hashes."""
+    above = np.asarray(elev) > region.boreal - BOREAL_BLEND * np.asarray(b)
+    hem = np.asarray(v) < hemlock_share_east(1 - EAST_NO_EVT_HEMLOCK, northeast, wet)
+    return np.where(above, sp, np.where(hem, HEMLOCK, HARDWOOD)).astype(np.int8)
+
+
 def assign_species(x, y, elev, chm_at, group, aspen_frac, alpine, aspen_like, northeast, wet, ridge, aspen_roll, have_evt,
-                   naip_decides=None):
+                   naip_decides=None, hardwood_frac=None, region=WEST):
     """species id per tree (int8 array). Inputs are per-tree arrays:
     x, y        local metres (hash seed)
     elev        ground height (m); chm_at measured lidar canopy height (0 in gaps)
@@ -280,23 +414,40 @@ def assign_species(x, y, elev, chm_at, group, aspen_frac, alpine, aspen_like, no
     ridge       exposed crest; aspen_roll uniform 0..1 (the existing seeded draw); have_evt False = no LANDFIRE
     naip_decides  (DATA-015) the tree stands on a `built` class: its group came from natural_evt and NAIP alone
                 decides aspen, at the aspen class's share where NAIP sees aspen canopy and never elsewhere
+    hardwood_frac (FEAT-233) the class's bare broadleaf share (classify_evt `hardwood`; None = 0, the west)
+    region      (FEAT-233) the pack's Region: in the east the fallbacks are eastern (east_no_evt) and there is no
+                aspen (NAIP's bright leaf-on canopy is the hardwoods there)
     """
     n = len(x)
     u = hash01(x, y, 1)       # spruce / fir
     v = hash01(x, y, 2)       # group's own species vs spruce-fir understory
     w = hash01(x, y, 3)       # ridge limber pine
     sp = np.where(u < fir_share(elev, northeast, wet), FIR, SPRUCE).astype(np.int8)
+    east = region.east
     if have_evt:
         sp[(group == G_LODGEPOLE) & (v < 0.85)] = LODGEPOLE
         sp[(group == G_DOUGLAS) & (v < 0.65 * smoothstep(3250, 3000, elev))] = DOUGLAS
         sp[(group == G_LIMBER) & (v < 0.8)] = LIMBER
         none = group == G_NONE
-        sp[none & (v < lodgepole_share_no_evt(elev, -northeast))] = LODGEPOLE
-        is_aspen = ((aspen_roll < aspen_frac) | (aspen_like & (aspen_roll < 0.5))) & (elev < 3300)
-        if naip_decides is not None:
-            nd = np.asarray(naip_decides, bool)
-            al, ar, el = np.asarray(aspen_like, bool), np.asarray(aspen_roll), np.asarray(elev)
-            is_aspen[nd] = al[nd] & (ar[nd] < NAIP_ASPEN_SHARE) & (el[nd] < 3300)
+        if east:
+            sp[none] = east_no_evt(sp, elev, northeast, wet, region, hash01(x, y, 4), v)[none]
+            hw = np.zeros(n, np.float32) if hardwood_frac is None else np.asarray(hardwood_frac, np.float32)
+            stand = np.isin(group, (G_HARDWOOD, G_HEMLOCK))
+            sp[stand] = np.where(v < hemlock_share_east(hw, northeast, wet), HEMLOCK, HARDWOOD)[stand]
+            # the broadleaf share of an eastern spruce-fir or pine class (spruce-fir-hardwood, oak-pine)
+            other = ~stand & ~none & (hash01(x, y, 5) < hw)
+            sp[other] = HARDWOOD
+            is_aspen = np.zeros(n, bool)
+        else:
+            sp[none & (v < lodgepole_share_no_evt(elev, -northeast))] = LODGEPOLE
+            is_aspen = ((aspen_roll < aspen_frac) | (aspen_like & (aspen_roll < 0.5))) & (elev < 3300)
+            if naip_decides is not None:
+                nd = np.asarray(naip_decides, bool)
+                al, ar, el = np.asarray(aspen_like, bool), np.asarray(aspen_roll), np.asarray(elev)
+                is_aspen[nd] = al[nd] & (ar[nd] < NAIP_ASPEN_SHARE) & (el[nd] < 3300)
+    elif east:
+        sp = east_no_evt(sp, elev, northeast, wet, region, hash01(x, y, 4), v)
+        is_aspen = np.zeros(n, bool)
     else:
         sp[v < lodgepole_share_no_evt(elev, -northeast)] = LODGEPOLE
         is_aspen = aspen_like & (elev < 3150)
@@ -452,21 +603,37 @@ def band_report(species, elev, band=200):
         n = int(m.sum())
         if n == 0:
             continue
-        cnt = np.bincount(species[m].astype(np.int64), minlength=8)
-        lines.append(f"{b0}-{b0 + band} m: {n:8d}  " + "  ".join(f"{SPECIES_NAMES[i]} {cnt[i] / n * 100:4.1f}%" for i in range(8) if cnt[i]))
+        cnt = np.bincount(species[m].astype(np.int64), minlength=N_SPECIES)
+        lines.append(f"{b0}-{b0 + band} m: {n:8d}  " + "  ".join(f"{SPECIES_NAMES[i]} {cnt[i] / n * 100:4.1f}%" for i in range(N_SPECIES) if cnt[i]))
+    return lines
+
+
+def group_report(species, group):
+    """FEAT-233: per LANDFIRE group (after the built classes are filled): tree count and share of each species, as log lines"""
+    lines = []
+    n_all = max(len(species), 1)
+    for g in range(len(GROUP_NAMES)):
+        m = np.asarray(group) == g
+        n = int(m.sum())
+        if n == 0:
+            continue
+        cnt = np.bincount(species[m].astype(np.int64), minlength=N_SPECIES)
+        lines.append(f"{GROUP_NAMES[g]:>11}: {n:8d} ({n / n_all * 100:4.1f}%)  "
+                     + "  ".join(f"{SPECIES_NAMES[i]} {cnt[i] / n * 100:4.1f}%" for i in range(N_SPECIES) if cnt[i]))
     return lines
 
 
 SPECIES_RGB = np.array([[30, 90, 40], [235, 225, 120], [150, 60, 160], [60, 170, 90], [210, 120, 40],
-                        [40, 90, 200], [230, 60, 60], [110, 110, 110]], np.uint8)
-GROUP_RGB = np.array([[245, 245, 245], [45, 130, 65], [235, 225, 120], [210, 120, 40], [40, 90, 200], [230, 60, 60]], np.uint8)
+                        [40, 90, 200], [230, 60, 60], [110, 110, 110], [150, 110, 80], [20, 60, 70]], np.uint8)
+GROUP_RGB = np.array([[245, 245, 245], [45, 130, 65], [235, 225, 120], [210, 120, 40], [40, 90, 200], [230, 60, 60],
+                      [150, 110, 80], [20, 60, 70]], np.uint8)
 
 
 def debug_png(path, tx, ty, species, group2, min_x, max_y, w_m, h_m, res=10.0):
     """species map (most common id per `res` m cell) left, LANDFIRE group map right, same scale"""
     wc, hc = int(np.ceil(w_m / res)), int(np.ceil(h_m / res))
     c = np.clip(((tx - min_x) / res).astype(np.int64), 0, wc - 1); r = np.clip(((max_y - ty) / res).astype(np.int64), 0, hc - 1)
-    votes = np.zeros((8, hc * wc), np.int32)
+    votes = np.zeros((N_SPECIES, hc * wc), np.int32)
     np.add.at(votes, (species.astype(np.int64), r * wc + c), 1)
     has = votes.sum(0) > 0
     left = np.full((hc * wc, 3), 245, np.uint8)

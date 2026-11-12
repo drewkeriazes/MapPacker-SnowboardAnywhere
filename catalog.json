@@ -80,18 +80,18 @@
     39.60017972811195
    ],
    "tier": "gold",
-   "status": "preview",
+   "status": "playable",
    "pack": {
-    "version": 1,
+    "version": 3,
     "formatVersion": 1,
-    "build": "20261111T145558Z-c2847e",
-    "built": "2026-11-11",
-    "pipeline": "428c65d",
-    "bytes": 235867682,
-    "sha256": "5e1501b03976e7bfc43a425eedba9d669dd49a5c7df9a70ec7a39932ce7862e8",
-    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/vail-v1/vail.zip"
+    "build": "20261112T061112Z-4b325d",
+    "built": "2026-11-12",
+    "pipeline": "4dd05fc",
+    "bytes": 272234739,
+    "sha256": "5a40ef13fde9e210ba5043e2f8079312b842c1b104093e9b9f35fc6048071d07",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/vail-v3/vail.zip"
    },
-   "report": null
+   "report": "reports/vail.md"
   }
  ],
  "test": [
@@ -107,15 +107,15 @@
    "tier": null,
    "status": "test",
    "pack": {
-    "version": 1,
+    "version": 2,
     "formatVersion": 1,
-    "build": "20261112T043433Z-cc16b5",
-    "built": "2026-11-11",
-    "pipeline": "ca90e25",
-    "bytes": 44885044,
-    "sha256": "56c16089c92c8914007c3c7ba91f65ad877495cd01187964946125cc4ebf26c6",
-    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/synth-v1/synth.zip",
-    "content": "449fa328c5fdcb36"
+    "build": "20261112T161724Z-1b2c96",
+    "built": "2026-11-12",
+    "pipeline": "a399de6",
+    "bytes": 46381341,
+    "sha256": "9ffe438632f4f3b304f11658a533bb453c1809c869ca09c72bfe1069e7bd2bcc",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/synth-v2/synth.zip",
+    "content": "78f1680f9ed0e9ed"
    },
    "report": null
   }

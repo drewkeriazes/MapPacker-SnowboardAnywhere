@@ -55,6 +55,10 @@ LC_LEVELS = (("mid", 16.0, 4), ("far", 100.0, 3))
 #     over CROWN_SIGMA m) passes CROWN_LO..CROWN_HI and the stand is at least 2 x STAND_MIN_R m across (a grey
 #     opening, then a closing to fill the holes), so a clump of a dozen trees on open snow is carried by its
 #     trees alone instead of a dark patch around them.
+# BUG-101: the stands test reads the detected crowns only, the share it was tuned on. FEAT-074's generated stems,
+# in expectation, add about 3x that on Vail and turned 94% of the forest into closed stands (bowl clumps read
+# 0.29 instead of 0.07), so the dark ground came back under them. R counts the stems too: without them the
+# distant timber washes out.
 FAR_SIGMA = 16.0
 CROWN_FULL = 0.2
 CROWN_SIGMA = 10.0
@@ -64,7 +68,7 @@ STAND_MIN_R = 20.0
 SHADOW_H = 12.0
 # natural crown radius / height per species id, as game/src/world/trees/species.ts SPECIES[].radius
 # (tests/test_contract.py parses the game's species.ts and fails if they drift apart; docs/pack-format.md > Contract)
-CROWN_RATIO = np.array([0.13, 0.17, 1.1, 0.1, 0.09, 0.17, 0.35, 0.05])
+CROWN_RATIO = np.array([0.13, 0.17, 1.1, 0.1, 0.09, 0.17, 0.35, 0.05, 0.26, 0.16])
 HEIGHT_SIGMA = 3.0     # cells: canopy height is averaged over the forested cells around (it only lifts coarse chunks)
 WC_TREE, WC_BUILT, WC_BARE = 10, 50, 60
 ETH_NODATA = 255
@@ -186,10 +190,11 @@ def crown_radii(species, height, crown):
 
 def crown_area(pack_dir, meta, w, h):
     """BUG-069: the share of each PACK_RES cell over the pack bounds (row 0 = north) under the crowns the
-    client draws, unsmoothed. Overlapping crowns are summed, so a cell can pass 1 and a clump reads a little
-    denser than the ground it shades; fine for weighting the cover, which saturates at CROWN_FULL anyway.
-    Also returns the same raster with each tree weighted by its height over SHADOW_H (FEAT-168: what throws a
-    shadow of the length the shader assumes; krummholz mats throw next to none)."""
+    client draws, unsmoothed: the detected trees' and (FEAT-074) the generated stems' in expectation, apart
+    (BUG-101: the closed-stand test reads the detected ones only). Overlapping crowns are summed, so a cell can
+    pass 1 and a clump reads a little denser than the ground it shades; fine for weighting the cover, which
+    saturates at CROWN_FULL anyway. Also returns both together weighted by each tree's height over SHADOW_H
+    (FEAT-168: what throws a shadow of the length the shader assumes; krummholz mats throw next to none)."""
     b = meta["bounds"]
     area = np.zeros((h, w), np.float64); shade = np.zeros((h, w), np.float64)
     for t in tree_records(pack_dir, meta):
@@ -202,11 +207,13 @@ def crown_area(pack_dir, meta, w, h):
     # FEAT-074: plus the stems the client generates from the stand density, in expectation
     import stands
     sa, ss, _h, _c = stands.expected_crowns(pack_dir, meta, PACK_RES, w, h, SHADOW_H)
-    return (area / PACK_RES ** 2 + sa).astype(np.float32), (shade / PACK_RES ** 2 + ss).astype(np.float32)
+    return ((area / PACK_RES ** 2).astype(np.float32), sa.astype(np.float32),
+            (shade / PACK_RES ** 2 + ss).astype(np.float32))
 
 
 def closed_stand(crowns):
-    """BUG-069: 0..1 weight of the ground under a closed stand of drawn trees, from their smoothed crown share"""
+    """BUG-069: 0..1 weight of the ground under a closed stand of drawn trees, from the detected trees' smoothed
+    crown share (BUG-101: not the generated stems', which the thresholds were not tuned on)"""
     from scipy import ndimage
     dense = smoothstep(CROWN_LO, CROWN_HI, crowns).astype(np.float32)
     r = int(round(STAND_MIN_R / PACK_RES))
@@ -245,12 +252,13 @@ def pack_level(pack_dir, meta, runs, log=print):
     log(f"  pack cover {w} x {h} at {PACK_RES:g} m: forest {forest.mean()*100:.1f}%, "
         f"runs clear {(forest * burn).sum() / max(forest.sum(), 1) * 100:.1f}% of it")
     forest *= 1 - burn
-    crowns, shade = crown_area(pack_dir, meta, w, h)
+    detected, stems, shade = crown_area(pack_dir, meta, w, h)
+    crowns = detected + stems
     stands = None
     if crowns.any():   # a pack without tree instances keeps its canopy (the ground then carries the forest)
         from scipy import ndimage
         before = forest.sum()
-        stands = forest * closed_stand(ndimage.gaussian_filter(crowns, CROWN_SIGMA / PACK_RES))
+        stands = forest * closed_stand(ndimage.gaussian_filter(detected, CROWN_SIGMA / PACK_RES))
         forest *= np.clip(ndimage.gaussian_filter(crowns, FAR_SIGMA / PACK_RES) / CROWN_FULL, 0, 1)
         log(f"  drawn trees keep {forest.sum() / max(before, 1) * 100:.1f}% of the forest from far off, "
             f"closed stands {stands.sum() / max(before, 1) * 100:.1f}% from near (BUG-069)")
