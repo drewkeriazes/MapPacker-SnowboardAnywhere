@@ -30,9 +30,10 @@ def tiny_pack_with_stamp(tmp_path, stamp="abc1234"):
     return d
 
 
-def fake_gh_and_git(monkeypatch, maintainer=True, catalog=None):
+def fake_gh_and_git(monkeypatch, maintainer=True, catalog=None, fail=None):
     """publish_pack.run records every argv and answers the gh and git queries; `git worktree add` makes the folder
-    with origin/main's catalog.json and `git worktree remove` deletes it, so open_publish_pr runs end to end"""
+    with origin/main's catalog.json and `git worktree remove` deletes it, so open_publish_pr runs end to end. A
+    command starting with `fail` exits as run() does on a failed command."""
     calls = []
     catalog = catalog or {"formatVersion": FORMAT_VERSION, "resorts": []}
     monkeypatch.delenv("GITHUB_TRIGGERING_ACTOR", raising=False)   # set on a GitHub runner
@@ -40,6 +41,8 @@ def fake_gh_and_git(monkeypatch, maintainer=True, catalog=None):
     def run(cmd, cwd=None, capture=True):
         calls.append(list(cmd))
         line = " ".join(cmd)
+        if fail and line.startswith(fail):
+            raise SystemExit(f"{line} failed (1):\nboom")
         if line.startswith("gh release list"):
             return json.dumps([{"tagName": "other-v1"}])
         if line.startswith("gh release create"):
@@ -114,23 +117,64 @@ def test_a_non_maintainer_publish_gets_no_automerge(tmp_path, monkeypatch):
 def test_the_pr_branch_carries_the_new_entry_on_origin_mains_catalog(tmp_path, monkeypatch):
     other = {"slug": "vail", "name": "Vail", "pack": {"version": 4, "formatVersion": FORMAT_VERSION}}
     calls = fake_gh_and_git(monkeypatch, catalog={"formatVersion": FORMAT_VERSION, "resorts": [other]})
+    checkout = tmp_path / "checkout"           # the publisher's checkout: the resort's config and an older report
+    (checkout / "resorts" / "demo").mkdir(parents=True)
+    (checkout / "resorts" / "demo" / "demo.json").write_text("{}")
+    (checkout / "reports").mkdir()
+    (checkout / "reports" / "demo.md").write_text("older report")
+    monkeypatch.setattr(publish_pack, "REPO", str(checkout))
+    pack = tiny_pack_with_stamp(tmp_path)
+    with open(os.path.join(pack, "report.md"), "w") as f:
+        f.write("this build's report")
     seen = {}
     fake_run = publish_pack.run
 
-    def run(cmd, cwd=None, capture=True):        # read the worktree's catalog at commit time
+    def run(cmd, cwd=None, capture=True):        # read the worktree at commit time
+        if cmd[:2] == ["git", "add"]:
+            seen["added"] = cmd[3:]
         if cmd[:2] == ["git", "commit"]:
             seen["catalog"] = json.load(open(os.path.join(cwd, "catalog.json"), encoding="utf-8"))
+            seen["report"] = open(os.path.join(cwd, "reports", "demo.md")).read()
             seen["message"] = cmd[-1]
         return fake_run(cmd, cwd, capture)
     monkeypatch.setattr(publish_pack, "run", run)
-    publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview", "--accept-change",
-                       "--requested-by", "player-1-id"])
+    publish_pack.main([pack, "--status", "preview", "--accept-change", "--requested-by", "player-1-id"])
     assert [r["slug"] for r in seen["catalog"]["resorts"]] == ["demo", "vail"]
     assert seen["catalog"]["resorts"][0]["pack"]["pipeline"] == "abc1234"
+    assert seen["catalog"]["resorts"][0]["report"] == "reports/demo.md"
+    assert sorted(seen["added"]) == ["catalog.json", "reports/demo.md", "resorts/demo/demo.json"]
+    assert seen["report"] == "this build's report"
+    assert (checkout / "reports" / "demo.md").read_text() == "older report"     # the checkout is left alone
+    assert sorted(p.name for p in (checkout / "reports").iterdir()) == ["demo.md"]
     assert seen["message"] == "demo v1: preview, 0 MB, pipeline abc1234"
     pr = next(c for c in calls if c[:3] == ["gh", "pr", "create"])
     assert "accept-change" in pr
     assert not any(os.path.exists(c[-2]) for c in calls if c[:3] == ["git", "worktree", "add"])
+
+
+def test_the_local_publish_branch_is_deleted_after_the_pr(tmp_path, monkeypatch):
+    calls = fake_gh_and_git(monkeypatch)
+    publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview"])
+    assert ["git", "branch", "-D", "publish/demo-v1"] in calls
+
+
+def test_a_failed_pr_names_the_draft_and_the_pushed_branch_and_cleans_up(tmp_path, monkeypatch):
+    calls = fake_gh_and_git(monkeypatch, fail="gh pr create")
+    with pytest.raises(SystemExit) as e:
+        publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview"])
+    msg = str(e.value)
+    assert "draft release demo-v1" in msg and "origin/publish/demo-v1" in msg
+    assert ["git", "branch", "-D", "publish/demo-v1"] in calls
+    assert calls.index(["git", "branch", "-D", "publish/demo-v1"]) > \
+        next(i for i, c in enumerate(calls) if c[:3] == ["git", "worktree", "remove"])
+
+
+def test_a_failure_before_the_push_does_not_mention_a_pushed_branch(tmp_path, monkeypatch):
+    calls = fake_gh_and_git(monkeypatch, fail="git commit")
+    with pytest.raises(SystemExit) as e:
+        publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview"])
+    assert "draft release demo-v1" in str(e.value) and "is pushed" not in str(e.value)
+    assert ["git", "branch", "-D", "publish/demo-v1"] in calls
 
 
 def test_a_stamp_problem_refuses_before_any_release(tmp_path, monkeypatch):

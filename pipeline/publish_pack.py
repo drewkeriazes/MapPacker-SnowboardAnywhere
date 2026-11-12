@@ -19,8 +19,9 @@ main (FEAT-272). Steps:
      the version counts draft tags, so two publishes in flight never pick the same number. Players and the catalog
      don't see a draft.
   4. open a publish PR (open_publish_pr): in a throwaway worktree off a fresh origin/main, branch
-     `publish/<slug>-v<N>` with catalog.json plus the new entry, reports/<slug>.md and the resort's config, EPT node
-     lists, data plan (resorts/<slug>/) and manifest (manifests/), copied from this checkout; labels `publish`,
+     `publish/<slug>-v<N>` with catalog.json plus the new entry, the pack's report as reports/<slug>.md and the
+     resort's config, EPT node lists, data plan (resorts/<slug>/) and manifest (manifests/), copied from this
+     checkout (which is left as it was; the worktree and the local branch are deleted afterwards); labels `publish`,
      `automerge` when the publisher is in .github/maintainers.txt, `accept-change` with --accept-change. The merge
      workflow releases the draft, then merges. The command prints the PR link and does not wait.
 
@@ -252,14 +253,24 @@ def pr_body(entry: dict, *, why: str, release_url: str, started_by: str, run_url
     return "\n".join(lines) + "\n"
 
 
+def warn_on_failure(cmd: list, cwd: str) -> None:
+    """run(cmd) for cleanup: a failure only warns, so it can't hide the error being cleaned up after"""
+    try:
+        run(cmd, cwd=cwd)
+    except SystemExit as e:
+        print(f"warning: {e}")
+
+
 def open_publish_pr(*, slug: str, version: int, entry: dict, test: bool, src_repo: str, labels: list[str],
-                    body: str, repo: str) -> str:
-    """Commit the catalog entry and the resort's own files (copied from `src_repo`) on publish/<slug>-v<N>, in a
-    throwaway worktree off a fresh origin/main (never the publisher's checkout), push that branch, open the PR
-    against main. Returns the PR URL."""
+                    body: str, repo: str, report: str | None = None) -> str:
+    """Commit the catalog entry, the resort's own files (copied from `src_repo`) and `report` (as
+    reports/<slug>.md) on publish/<slug>-v<N>, in a throwaway worktree off a fresh origin/main (never the publisher's
+    checkout), push that branch, open the PR against main. Returns the PR URL. The worktree and the local branch
+    are deleted afterwards, so a rerun can make the branch again."""
     branch = publish_branch(slug, version)
     tmp = tempfile.mkdtemp(prefix=f"publish-pr-{slug}-")
     wt = os.path.join(tmp, "wt")
+    created = pushed = False
     try:
         run(["git", "fetch", "origin", "main"], cwd=src_repo)
         run(["git", "worktree", "add", "--detach", wt, "origin/main"], cwd=src_repo)
@@ -269,28 +280,36 @@ def open_publish_pr(*, slug: str, version: int, entry: dict, test: bool, src_rep
         with open(cat_path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(update_catalog(catalog, entry, test=test), f, indent=1)
             f.write("\n")
-        own = [] if test else resort_files(slug, src_repo)
-        for rel in own:
+        report_rel = f"reports/{slug}.md"   # this publish's report only, never an older one left in src_repo
+        own = [] if test else [rel for rel in resort_files(slug, src_repo) if rel != report_rel]
+        copies = [(os.path.join(src_repo, rel), rel) for rel in own] + ([(report, report_rel)] if report else [])
+        for src, rel in copies:
             os.makedirs(os.path.dirname(os.path.join(wt, rel)), exist_ok=True)
-            shutil.copy2(os.path.join(src_repo, rel), os.path.join(wt, rel))
+            shutil.copy2(src, os.path.join(wt, rel))
         p = entry["pack"]
         run(["git", "switch", "-c", branch], cwd=wt)
-        run(["git", "add", "--", "catalog.json", *own], cwd=wt)
+        created = True
+        run(["git", "add", "--", "catalog.json", *[rel for _, rel in copies]], cwd=wt)
         run(["git", "commit", "-q", "-m",
              f"{slug} v{version}: {entry['status']}, {p['bytes'] / 1e6:.0f} MB, pipeline {p['pipeline']}"], cwd=wt)
         run(["git", "push", "-u", "origin", branch], cwd=wt)
+        pushed = True
         body_path = os.path.join(tmp, "body.md")
         with open(body_path, "w", encoding="utf-8", newline="\n") as f:
             f.write(body)
         return run(["gh", "pr", "create", "-R", repo, "--base", "main", "--head", branch,
                     "--title", f"{slug} v{version}: publish", "--body-file", body_path,
                     *[arg for label in ["publish", *labels] for arg in ("--label", label)]], cwd=wt)
+    except SystemExit as e:
+        if pushed:
+            raise SystemExit(f"{e}\nThe branch {branch} is pushed: delete origin/{branch} too "
+                             f"(git push origin --delete {branch})")
+        raise
     finally:
         if os.path.isdir(wt):
-            try:
-                run(["git", "worktree", "remove", "--force", wt], cwd=src_repo)
-            except SystemExit as e:
-                print(f"warning: {e}")
+            warn_on_failure(["git", "worktree", "remove", "--force", wt], src_repo)
+        if created:
+            warn_on_failure(["git", "branch", "-D", branch], src_repo)
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -410,14 +429,11 @@ def main(argv=None) -> None:
                            "--title", f"{meta['name']} v{version}", "--notes", notes])
 
         # the recipe that built it goes in the PR beside the catalog: config, node lists, plan, manifest, report
-        if report and os.path.abspath(report) != os.path.abspath(os.path.join(REPO, report_rel)):
-            os.makedirs(os.path.join(REPO, "reports"), exist_ok=True)
-            shutil.copy2(report, os.path.join(REPO, report_rel))
         body = pr_body(entry, why=why, release_url=release_url, started_by=login, run_url=a.run_url,
                        requested_by=a.requested_by)
         try:
             pr = open_publish_pr(slug=slug, version=version, entry=entry, test=test, src_repo=REPO, labels=labels,
-                                 body=body, repo=a.repo)
+                                 body=body, repo=a.repo, report=report)
         except SystemExit as e:
             raise SystemExit(f"{e}\nThe draft release {tag} exists with nothing pointing at it: open the PR by hand, "
                              f"or delete the draft (gh release delete {tag} -R {a.repo} --yes)")
