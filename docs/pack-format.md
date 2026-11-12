@@ -25,6 +25,7 @@ pack/<slug>/
   rocks/<tx>_<ty>.bin       rock instances per 1 km cell
   features.json             lifts, runs, buildings, roads, water, peaks, labels
   report.json, report.md    the DATA-022 scorecard from pipeline/pack_report.py (optional, not read by the game)
+  attract/                  the main menu's shots, still and ghost takes (optional, FEAT-175: generated)
 ```
 
 ## Height tiles (Terrarium RGB)
@@ -234,6 +235,21 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
 
 `packs/index.json` (`{"packs": ["synth", "vail"], "names": {"synth": "Test mountain (synthetic)", "vail": "Vail"}}`) lists every pack folder with a `meta.json`, and each pack's `meta.json` `name` (FEAT-175). `write_meta` rewrites it after each build, and `get_pack.mjs` after each install; the menu reads it instead of probing each resort's `meta.json`, and lists every pack in it under that name, so a new resort needs no entry in `game/src/resorts.ts` (which only orders the known ones and names packs in an index without `names`).
 
+## Main menu (optional, FEAT-175)
+
+`attract/` holds a resort's main menu content when the game has no hand-made one: `pipeline/gen_content.py` writes
+`shots.json` (a list of the game's `AttractShot`, `game/src/world/AttractShots.ts`: id, x, y in pack metres, h heading
+in degrees clockwise from grid north, pitch, vertical fov, eye height over the snow, place, region, elev, the drift
+dolly / pan / period and conditions; the menu uses the first) and `index.json`, the resort's entry of the game's attract
+manifest: `{"shots": true, "generated": true, "stills": [<shot id>], "ghosts": [<take file>], "looks": {<shot id>:
+{"code", "pack": <meta.build>}}, "shotGhosts": {<shot id>: [<take file>]}}`. The game's `tools/auto_attract.mjs` adds
+the still `<shot id>.jpg` (1920 x 1080, shown only while `looks.<id>.pack` is the pack's `build`) and the ghost takes
+`<shot id>-start-run[-v<n>]-<i>.json` (the game's `AttractTake`: replay samples at 20 Hz). `meta.attract`
+(`{"generated": true}`) tells the game the folder is there, so a pack without it requests nothing. A game whose own
+`game/public/attract/index.json` lists the resort uses that instead. An `index.json` without `generated` is hand-made
+content (FEAT-243 moves Vail's and Breckenridge's here) and `gen_content.py` leaves it alone. Optional and ignored by
+an older game: no format bump.
+
 ## features.json
 
 ```
@@ -279,7 +295,12 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
                   "evtGroups": { "hardwood": 0.95, ... } },                     // the client ignores it
   "stands": { "res": 4, "size": 250, "zBase", "zScale": 32, "hStep": 0.25,  // optional, FEAT-074
               "cells": ["cx_cy", ...], "stems" },          // cells with an image; stems over the pack at full density
-  "start": { "x", "y", "heading" },                       // default drop-in
+  "start": { "x", "y", "heading", "run", "lift", "label", "source" },  // default drop-in, heading in radians from north;
+                                                           // gen_content.py (FEAT-175): source "generated", the top of the
+                                                           // highest lift (`lift`) on `run`, `label` the menu's line
+  "attract": { "generated": true },                       // optional (FEAT-175): the pack has attract/ (Main menu above)
+  "generated": { "start": true, "shots": 5, "buildStart": {...} },  // optional (FEAT-175): gen_content.py ran on this build,
+                                                           // what it found and the build's own start; a log, the client ignores it
   "treeline": 2700,                                       // optional, m (DATA-021): measured from the canopy; absent = 3,480 (Colorado);
                                                            // null = measured none (FEAT-234), see below
   "derived": { "rock.grey_sat": 0.093, "treeline": 2700, ... }, // optional (FEAT-175): values the build derived for this resort instead of

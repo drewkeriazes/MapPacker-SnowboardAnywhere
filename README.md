@@ -23,7 +23,7 @@ On Drew's PC (Windows; Python 3.13 with `pip install -r pipeline/requirements.tx
 
 ```
 add_resort.cmd "Boston Mills"     :: name to published pack: resolve, plan, fetch, build, report, ride, publish
-build_resort.cmd vail             :: config to scored pack in packs\vail (no ride, no publish)
+build_resort.cmd vail             :: config to scored pack in packs\vail with its start, menu and proposed compare spots (no ride, no publish)
 python pipeline\resort.py add --help
 ```
 
