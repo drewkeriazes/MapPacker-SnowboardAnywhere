@@ -2,13 +2,15 @@
 
     python pipeline/publish_check.py --base <catalog.json> --head <catalog.json> --repo <owner/name>
 
-For each entry in head that is new or whose pack differs from base, downloads release `<slug>-v<version>`'s
-`<slug>.zip` (drafts included, with a write token), checks its size and sha256 against the entry, then lints it
-(pack_lint.py). Prints the problems per slug, exit 1 if there are any. CI runs this from main's copy of pipeline/."""
+For each entry in head that is new or whose pack differs from base: refuses a slug that is not `[a-z0-9][a-z0-9-]*`
+or a version that is not a positive integer (before any gh call or path), flags a `pack.url` that is not this repo's
+release url for it, downloads release `<slug>-v<version>`'s `<slug>.zip` (drafts included, with a write token),
+checks its size and sha256 against the entry, then lints it (pack_lint.py). Prints the problems per slug, exit 1 if there are any. CI runs this from main's copy of pipeline/."""
 import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -16,7 +18,9 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pack_lint import lint_zip  # noqa: E402
-from publish_pack import all_entries  # noqa: E402
+from publish_pack import all_entries, asset_url  # noqa: E402
+
+SLUG = re.compile(r"[a-z0-9][a-z0-9-]*")
 
 
 def _key(e):
@@ -53,22 +57,40 @@ def download(entry: dict, repo: str, dest: str) -> str:
     return os.path.join(dest, f"{slug}.zip")
 
 
+def entry_problem(entry: dict) -> str | None:
+    """why the entry's slug or version can't name a release or a file, or None"""
+    slug, version = entry.get("slug"), (entry.get("pack") or {}).get("version")
+    if not isinstance(slug, str) or not SLUG.fullmatch(slug):
+        return f"slug {slug!r} does not match [a-z0-9][a-z0-9-]*"
+    if type(version) is not int or version < 1:
+        return f"version {version!r} is not a positive integer"
+    return None
+
+
 def check(base: dict, head: dict, repo: str, fetch=download) -> dict:
     """{slug: problems} for every changed entry; `fetch(entry, repo, dest)` downloads the zip"""
     out = {}
     for e in changed_entries(base, head):
+        bad = entry_problem(e)
+        if bad:                       # nothing below runs: the slug and version go into a gh call and a path
+            out[str(e.get("slug"))] = [bad]
+            continue
+        slug, version = e["slug"], e["pack"]["version"]
+        want = asset_url(slug, version, repo)
+        url = (e.get("pack") or {}).get("url")
+        problems = [] if str(url).lower() == want.lower() else [f"url: the catalog says {url}, the release is {want}"]
         with tempfile.TemporaryDirectory() as tmp:
             try:
                 path = fetch(e, repo, tmp)
             except (subprocess.CalledProcessError, OSError) as err:
-                out[e["slug"]] = [f"download failed: {err}"]
+                out[slug] = problems + [f"download failed: {err}"]
                 continue
-            problems = zip_problems(e, path)
+            problems += zip_problems(e, path)
             try:
                 problems += lint_zip(path)
             except zipfile.BadZipFile:
                 problems.append("not a zip file")
-            out[e["slug"]] = problems
+            out[slug] = problems
     return out
 
 

@@ -50,3 +50,38 @@ def test_check_runs_size_hash_and_lint_on_the_downloaded_zip_without_gh(tmp_path
     assert list(out) == ["demo"]
     assert out["demo"], "b'abc' is not a zip: the check must say so"
     assert not any("bytes" in p or "sha256" in p for p in out["demo"])
+
+
+def good_zip_fetch(data=b"abc"):
+    def fetch(ent, repo, dest):
+        p = os.path.join(dest, f"{ent['slug']}.zip")
+        with open(p, "wb") as f:
+            f.write(data)
+        return p
+    return fetch
+
+
+def test_check_flags_a_url_that_is_not_this_repos_release():
+    import publish_check
+    from publish_pack import asset_url
+    ok = {**entry("demo", 1), "pack": {**entry("demo", 1)["pack"], "url": asset_url("demo", 1, "o/r")}}
+    out = publish_check.check({"resorts": []}, {"resorts": [ok]}, "o/r", fetch=good_zip_fetch())
+    assert not any(p.startswith("url") for p in out["demo"])
+    evil = {**ok, "pack": {**ok["pack"], "url": "https://evil.invalid/demo.zip"}}
+    out = publish_check.check({"resorts": []}, {"resorts": [evil]}, "o/r", fetch=good_zip_fetch())
+    assert any(p.startswith("url") and "evil.invalid" in p for p in out["demo"])
+    other_tag = {**ok, "pack": {**ok["pack"], "url": asset_url("demo", 2, "o/r")}}
+    out = publish_check.check({"resorts": []}, {"resorts": [other_tag]}, "o/r", fetch=good_zip_fetch())
+    assert any(p.startswith("url") for p in out["demo"])
+
+
+def test_check_refuses_a_bad_slug_or_version_before_any_download():
+    import publish_check
+
+    def never(ent, repo, dest):
+        raise AssertionError("downloaded an entry whose slug or version is not checked")
+    for slug, version in (("../x", 1), ("Demo", 1), ("-x", 1), ("a/b", 1), (None, 1), ("demo\n", 1),
+                          ("demo", 0), ("demo", -1), ("demo", "1"), ("demo", 1.0), ("demo", True), ("demo", None)):
+        e = {"slug": slug, "pack": {"version": version, "formatVersion": 1, "bytes": 3, "sha256": "0" * 64}}
+        out = publish_check.check({"resorts": []}, {"resorts": [e]}, "o/r", fetch=never)
+        assert len(out) == 1 and len(next(iter(out.values()))) == 1, (slug, version)

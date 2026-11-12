@@ -191,6 +191,36 @@ def test_dry_run_prints_the_branch_and_calls_no_gh_and_no_fetch(tmp_path, monkey
     assert not any(c[0] == "gh" or c[:2] in (["git", "fetch"], ["git", "push"], ["git", "worktree"]) for c in calls)
 
 
+@pytest.mark.parametrize("dry", [False, True])
+def test_a_pack_the_lint_rejects_is_refused_before_the_zip_and_any_release(tmp_path, monkeypatch, dry):
+    calls = fake_gh_and_git(monkeypatch)
+    pack = tiny_pack_with_stamp(tmp_path)
+    os.remove(os.path.join(pack, "fine", "0_0.png"))
+    zipped = []
+    monkeypatch.setattr(publish_pack, "zip_pack", lambda *a: zipped.append(a) or (1, "0" * 64))
+    with pytest.raises(SystemExit) as e:
+        publish_pack.main([pack, "--status", "preview"] + (["--dry-run"] if dry else []))
+    assert "pack_lint found 1 problem(s)" in str(e.value) and "fine/0_0.png: missing" in str(e.value)
+    assert not zipped
+    assert not any(c[0] == "gh" or c[:2] == ["git", "push"] for c in calls)
+
+
+def test_the_lint_refusal_lists_at_most_twenty_problems(monkeypatch):
+    monkeypatch.setattr(publish_pack, "lint", lambda d: [f"p{i}" for i in range(25)])
+    with pytest.raises(SystemExit) as e:
+        publish_pack.lint_refusal("packs/x")
+    msg = str(e.value)
+    assert "25 problem(s)" in msg and "  - p19" in msg and "p20" not in msg and "and 5 more" in msg
+
+
+def test_the_printed_next_step_says_the_app_is_needed_and_names_the_safe_manual_path(tmp_path, monkeypatch, capsys):
+    fake_gh_and_git(monkeypatch)
+    publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview"])
+    out = capsys.readouterr().out
+    assert "when the publish App is set up" in out
+    assert out.index("gh release edit demo-v1") < out.index("then merge the PR")
+
+
 def make_pack(root, slug="demo", fmt=FORMAT_VERSION):
     d = root / slug
     (d / "fine").mkdir(parents=True)

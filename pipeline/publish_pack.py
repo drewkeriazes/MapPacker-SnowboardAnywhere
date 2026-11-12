@@ -13,7 +13,8 @@ Runs from any checkout or worktree (needs `gh` signed in with push access to thi
 main (FEAT-272). Steps:
   1. refuse a pack whose meta.json `formatVersion` is not this pipeline's FORMAT_VERSION (rebuild it on main), and
      one whose build stamp (meta.json `pipeline`) is missing, `+dirty` or not on origin/main (stamp_problem)
-  2. zip the pack, stored (PNG tiles do not compress), fixed timestamps so the same pack gives the same sha256;
+  2. refuse a pack pack_lint.py finds problems in (the publish-check job would reject its zip), dry run included;
+     zip the pack, stored (PNG tiles do not compress), fixed timestamps so the same pack gives the same sha256;
      refuse a zip over 1.9 GiB (GitHub's limit per release asset is 2 GiB)
   3. `gh release create <slug>-v<N> --draft` in this repo with the zip, meta.json and the report if there is one;
      the version counts draft tags, so two publishes in flight never pick the same number. Players and the catalog
@@ -40,6 +41,7 @@ from typing import Callable
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from packwriter import FORMAT_VERSION, pipeline_commit  # noqa: E402
+from pack_lint import lint  # noqa: E402
 import paths  # noqa: E402
 
 RESORTS_REPO = "drewkeriazes/MapPacker-SnowboardAnywhere"
@@ -313,6 +315,20 @@ def open_publish_pr(*, slug: str, version: int, entry: dict, test: bool, src_rep
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+LINT_SHOWN = 20
+
+
+def lint_refusal(pack_dir: str) -> None:
+    """refuse a pack the publish-check job's pack lint would reject, before anything is zipped or uploaded"""
+    problems = lint(pack_dir)
+    if problems:
+        shown = [f"  - {p}" for p in problems[:LINT_SHOWN]]
+        if len(problems) > LINT_SHOWN:
+            shown.append(f"  ... and {len(problems) - LINT_SHOWN} more (python pipeline/pack_lint.py {pack_dir})")
+        raise SystemExit("\n".join([f"refusing to publish: pack_lint found {len(problems)} problem(s) in {pack_dir}",
+                                    *shown]))
+
+
 def build_synth(out_dir: str) -> str:
     """synth_pack.py into a clean out_dir (a file left from an older build would go in the zip)"""
     shutil.rmtree(out_dir, ignore_errors=True)
@@ -360,6 +376,7 @@ def main(argv=None) -> None:
     problem = stamp_problem(meta, origin_main)
     if problem:
         raise SystemExit(f"refusing to publish: {problem}")
+    lint_refusal(pack_dir)          # local, so a dry run lints too; before any gh call, zip or upload
     pipeline = meta["pipeline"]
     if test:
         a.status, why, a.tier, report, cfg = "test", "test pack, not in the picker", None, None, {}
@@ -438,8 +455,11 @@ def main(argv=None) -> None:
             raise SystemExit(f"{e}\nThe draft release {tag} exists with nothing pointing at it: open the PR by hand, "
                              f"or delete the draft (gh release delete {tag} -R {a.repo} --yes)")
         print(f"opened {pr} (draft release {tag}): " + (
-            "it releases and merges itself once checks pass" if trusted else
+            "once checks pass it releases and merges itself, when the publish App is set up (publish-merge.yml)"
+            if trusted else
             f"{login} is not in .github/maintainers.txt, so a maintainer approves it with the automerge label"))
+        print(f"Without the App nothing merges itself: once checks pass, run gh release edit {tag} -R {a.repo} "
+              f"--draft=false first, then merge the PR (never the merge button while the release is a draft)")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
