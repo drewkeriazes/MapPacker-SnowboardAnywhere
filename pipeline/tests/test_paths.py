@@ -1,14 +1,13 @@
 """FEAT-238: where the pipeline reads and writes in MapPacker, and how it finds the game."""
 import json
 import os
-import subprocess
 import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import paths  # noqa: E402
-from publish_pack import ready_to_commit, resort_files  # noqa: E402
+from publish_pack import resort_files  # noqa: E402
 
 
 def test_layout_is_at_the_repo_root():
@@ -53,19 +52,6 @@ def test_publish_commits_the_resorts_own_files(tmp_path):
                                                    "manifests/demo.json", "reports/demo.md",
                                                    "resorts/demo/demo_ept_far_nodes.txt",
                                                    "resorts/demo/demo_ept_nodes.txt"]   # not a stray flat resorts/demo.json
-
-
-def git(repo, *a):
-    subprocess.run(["git", *a], cwd=repo, check=True, capture_output=True)
-
-
-def test_publish_refuses_a_checkout_not_on_main(tmp_path):
-    git(tmp_path, "init", "-q", "-b", "card")
-    (tmp_path / "catalog.json").write_text(json.dumps({"resorts": []}))
-    git(tmp_path, "add", "catalog.json")
-    git(tmp_path, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "x")
-    with pytest.raises(SystemExit, match="is on card: publish from the main checkout on main"):
-        ready_to_commit(str(tmp_path))
 
 
 def test_every_resort_has_its_own_folder_with_the_node_lists_it_names():

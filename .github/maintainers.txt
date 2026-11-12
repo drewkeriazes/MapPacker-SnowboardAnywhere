@@ -1,0 +1,4 @@
+# FEAT-272: GitHub logins trusted to publish packs. A publish one of them starts (gh's signed-in user, or a
+# workflow's triggering actor) gets the automerge label and releases and merges itself once checks pass
+# (when the publish App is set up, see .github/workflows/publish-merge.yml). One per line.
+drewkeriazes

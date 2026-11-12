@@ -1,11 +1,11 @@
 @echo off
-REM Double-click to add a resort by name (FEAT-224): resolve, plan, fetch, build, report, headless ride, publish.
+REM Double-click to add a resort by name (FEAT-224): resolve, plan, fetch, build, report, publish (a draft release and a publish PR; FEAT-272).
 REM The first run stops after the plan so you can read the data plan (resorts\<slug>\<slug>-plan.md) before
 REM a 1+ GB fetch; run it again to go on. Every stage is skipped when done, so it is safe to re-run.
 REM Several matches or neighbours (BUG-103): it asks here; the answer is kept for the second run.
-REM Optional: add_resort.cmd "<name>" [resort.py add options, e.g. --with Brandywine or --no-publish].
+REM Optional: add_resort.cmd "<name>" [resort.py add options, e.g. --with Brandywine, --no-publish or --ride].
 REM Set LANDFIRE_EMAIL to skip the email prompt. Raw data goes to SBA_RAW_ROOT (else raw\ in this checkout); the
-REM ride stage needs the game checked out next to this repo (..\SnowboardAnywhere, or SBA_GAME_REPO).
+REM headless ride (--ride only) needs the game checked out next to this repo (..\SnowboardAnywhere, or SBA_GAME_REPO).
 REM More: python pipeline\resort.py add --help
 cd /d "%~dp0"
 set NAME=%~1

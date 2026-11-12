@@ -23,6 +23,8 @@
 #                     the PR build the same pack (tools/ci/pack_content_key.py), or
 #                     when an earlier commit of the PR passed with the same two packs,
 #                     game commit and tools: that run's report is reused
+#   publish-check     the changed catalog entry's draft zip: size, sha256,            PRs, catalog.json changed
+#                     pack_lint.py; scripts from main
 #   repo-rules        no em dashes in added Markdown, plain commit messages,          always (PRs)
 #                     docs-travel warning
 #   public-guards     no .env files, no packs, raw data or data files in git, files   always
@@ -72,6 +74,7 @@ jobs:
       pull-requests: read
     outputs:
       pipeline: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.f.outputs.pipeline }}
+      catalog: ${{ steps.f.outputs.catalog }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
@@ -82,6 +85,39 @@ jobs:
               - '.github/workflows/checks.yml'
               - 'tools/ci/**'
               - 'pipeline/**'
+            catalog:
+              - 'catalog.json'
+
+  # A publish PR (FEAT-272) adds a catalog entry whose zip sits in a draft release. Downloads it and checks it against
+  # the entry. The token can write, so nothing from the PR runs: scripts come from main/, the PR's catalog.json is data.
+  publish-check:
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.catalog == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write   # a draft release's assets need push access to be read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          path: main
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          sparse-checkout: catalog.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: main/pipeline/requirements.txt
+      - run: pip install -r main/pipeline/requirements.txt
+      - name: Draft zip against its catalog entry (main's scripts)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python main/pipeline/publish_check.py --base main/catalog.json --head pr/catalog.json --repo ${{ github.repository }}
 
   pipeline-tests:
     needs: changes
@@ -95,7 +131,7 @@ jobs:
           python-version: '3.13'
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
-      - run: pip install -r pipeline/requirements.txt pytest
+      - run: pip install -r pipeline/requirements.txt pytest pyyaml
       - name: pytest (the game's tests run in format-check)
         run: python -m pytest pipeline/tests -v -m "not game"
 
@@ -119,7 +155,7 @@ jobs:
           python-version: '3.13'
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
-      - run: pip install -r pipeline/requirements.txt pytest
+      - run: pip install -r pipeline/requirements.txt pytest pyyaml
       # exit 1 on a mismatch, 2 when GitHub can't be reached: either fails the job
       - name: Pack format contract (pipeline/contract.py, the game's main on GitHub)
         run: python pipeline/contract.py

@@ -56,6 +56,8 @@ class World:
         monkeypatch.setattr(R, "ride", ride)
         monkeypatch.setattr(R, "published", lambda slug, pack, repo_dir=None: world.is_published)
         self.is_published = False
+        self.pending = None
+        monkeypatch.setattr(R, "publish_pending", lambda slug, build, runner=None: world.pending)
         self.fail_at = None
 
         class Failed(Exception):
@@ -82,7 +84,7 @@ class World:
     def add(self, **kw):
         a = argparse.Namespace(name="Demo", id=None, with_=None, alone=False, slug=None, first=None, last=None,
                                force=False, force_list=[], raw_root=str(self.tmp / "raw"), out=str(self.out),
-                               email=None, no_publish=False, resorts_dir=str(self.resorts))
+                               email=None, no_publish=False, ride=False, resorts_dir=str(self.resorts))
         for k, v in kw.items():
             setattr(a, k, v)
         return R.cmd_add(a, None, publish=self.publish, br=self.br)
@@ -97,11 +99,70 @@ def test_add_runs_every_stage_in_order_and_prints_the_gate(world, capsys):
     assert world.add() == 0
     assert world.calls == [("resolve", True), ("plan", "demo"),
                            ("build_resort", "nodes", "grooming"), ("build_resort", "build", "index"),
-                           ("build_resort", "report", "report"), ("ride", "demo"),
+                           ("build_resort", "report", "report"),
                            ("publish", (str(world.out), "--tier", "gold"))]
     out = capsys.readouterr().out
     assert "DATA-022 gate: preview, held back by:" in out and "8b Far tree ring: none: set lidar.far" in out
     assert "17 Main menu shot" not in out              # not an MVP line
+
+
+def test_add_skips_the_ride_unless_asked(world):
+    world.add()
+    assert "ride" not in [c[0] for c in world.calls]
+    world.calls.clear()
+    world.add(ride=True)
+    assert "ride" in [c[0] for c in world.calls]
+
+
+def test_an_open_publish_pr_for_this_build_skips_publish(world, capsys):
+    world.pending = "https://github.com/o/r/pull/9"
+    world.add()
+    assert not any(c[0] == "publish" for c in world.calls)
+    assert "publish: skip: https://github.com/o/r/pull/9 is open for this build" in capsys.readouterr().out
+
+
+def _runner(prs):
+    def run(cmd, cwd, env=None):
+        assert cmd[:3] == ["gh", "pr", "list"] and "publish" in cmd
+        return types.SimpleNamespace(returncode=0, stdout=json.dumps(prs), stderr="")
+    return run
+
+
+def test_publish_pending_matches_branch_and_build():
+    prs = [{"url": "u1", "headRefName": "publish/demo-v1", "body": "x\nBuild: b0\n"},
+           {"url": "u2", "headRefName": "publish/other-v1", "body": "Build: b1"},
+           {"url": "u3", "headRefName": "publish/demo-v2", "body": "Build: b1\n"}]
+    assert R.publish_pending("demo", "b1", _runner(prs)) == "u3"
+    assert R.publish_pending("demo", "b9", _runner(prs)) is None
+    assert R.publish_pending("dem", "b1", _runner(prs)) is None
+
+
+def test_publish_pending_is_none_when_gh_fails():
+    bad = lambda cmd, cwd, env=None: types.SimpleNamespace(returncode=1, stdout="", stderr="no auth")
+    assert R.publish_pending("demo", "b1", bad) is None
+
+
+def test_published_reads_origin_main_and_falls_back_offline(tmp_path):
+    pack = tmp_path / "demo"
+    pack.mkdir()
+    json.dump({"build": "b1"}, open(pack / "meta.json", "w"))
+    local = tmp_path / "mp"
+    local.mkdir()
+    json.dump({"resorts": []}, open(local / "catalog.json", "w"))          # stale checkout
+    remote = {"resorts": [{"slug": "demo", "pack": {"build": "b1"}}]}
+    seen = []
+
+    def online(cmd, cwd, env=None):
+        seen.append(cmd)
+        out = json.dumps(remote) if cmd[1] == "show" else ""
+        return types.SimpleNamespace(returncode=0, stdout=out, stderr="")
+
+    assert R.published("demo", str(pack), str(local), online)
+    assert seen[0][:4] == ["git", "fetch", "origin", "main"] and seen[1] == ["git", "show", "origin/main:catalog.json"]
+    offline = lambda cmd, cwd, env=None: types.SimpleNamespace(returncode=128, stdout="", stderr="unreachable")
+    assert not R.published("demo", str(pack), str(local), offline)          # the local file is the fallback
+    json.dump(remote, open(local / "catalog.json", "w"))
+    assert R.published("demo", str(pack), str(local), offline)
 
 
 def test_a_second_run_skips_the_plan_and_a_published_build(world, capsys):
@@ -143,7 +204,7 @@ def test_no_publish_and_from(world, capsys):
     assert not any(c[0] == "publish" for c in world.calls)
     world.calls.clear()
     assert world.add(first="ride", slug="demo") == 0
-    assert [c[0] for c in world.calls] == ["ride", "publish"]
+    assert [c[0] for c in world.calls] == ["publish"]            # --from ride alone does not ride
     assert world.add(first="publish", last="plan") == 2
 
 

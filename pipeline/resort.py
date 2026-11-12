@@ -1475,16 +1475,51 @@ def ride(slug, raw_dir, out_dir, runner=default_runner, log=print, game_repo=Non
     return True
 
 
-def published(slug, pack_dir, repo_dir=None):
-    """True when the catalog (catalog.json in the main checkout, where publish_pack.py commits it) already has this
-    pack's build"""
+def published(slug, pack_dir, repo_dir=None, runner=default_runner):
+    """True when the catalog already has this pack's build. Publishes land on main through pull requests, so the
+    catalog read is origin/main's (git fetch, git show); offline, the main checkout's catalog.json is the fallback"""
     repo_dir = repo_dir or paths.main_checkout()
     try:
-        cat = load_json(os.path.join(repo_dir, "catalog.json"))
         build = load_json(os.path.join(pack_dir, "meta.json")).get("build")
     except (OSError, ValueError):
         return False
+    cat = None
+    try:
+        if runner(["git", "fetch", "origin", "main"], repo_dir).returncode == 0:
+            r = runner(["git", "show", "origin/main:catalog.json"], repo_dir)
+            if r.returncode == 0:
+                cat = json.loads(r.stdout)
+    except (OSError, ValueError):
+        cat = None
+    if cat is None:
+        try:
+            cat = load_json(os.path.join(repo_dir, "catalog.json"))
+        except (OSError, ValueError):
+            return False
     return any(e.get("slug") == slug and (e.get("pack") or {}).get("build") == build for e in cat.get("resorts", []))
+
+
+def publish_pending(slug, build, runner=default_runner):
+    """the URL of an open publish PR (label publish, branch publish/<slug>-v<N>) whose body names this build, else
+    None (also when gh is missing or fails: then publish goes ahead and opens its own)"""
+    try:
+        r = runner(["gh", "pr", "list", "--label", "publish", "--state", "open", "--json", "url,headRefName,body"],
+                   paths.main_checkout())
+        prs = json.loads(r.stdout) if r.returncode == 0 else []
+    except (OSError, ValueError):
+        return None
+    for pr in prs:
+        lines = [l.strip() for l in (pr.get("body") or "").splitlines()]
+        if str(pr.get("headRefName", "")).startswith(f"publish/{slug}-v") and f"Build: {build}" in lines:
+            return pr.get("url")
+    return None
+
+
+def pack_build(pack_dir):
+    try:
+        return load_json(os.path.join(pack_dir, "meta.json")).get("build")
+    except (OSError, ValueError):
+        return None
 
 
 def cmd_add(a, hosts, publish=None, br=None):
@@ -1497,7 +1532,7 @@ def cmd_add(a, hosts, publish=None, br=None):
     if first > last:
         print("--from comes after --stop-after")
         return 2
-    todo = ADD_STAGES[first:last + 1]
+    todo = [s for s in ADD_STAGES[first:last + 1] if s != "ride" or getattr(a, "ride", False)]   # the ride is on request
     forced = set(getattr(a, "force_list", None) or [])
     slug = a.slug or slugify(a.name)
 
@@ -1568,6 +1603,8 @@ def cmd_add(a, hosts, publish=None, br=None):
             head("publish", "skip: --no-publish")
         elif published(slug, out) and not forced & {"publish", "all"}:
             head("publish", "skip: the catalog already has this build")
+        elif not forced & {"publish", "all"} and (url := publish_pending(slug, pack_build(out))):
+            head("publish", f"skip: {url} is open for this build")
         else:
             head("publish", f"publish_pack.py {out} (a release in {RESORTS_REPO})")
             if publish is None:
@@ -1604,7 +1641,7 @@ def main(argv=None):
     c = sub.add_parser("compare", help="plan a hand-written config again and list the differences")
     c.add_argument("slug")
     import build_resort
-    d = sub.add_parser("add", help="resolve, plan, fetch, build, report, ride and publish (FEAT-224)")
+    d = sub.add_parser("add", help="resolve, plan, fetch, build, report and publish; the ride with --ride (FEAT-224)")
     d.add_argument("name")
     d.add_argument("--id", help="OpenSkiData ski area id, when several match")
     d.add_argument("--with", dest="with_", action="append", help="a neighbour to build into the same pack")
@@ -1622,6 +1659,8 @@ def main(argv=None):
     d.add_argument("--game-repo", help="the SnowboardAnywhere checkout for the ride stage (default "
                    "../SnowboardAnywhere, or SBA_GAME_REPO)")
     d.add_argument("--email", help="email for the LANDFIRE service (or LANDFIRE_EMAIL)")
+    d.add_argument("--ride", action="store_true", help="also run the headless ride (needs the game and a GPU; "
+                   "off by default)")
     d.add_argument("--no-publish", action="store_true", help="everything but the release")
     d.add_argument("--review-plan", action="store_true", help="stop after a plan that was just written, to read it "
                    "before the fetch (add_resort.cmd passes it)")

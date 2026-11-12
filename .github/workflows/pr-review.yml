@@ -10,7 +10,7 @@
 #
 #   3. The same token works in both repos; the game repo has its own copy of the secret.
 #
-# Skip: PRs with the `review loop` label get no automatic review (FEAT-117).
+# Skip: PRs with the `review loop` label get no automatic review (FEAT-117); nor does a pure publish PR (FEAT-272).
 #
 # Manual review: Actions tab > Claude PR review > Run workflow, enter the PR number.
 # Or from a terminal: gh workflow run pr-review.yml -f pr_number=123
@@ -79,8 +79,34 @@ jobs:
           echo "round=$round" >> "$GITHUB_OUTPUT"
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
 
+      # FEAT-272: a pure publish PR (a `publish`-labelled publish/<slug>-v<N> branch changing only the publish file
+      # set: catalog, release notes, the resort's report, config and manifest) has no code for Claude to review; the
+      # Checks workflow vets the pack itself (publish-check). Anything else on a publish branch is reviewed as usual.
+      # The script is main's copy, in its own folder: nothing from the PR is checked out or run here.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install numpy pillow
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          path: .pure-main
+          fetch-depth: 1
+      - name: Pure publish PR
+        id: pure
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # a manual run always reviews
+          pure=false
+          [ "$EVENT" = workflow_dispatch ] || pure=$(python .pure-main/pipeline/publish_merge.py pure "$PR_NUMBER" | tail -n 1)
+          echo "pure=$pure"
+          echo "pure=$pure" >> "$GITHUB_OUTPUT"
+
       - name: Flag review loop
-        if: steps.round.outputs.mode == 'stop'
+        if: ${{ steps.round.outputs.mode == 'stop' && steps.pure.outputs.pure != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -90,7 +116,7 @@ jobs:
           gh api "repos/$REPO/issues/$PR_NUMBER/labels" -f "labels[]=review-loop" > /dev/null
           gh pr comment "$PR_NUMBER" --repo "$REPO" --body "**Review loop guard:** this PR has had ${{ steps.round.outputs.round }} pushes after Claude reviews, so automatic reviews are paused and it is flagged \`review-loop\` for @drewkeriazes to look at. To resume: remove the label, then Actions > Claude PR review > Run workflow."
 
-      - if: steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only'
+      - if: ${{ (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only') && steps.pure.outputs.pure != 'true' }}
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
@@ -99,7 +125,7 @@ jobs:
 
       # Reviewer rules always come from main, so PR branches cut before the
       # rules existed still get them, and a PR cannot rewrite its own rules.
-      - if: steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only'
+      - if: ${{ (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only') && steps.pure.outputs.pure != 'true' }}
         uses: actions/checkout@v6
         with:
           ref: main
@@ -107,20 +133,20 @@ jobs:
           sparse-checkout: .claude/agents
 
       # So the reviewer can run the pipeline's tests as evidence, once the pipeline lives here (FEAT-238).
-      - if: (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only') && hashFiles('pipeline/requirements.txt') != ''
+      - if: (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only') && steps.pure.outputs.pure != 'true' && hashFiles('pipeline/requirements.txt') != ''
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
-      - if: (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only') && hashFiles('pipeline/requirements.txt') != ''
+      - if: (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only') && steps.pure.outputs.pure != 'true' && hashFiles('pipeline/requirements.txt') != ''
         run: pip install -r pipeline/requirements.txt pytest
 
       # Wait for the Checks workflow (checks.yml, FEAT-240) on the PR's head commit, then write what it found
       # to checks-summary.md for the reviewer: each job's result and the end of each failed job's log.
       # The reviewer treats a failed check as blocking. Until checks.yml exists here this step is skipped.
       - name: Wait for the checks
-        if: (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only') && hashFiles('.github/workflows/checks.yml') != ''
+        if: (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only') && steps.pure.outputs.pure != 'true' && hashFiles('.github/workflows/checks.yml') != ''
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -159,7 +185,7 @@ jobs:
           } > checks-summary.md
           cat checks-summary.md
 
-      - if: steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only'
+      - if: ${{ (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only') && steps.pure.outputs.pure != 'true' }}
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -182,7 +208,7 @@ jobs:
 
       # BUG-050: keep Claude's full log (tool calls, permission denials) for 7 days
       # so a review that skipped its inline comments can be diagnosed.
-      - if: always() && (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only')
+      - if: always() && (steps.round.outputs.mode == 'full' || steps.round.outputs.mode == 'blocking-only') && steps.pure.outputs.pure != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: claude-review-log
