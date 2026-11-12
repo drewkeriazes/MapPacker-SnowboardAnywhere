@@ -12,6 +12,7 @@ relative to `meta.origin` (a UTM easting/northing). The client never touches lat
 pack/<slug>/
   meta.json
   fine/<tx>_<ty>.png        1 m heights, 512 x 512 samples per tile, resort area only
+  coarse/<tx>_<ty>.png      4 m heights, 512 x 512 samples per tile, over the fine area (optional, FEAT-229)
   mid/<tx>_<ty>.png         16 m heights, 512 x 512 samples per tile, 40 km square
   far/<tx>_<ty>.png         128 m heights, 512 x 512 samples per tile, 262 km square
   mask/<tx>_<ty>.png        2 m RGBA surface classes, 512 x 512 per tile, resort area
@@ -24,6 +25,7 @@ pack/<slug>/
   rocks/<tx>_<ty>.bin       rock instances per 1 km cell
   features.json             lifts, runs, buildings, roads, water, peaks, labels
   report.json, report.md    the DATA-022 scorecard from pipeline/pack_report.py (optional, not read by the game)
+  boot.json                 only in a pack installed from its boot zip: the tiles the boot zip holds (FEAT-230)
 ```
 
 ## Height tiles (Terrarium RGB)
@@ -37,6 +39,14 @@ Tiles abut without overlap; a sampler reads the neighbour tile across an edge.
 tile (0,0) in local metres), `tilesX`, `tilesY`. Tile `<tx>_<ty>` covers
 `x in [minX + tx*size, minX + (tx+1)*size)`, `y in [minY + ty*size, ...)` with `size = res*tileSize`.
 Void samples are encoded as height -32768 (R=G=B=0) and must be treated as "no data".
+
+`coarse` (FEAT-229, optional, `pipeline/coarse_set.py`) is a 4 m set over the fine set's area, with the fine
+set's `minX`, `minY` (2 km tiles): each sample is the mean of the 4 x 4 fine samples it covers, void ones left out,
+so its centre is at `minX + (i + 0.5) * 4` like any set's. The game's 4 and 8 m terrain chunks read it instead of
+the 1 m tiles (only 1 and 2 m chunks and physics load `fine`); a pack without it behaves as before. Vail: 36 tiles,
+14 MB, against 529 fine tiles, 143 MB. It is what lets a boot zip (below) hold only the fine tiles round the start
+and still show the 4 and 8 m ring (about 350 m to 1.7 km out) as it looks with the whole pack. Add it to a built pack:
+`python pipeline/coarse_set.py packs/<slug>`.
 
 ## Mask tiles
 
@@ -210,7 +220,33 @@ The build writes `debug/species.png` into the pack: the most common species per 
 
 Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/minY`. `treeCells`, `rockCells` and `shrubCells` list the cells that have a file (`"cx_cy"`); the client only requests those. Packs built before BUG-036 lack the lists and the client requests every cell in range; add them without a rebuild with `python pipeline/packwriter.py packs/<slug>`.
 
-`packs/index.json` (`{"packs": ["synth", "vail"], "names": {"synth": "Test mountain (synthetic)", "vail": "Vail"}}`) lists every pack folder with a `meta.json`, and each pack's `meta.json` `name` (FEAT-175). `write_meta` rewrites it after each build, and `get_pack.mjs` after each install; the menu reads it instead of probing each resort's `meta.json`, and lists every pack in it under that name, so a new resort needs no entry in `game/src/resorts.ts` (which only orders the known ones and names packs in an index without `names`).
+`packs/index.json` (`{"packs": ["synth", "vail"], "names": {"synth": "Test mountain (synthetic)", "vail": "Vail"}}`) lists every pack folder with a `meta.json`, and each pack's `meta.json` `name` (FEAT-175). The game's `get_pack.mjs` adds `"partial": ["<slug>", ...]` while a pack holds only its boot zip (FEAT-230, Boot and rest above); `index_packs` here never writes it. `write_meta` rewrites it after each build, and `get_pack.mjs` after each install; the menu reads it instead of probing each resort's `meta.json`, and lists every pack in it under that name, so a new resort needs no entry in `game/src/resorts.ts` (which only orders the known ones and names packs in an index without `names`).
+
+## Boot and rest (FEAT-230)
+
+`publish_pack.py` puts a resort out as three zips in its release: `<slug>.zip` (the whole pack, for games older than
+FEAT-230), and `<slug>-boot.zip` and `<slug>-rest.zip` from `pipeline/boot_split.py`, which together hold the same
+files. The boot zip is what the game needs to load and ride from the start: `meta.json`, `features.json`, every
+`far`, `mid` and `coarse` tile, the cover levels and any file outside the folders below; and of `fine`, `mask`,
+`ao`, `dir`, `moguls`, `trees`, `rocks`, `shrubs`, `stands` and `farTrees` only the tiles or cells within 1 km of a
+boot centre, or 300 m of a run that passes within 150 m of one (the first runs down). Boot centres are `meta.start`,
+the game's own start for the resort (until FEAT-243 moves it into the pack) and any `--boot-at`. Everything else,
+and `report.*`, is in the rest zip. The boot zip also carries `boot.json`:
+
+```
+{ "boot": 1, "centres": [[x, y], ...], "radius": 1000, "corridor": 300, "runs": 15,
+  "tiles": { "fine": ["9_12", ...], "mask": [...], "trees": [...], ... },   // the tiles ("tx_ty", file names) it holds
+  "bootBytes": 70930176, "restBytes": 183036430 }
+```
+
+A folder listed in `tiles` holds only those tiles until the rest is in (an empty list: none yet); every other file
+of the pack is there. The game's `get_pack.mjs` unzips the boot zip into `packs/<slug>`, lists the pack under
+`partial` in `packs/index.json`, then fetches the rest and moves its files in; the game asks a partial pack only
+for the tiles `boot.json` lists (the coarse set and the cover stand in round them), and asks again for the rest once
+`partial` no longer names the pack. `boot.json` stays in the pack afterwards and is not read then.
+
+Vail (2026-11-12, with the coarse set): boot 71 MB (cover 17.6, fine 14.2 in 52 tiles, coarse 14, mid 12, trees 2.9,
+mask 2.4, ao 1.3), rest 183 MB, full 254 MB.
 
 ## features.json
 
@@ -277,6 +313,10 @@ FEAT-222. `meta.json` `formatVersion` is the pack format a build wrote: `FORMAT_
 | 0 | | Packs without the field (built before FEAT-222), whatever layers they have |
 | 1 | FEAT-222, 2026-11-11 | The format at FEAT-222: `stands/` (FEAT-074), `treeSpecies` 2 (DATA-020), `cover` levels (FEAT-153), `treeline` when measured (DATA-021), `build` (FEAT-177) |
 
+Not a bump: the `coarse` height set (FEAT-229) and `boot.json` (FEAT-230) are optional and a game before them ignores
+them, and the catalog's `pack.boot` and `pack.rest` sit beside the full zip's `url`, `bytes` and `sha256`, which an
+older `get_pack.mjs` still reads.
+
 ## Contract
 
 FEAT-239. Every value the pipeline and the game must agree on, with where each side keeps it. The layout and
@@ -291,7 +331,9 @@ Lines are as of 2026-11-11 (the game at `51efba2`); search for the name if they 
 | Record crown radius / height per id | `pipeline/species.py:25` `CROWN_K` (field 4 of `trees/*.bin`, the table under Instances) | `game/src/world/trees/species.ts:86` `crownRadius`: the drawn radius nudged by record / natural, clamped to 0.85..1.25 | not checked: it need not equal `SPECIES[].radius` |
 | Default treeline (no measured `treeline`) | `pipeline/species.py:21` `COLORADO_TREELINE` (3,480 m, what the species bands were tuned for) | `game/src/pack/treeline.ts:4` `DEFAULT_TREELINE`; `game/src/pack/types.ts:111` | `tests/test_contract.py`: must be equal |
 | `packs/index.json` `{"packs", "names"}` | `pipeline/packwriter.py:100` `index_packs` | `game/tools/get_pack.mjs:59` `writePackIndex` (rewrites it after an install); `game/src/resorts.ts:14` `PackIndex` | `tests/test_publish_pack.py` round trip through `get_pack.mjs` (needs the game checkout and node) |
-| `catalog.json` | `pipeline/publish_pack.py:94` `catalog_entry`, `:109` `update_catalog` | `game/tools/get_pack.mjs:19` `CATALOG_URL`, `:75` `getPack`; `game/src/ui/ResortPicker.ts:42` | `tests/test_publish_pack.py` round trip |
+| `catalog.json` | `pipeline/publish_pack.py:94` `catalog_entry`, `:109` `update_catalog`; FEAT-230 `add_parts` (`pack.boot`, `pack.rest`: `url`, `bytes`, `sha256`) | `game/tools/get_pack.mjs:19` `CATALOG_URL`, `getPack` (boot then rest), `getRest`; `game/src/ui/ResortPicker.ts:42` | `tests/test_publish_pack.py` round trips (whole zip; boot then rest) |
+| `boot.json` (FEAT-230) | `pipeline/boot_split.py` `split` | `game/src/pack/Pack.ts` `checkPartial`, `has`; `game/src/pack/types.ts` `BootInfo` | `tests/test_publish_pack.py` boot round trip; the game's `tools/getpackcheck.mjs` |
+| `terrain.coarse` (FEAT-229) | `pipeline/coarse_set.py`, `pipeline/build_pack.py` stage 1 | `game/src/pack/Pack.ts` `coarse`, `skipFine`; `game/src/terrain/Terrain.ts` `update` | not checked across repos |
 | Terrarium heights | `pipeline/packwriter.py:17` `encode_terrarium` | `game/src/pack/HeightSet.ts:88` | not checked across repos |
 
 `python pipeline/contract.py` prints the checked lines against the game's `main` (`--game-repo <dir>` for a

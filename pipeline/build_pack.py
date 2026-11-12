@@ -80,6 +80,11 @@ if void.any():
 dem_local = dem  # heights are absolute metres; x,y are local
 fine_meta = write_height_set(out, "fine", dem, 1.0, X0 - OX, Y0 - OY)
 log("  fine written", fine_meta["tilesX"], "x", fine_meta["tilesY"])
+# FEAT-229: the 4 m set the 4 and 8 m chunks read (coarse_set.py), so a boot download needs only the fine tiles
+# round the start (FEAT-230)
+from coarse_set import write_coarse
+coarse_meta = write_coarse(out, dem, X0 - OX, Y0 - OY)
+log("  coarse written", coarse_meta["tilesX"], "x", coarse_meta["tilesY"])
 
 # ------------------------------------------------------------------ 2. mid (16 m from the 10 m export)
 log("mid ring")
@@ -1056,7 +1061,7 @@ if seg is not None:
 meta = {"version": 1, "formatVersion": FORMAT_VERSION, "slug": slug, "name": cfg["name"], "crs": crs, "origin": [OX, OY], "lonlat": [lon_c, lat_c],
         "bounds": {"minX": X0 - OX, "minY": Y0 - OY, "maxX": X1 - OX, "maxY": Y1 - OY},
         "zRange": [float(np.floor(Z_MIN / 100) * 100 - 100), float(np.ceil(Z_MAX / 100) * 100 + 100)],
-        "terrain": {"fine": fine_meta, "mid": mid_meta, "far": far_meta}, "mask": mask_meta, "ao": ao_meta, "dir": dir_meta, "moguls": mog_meta, "instances": inst, "stands": stand_meta, "treeSpecies": spc.TREE_SPECIES_VERSION,
+        "terrain": {"fine": fine_meta, "coarse": coarse_meta, "mid": mid_meta, "far": far_meta}, "mask": mask_meta, "ao": ao_meta, "dir": dir_meta, "moguls": mog_meta, "instances": inst, "stands": stand_meta, "treeSpecies": spc.TREE_SPECIES_VERSION,
         "start": start, "sun": {"azimuth": 160, "elevation": 30}, "attribution": cfg["attribution"]}
 if lf_tifs and LANDFIRE_ATTRIBUTION not in meta["attribution"]:   # FEAT-175: pack_report.py line 13 checks every credit
     meta["attribution"] = meta["attribution"] + [LANDFIRE_ATTRIBUTION]

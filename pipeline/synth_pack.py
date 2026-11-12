@@ -78,6 +78,8 @@ FX0, FY0, FS = -2048, -1024, 4096
 X, Y = grid(FX0, FY0, FS, FS, 1.0)
 print("fine ..."); Hf = height(X, Y)
 meta["terrain"]["fine"] = write_height_set(out, "fine", Hf, 1.0, FX0, FY0)
+from coarse_set import write_coarse  # FEAT-229
+meta["terrain"]["coarse"] = write_coarse(out, Hf, FX0, FY0)
 meta["bounds"] = {"minX": FX0, "minY": FY0, "maxX": FX0 + FS, "maxY": FY0 + FS}
 
 # mid: 40 km at 16 m

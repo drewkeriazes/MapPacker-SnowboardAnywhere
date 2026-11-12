@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from packwriter import FORMAT_VERSION, write_meta  # noqa: E402
-from publish_pack import (catalog_entry, content_key, find_test_pack, next_version, pack_files,  # noqa: E402
+from publish_pack import (add_parts, catalog_entry, content_key, find_test_pack, next_version, pack_files,  # noqa: E402
                           update_catalog, zip_pack)
 
 
@@ -153,3 +153,36 @@ def test_get_pack_installs_a_published_zip(tmp_path, game_file):
     catalog.write_text(json.dumps(update_catalog({}, entry)))
     assert "--force" in run().stderr
     assert run("--force").returncode == 0
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
+def test_get_pack_installs_boot_then_rest(tmp_path, game_file):
+    """FEAT-230: boot_split's two zips through get_pack.mjs give the same pack as the full zip"""
+    import boot_split
+    tool = game_file("game", "tools", "get_pack.mjs")
+    if "pack.boot" not in open(tool, encoding="utf-8").read():
+        pytest.skip("the game's get_pack.mjs predates the boot zip (FEAT-230)")
+    pack = make_pack(tmp_path / "src")
+    (pack / "fine" / "9_9.png").write_bytes(b"far fine tile")
+    meta = json.load(open(pack / "meta.json"))
+    meta.update(start={"x": 10, "y": 10, "heading": 0},
+                terrain={"fine": {"res": 1.0, "tileSize": 512, "minX": 0, "minY": 0, "tilesX": 10, "tilesY": 10}})
+    write_meta(str(pack), meta)
+    zpath = tmp_path / "demo.zip"
+    size, sha = zip_pack(str(pack), str(zpath))
+    parts = boot_split.write_split(str(pack), pack_files(str(pack)), str(tmp_path), "demo", [(10.0, 10.0)], radius=500)
+    assert parts["info"]["tiles"]["fine"] == ["0_0"]
+    entry = catalog_entry(meta, {}, version=1, size=size, sha256=sha, pipeline="x", tier="gold", status="preview", report=None)
+    add_parts(entry, parts)
+    entry["pack"]["url"] = str(zpath)
+    for p in ("boot", "rest"):
+        entry["pack"][p]["url"] = parts[p]["path"]
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text(json.dumps(update_catalog({}, entry)))
+    packs = tmp_path / "packs"
+    r = subprocess.run(["node", tool, "demo", "--catalog", str(catalog), "--packs", str(packs)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert "boot zip in" in r.stdout
+    got = sorted(p for p in pack_files(str(packs / "demo")) if p != "boot.json")
+    assert got == pack_files(str(pack))
+    assert json.load(open(packs / "index.json")) == {"packs": ["demo"], "names": {"demo": "Demo Mountain"}}
