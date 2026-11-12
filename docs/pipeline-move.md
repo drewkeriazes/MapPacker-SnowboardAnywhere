@@ -61,6 +61,8 @@ Today one workflow (`SnowboardAnywhere/.github/workflows/checks.yml`) covers bot
 
 The GPU pre-push hook (`.githooks/pre-push`) runs `render-budgets` on `game/` or `pipeline/` changes; its pipeline half moves with FEAT-240.
 
+FEAT-241 as built: `publish_pack.py --synth` builds the synthetic pack and publishes it as release `synth-v<N>` in the catalog's `test` list (one entry per pack format, with a `content` hash of the pack less its build stamps, so an unchanged rebuild publishes nothing). The game's `get_pack.mjs` reads `test` too and picks the entry for its own `PACK_FORMAT`; its CI caches the download on the release's sha256.
+
 ## 5. Game repo cleanup (FEAT-242)
 
 - Remove `pipeline/`, the four launchers, the `pack-build` skill, the `pipeline-tests` job and the `pipeline/**` filters.
