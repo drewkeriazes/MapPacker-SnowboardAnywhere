@@ -1,5 +1,10 @@
 # Resort pack format v1
 
+The pack format is the contract between this repo, which builds packs, and SnowboardAnywhere, which plays them
+(EPIC-16). This spec lives with the producer (FEAT-239); the game's `docs/pack-format.md` points here. Paths are
+this repo's, except those under `game/`, which are the game's. [Contract](#contract) lists the values both sides
+must agree on, [formatVersion](#formatversion) the bump rule.
+
 A pack is a static folder served over HTTP. Everything is in **local metres**: x east, y north, z up,
 relative to `meta.origin` (a UTM easting/northing). The client never touches lat/lon.
 
@@ -259,11 +264,35 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
 
 ## formatVersion
 
-FEAT-222. `meta.json` `formatVersion` is the pack format a build wrote: `FORMAT_VERSION` in `pipeline/packwriter.py`, which must equal `PACK_FORMAT` in `game/src/pack/format.ts` (`pipeline/tests/test_publish_pack.py` checks). `publish_pack.py` copies it into the resorts repo's `catalog.json`; `get_pack.mjs` installs only a pack of the game's own format, and the resort picker shows an older one as "needs rebuild" (still loadable when it is on disk). Packs built before FEAT-222 have no field and count as 0.
+FEAT-222. `meta.json` `formatVersion` is the pack format a build wrote: `FORMAT_VERSION` in `pipeline/packwriter.py`, which must equal `PACK_FORMAT` in the game's `game/src/pack/format.ts` (see [Contract](#contract)). `publish_pack.py` copies it into this repo's `catalog.json`; `get_pack.mjs` installs only a pack of the game's own format, and the resort picker shows an older one as "needs rebuild" (still loadable when it is on disk). Packs built before FEAT-222 have no field and count as 0.
 
-Bump both constants in the same PR as any change a client must know about: a new required layer, a changed encoding, or a field the client now relies on. Optional layers the client already treats as absent don't need a bump. Add a line here:
+**Bump rule** (FEAT-239):
+
+1. Any change a current game can't read bumps `formatVersion`: a new required layer, a changed encoding, or a field the game now relies on. Optional layers the game already treats as absent don't need a bump.
+2. It takes a PR here (`FORMAT_VERSION`, a line in the table below) and a PR in the game (`PACK_FORMAT` and the reader). The game's PR lands first or together: `tests/test_contract.py` fails here while this repo is ahead of the game's `main` ("land the game's format PR first"). To check the pair before either lands, point it at the game PR's checkout: `SBA_GAME_REPO=<game worktree> python -m pytest pipeline/tests/test_contract.py`, or `python pipeline/contract.py --game-repo <game worktree>`.
+3. Every catalog pack on an older format shows "needs rebuild" in the resort picker, and `npm run get` refuses it, until it is rebuilt and republished (`publish_pack.py` refuses a pack that is not on this pipeline's format).
 
 | formatVersion | Since | What |
 |---|---|---|
 | 0 | | Packs without the field (built before FEAT-222), whatever layers they have |
 | 1 | FEAT-222, 2026-11-11 | The format at FEAT-222: `stands/` (FEAT-074), `treeSpecies` 2 (DATA-020), `cover` levels (FEAT-153), `treeline` when measured (DATA-021), `build` (FEAT-177) |
+
+## Contract
+
+FEAT-239. Every value the pipeline and the game must agree on, with where each side keeps it. The layout and
+encodings above are the rest of the contract; these are the numbers and shapes that are written down twice.
+Lines are as of 2026-11-11 (the game at `51efba2`); search for the name if they have moved.
+
+| Value | MapPacker (writes) | SnowboardAnywhere (reads) | Checked by |
+|---|---|---|---|
+| `formatVersion` | `pipeline/packwriter.py:15` `FORMAT_VERSION`, written to `meta.json` (`pipeline/build_pack.py:1056`) and `catalog.json` (`pipeline/publish_pack.py:102`, `:114`) | `game/src/pack/format.ts:7` `PACK_FORMAT`; `game/tools/get_pack.mjs:67` `formatProblem`; `game/src/ui/ResortPicker.ts:32`, `:42` ("needs rebuild") | `tests/test_contract.py` against the game's `main` |
+| Species ids 0..7 (`treeSpecies` 2) | `pipeline/species.py:18` (ids), `:23` `TREE_SPECIES_VERSION` | `game/src/world/trees/species.ts:45` `SPECIES` (one row per id, in order), `:71` `speciesFor` (packs without `treeSpecies`: ids 0..2); `game/src/pack/types.ts:106` | `tests/test_contract.py` (the ids are the rows of the crown radius table) |
+| Drawn crown radius / height per id | `pipeline/cover.py:67` and `pipeline/stands.py:31` `CROWN_RATIO` (the crowns the game will draw, for the cover and the stem chance) | `game/src/world/trees/species.ts:46`-`53` `SPECIES[].radius` | `tests/test_contract.py`: must be equal |
+| Record crown radius / height per id | `pipeline/species.py:25` `CROWN_K` (field 4 of `trees/*.bin`, the table under Instances) | `game/src/world/trees/species.ts:86` `crownRadius`: the drawn radius nudged by record / natural, clamped to 0.85..1.25 | not checked: it need not equal `SPECIES[].radius` |
+| Default treeline (no measured `treeline`) | `pipeline/species.py:21` `COLORADO_TREELINE` (3,480 m, what the species bands were tuned for) | `game/src/pack/treeline.ts:4` `DEFAULT_TREELINE`; `game/src/pack/types.ts:111` | `tests/test_contract.py`: must be equal |
+| `packs/index.json` `{"packs", "names"}` | `pipeline/packwriter.py:100` `index_packs` | `game/tools/get_pack.mjs:59` `writePackIndex` (rewrites it after an install); `game/src/resorts.ts:14` `PackIndex` | `tests/test_publish_pack.py` round trip through `get_pack.mjs` (needs the game checkout and node) |
+| `catalog.json` | `pipeline/publish_pack.py:94` `catalog_entry`, `:109` `update_catalog` | `game/tools/get_pack.mjs:19` `CATALOG_URL`, `:75` `getPack`; `game/src/ui/ResortPicker.ts:42` | `tests/test_publish_pack.py` round trip |
+| Terrarium heights | `pipeline/packwriter.py:17` `encode_terrarium` | `game/src/pack/HeightSet.ts:88` | not checked across repos |
+
+`python pipeline/contract.py` prints the checked lines against the game's `main` (`--game-repo <dir>` for a
+checkout). Add a line here, and to `contract.py` where it can be parsed, for any new value both sides hold.

@@ -63,7 +63,7 @@ STAND_MIN_R = 20.0
 # FEAT-168: the tree height (m) the shader's shadow length stands for (TerrainMaterial TREE_SHADOW_H)
 SHADOW_H = 12.0
 # natural crown radius / height per species id, as game/src/world/trees/species.ts SPECIES[].radius
-# (tests/test_cover.py parses species.ts and fails if they drift apart)
+# (tests/test_contract.py parses the game's species.ts and fails if they drift apart; docs/pack-format.md > Contract)
 CROWN_RATIO = np.array([0.13, 0.17, 1.1, 0.1, 0.09, 0.17, 0.35, 0.05])
 HEIGHT_SIGMA = 3.0     # cells: canopy height is averaged over the forested cells around (it only lifts coarse chunks)
 WC_TREE, WC_BUILT, WC_BARE = 10, 50, 60

@@ -6,7 +6,8 @@
     raw/<slug>/                                       raw data: SBA_RAW_ROOT, else raw/ in the main checkout,
                                                       which every worktree shares
     ../SnowboardAnywhere                              the game, for the headless ride, pack_report.py's game-side
-                                                      lines and the format check: --game-repo or SBA_GAME_REPO
+                                                      lines: --game-repo or SBA_GAME_REPO (contract.py reads
+                                                      the game's main on GitHub unless one is given)
 """
 import os, subprocess
 
