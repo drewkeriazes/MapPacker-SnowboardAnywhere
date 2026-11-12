@@ -94,6 +94,29 @@
    "report": "reports/ohio-hills.md"
   },
   {
+   "slug": "park-city-mountain",
+   "name": "Park City Mountain",
+   "region": "Utah",
+   "country": "US",
+   "lonlat": [
+    -111.54885316113614,
+    40.65405653237404
+   ],
+   "tier": "silver",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261112T165956Z-1e47fa",
+    "built": "2026-11-12",
+    "pipeline": "039b9a7",
+    "bytes": 245318703,
+    "sha256": "1267bf1260c8b41903091ddcfcf6a60ad397ac37b887c3979af7de32d93fa096",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/park-city-mountain-v1/park-city-mountain.zip"
+   },
+   "report": "reports/park-city-mountain.md"
+  },
+  {
    "slug": "vail",
    "name": "Vail",
    "region": "Colorado",
