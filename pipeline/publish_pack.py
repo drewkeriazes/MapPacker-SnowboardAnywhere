@@ -3,7 +3,6 @@
     python pipeline/publish_pack.py packs/vail [--status preview|playable] [--tier gold] [--report report.md]
                                                [--dry-run]
     python pipeline/publish_pack.py --synth [--force] [--dry-run]
-    (resorts also: [--boot-at x,y ...] [--boot-radius 1000] [--no-boot])
 
 `--synth` (FEAT-241) builds the synthetic pack (synth_pack.py, about 2 minutes) into packs/synth and publishes it
 as a test pack, release `synth-v<N>`, for the game's CI (`node game/tools/get_pack.mjs synth`). It publishes only
@@ -14,10 +13,7 @@ Runs on Drew's PC, in the main checkout on `main` (needs `gh` signed in with pus
   1. refuse a pack whose meta.json `formatVersion` is not this pipeline's FORMAT_VERSION (rebuild it on main)
   2. zip the pack, stored (PNG tiles do not compress), fixed timestamps so the same pack gives the same sha256;
      refuse a zip over 1.9 GiB (GitHub's limit per release asset is 2 GiB)
-  2b. FEAT-230: for a resort (not a test pack), also split it into `<slug>-boot.zip` (everything the game needs to
-     ride from the start: boot_split.py) and `<slug>-rest.zip` (every other file); the game's get_pack downloads
-     the boot zip, plays it, and fetches the rest behind it. The full zip stays in the release for older games.
-  3. `gh release create <slug>-v<N>` in this repo with the zips, meta.json and the report if there is one
+  3. `gh release create <slug>-v<N>` in this repo with the zip, meta.json and the report if there is one
   4. update catalog.json, copy the report to reports/<slug>.md, and commit them in place with the resort's
      config, EPT node lists, data plan (resorts/<slug>/) and manifest (manifests/), then push. Only those files go in
      the commit; anything else uncommitted in the checkout is left alone.
@@ -130,20 +126,8 @@ def report_status(pack_dir: str, meta: dict, requested: str | None) -> tuple:
     return requested or ("playable" if passes else "preview"), why
 
 
-def asset_url(slug: str, version: int, repo: str = RESORTS_REPO, part: str | None = None) -> str:
-    """the release asset: the full zip, or with `part` the boot or rest zip (FEAT-230)"""
-    name = f"{slug}-{part}.zip" if part else f"{slug}.zip"
-    return f"https://github.com/{repo}/releases/download/{slug}-v{version}/{name}"
-
-
-def add_parts(entry: dict, parts: dict, repo: str = RESORTS_REPO) -> dict:
-    """FEAT-230: `pack.boot` and `pack.rest` ({url, bytes, sha256}) beside the full zip's url, bytes and sha256, which
-    stay for games older than the split (they read only those)"""
-    pk = entry["pack"]
-    for part in ("boot", "rest"):
-        p = parts[part]
-        pk[part] = {"url": asset_url(entry["slug"], pk["version"], repo, part), "bytes": p["bytes"], "sha256": p["sha256"]}
-    return entry
+def asset_url(slug: str, version: int, repo: str = RESORTS_REPO) -> str:
+    return f"https://github.com/{repo}/releases/download/{slug}-v{version}/{slug}.zip"
 
 
 def catalog_entry(meta: dict, cfg: dict, *, version: int, size: int, sha256: str, pipeline: str, tier: str,
@@ -229,10 +213,6 @@ def main(argv=None) -> None:
                     help="build the synthetic pack into packs/synth and publish it as a test pack if it changed")
     ap.add_argument("--force", action="store_true", help="with --synth: publish even when the content is unchanged")
     ap.add_argument("--repo", default=RESORTS_REPO)
-    ap.add_argument("--no-boot", action="store_true", help="publish the full zip only, no boot and rest zips (FEAT-230)")
-    ap.add_argument("--boot-at", action="append", default=[], metavar="X,Y",
-                    help="another boot centre in pack metres (meta.start and the game's start are always in)")
-    ap.add_argument("--boot-radius", type=float, default=None, help="m round each boot centre (default 1000)")
     ap.add_argument("--dry-run", action="store_true", help="zip and print the catalog entry; no release, no commit")
     a = ap.parse_args(argv)
     if a.synth == bool(a.pack_dir):
@@ -291,18 +271,6 @@ def main(argv=None) -> None:
                               tier=a.tier, status=a.status, report=report_rel, repo=a.repo)
         if content:
             entry["pack"]["content"] = content
-        parts = None
-        if not test and not a.no_boot:
-            import boot_split
-            game = paths.game_repo() if paths.has_game(paths.game_repo()) else None
-            centres = boot_split.boot_centres(meta, [c.split(",") for c in a.boot_at], game)
-            parts = boot_split.write_split(pack_dir, pack_files(pack_dir), tmp, slug, centres,
-                                           a.boot_radius or boot_split.RADIUS)
-            add_parts(entry, parts, a.repo)
-            i = parts["info"]
-            print(f"boot zip {parts['boot']['bytes'] / 1e6:.0f} MB round {i['centres']} ({i['radius']:.0f} m, "
-                  f"{i['runs']} runs), rest {parts['rest']['bytes'] / 1e6:.0f} MB"
-                  + ("" if game else "; no game checkout, so the game's own start is not a boot centre"))
         if a.dry_run:
             print(json.dumps(entry, indent=1))
             return
@@ -314,13 +282,9 @@ def main(argv=None) -> None:
                      f"Get it: `cd game && npm run get {slug}` in SnowboardAnywhere.")
         else:
             notes = (f"{meta['name']} pack v{version} ({a.status}, {a.tier} tier). Pack format {fmt}, build {meta.get('build')}, "
-                     f"pipeline {pipeline}. {size / 1e6:.0f} MB, sha256 `{sha}`."
-                     + (f" The game downloads the boot zip ({parts['boot']['bytes'] / 1e6:.0f} MB) first and rides from "
-                        f"the start while the rest ({parts['rest']['bytes'] / 1e6:.0f} MB) follows (FEAT-230)." if parts else "")
-                     + f"\n\nGet it: `cd game && npm run get {slug}` in SnowboardAnywhere.")
+                     f"pipeline {pipeline}. {size / 1e6:.0f} MB, sha256 `{sha}`.\n\n"
+                     f"Get it: `cd game && npm run get {slug}` in SnowboardAnywhere.")
         assets = [zip_path, os.path.join(pack_dir, "meta.json")] + ([report] if report else [])
-        if parts:
-            assets += [parts["boot"]["path"], parts["rest"]["path"]]
         print(f"creating release {tag} in {a.repo}")
         run(["gh", "release", "create", tag, *assets, "-R", a.repo, "--title", f"{meta['name']} v{version}",
              "--notes", notes], capture=False)

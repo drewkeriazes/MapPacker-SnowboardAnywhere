@@ -80,8 +80,7 @@ if void.any():
 dem_local = dem  # heights are absolute metres; x,y are local
 fine_meta = write_height_set(out, "fine", dem, 1.0, X0 - OX, Y0 - OY)
 log("  fine written", fine_meta["tilesX"], "x", fine_meta["tilesY"])
-# FEAT-229: the 4 m set the 4 and 8 m chunks read (coarse_set.py), so a boot download needs only the fine tiles
-# round the start (FEAT-230)
+# FEAT-229: the 4 m set the 4 and 8 m chunks read instead of the 1 m tiles (coarse_set.py)
 from coarse_set import write_coarse
 coarse_meta = write_coarse(out, dem, X0 - OX, Y0 - OY)
 log("  coarse written", coarse_meta["tilesX"], "x", coarse_meta["tilesY"])

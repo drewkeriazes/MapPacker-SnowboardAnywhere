@@ -1,8 +1,7 @@
 """FEAT-229: the `coarse` height set, 4 m between `fine` (1 m) and `mid` (16 m), over the fine set's area.
 
-The game's 4 and 8 m terrain chunks (about 350 m to 1.7 km from the camera) read it instead of the 1 m tiles, so a
-boot download (FEAT-230, boot_split.py) can hold the whole of it and only the fine tiles round the start, and the
-ring still looks finished. Each sample is the mean of the 4 x 4 fine samples it covers (void samples left out; all
+The game's 4 and 8 m terrain chunks (about 350 m to 1.7 km from the camera) read it instead of the 1 m tiles (at the
+Vail start 6 coarse tiles instead of 40 fine ones, the same look). Each sample is the mean of the 4 x 4 fine samples it covers (void samples left out; all
 void stays void), so its centre falls where the height set's own rule puts it (minX + (i + 0.5) * 4). Same tiling
 and anchor as fine (lower-left corner at fine's minX, minY), 512 samples per tile: 2 km tiles, 1/16 of the fine set.
 
