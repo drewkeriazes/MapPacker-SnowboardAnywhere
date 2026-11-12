@@ -12,6 +12,7 @@ relative to `meta.origin` (a UTM easting/northing). The client never touches lat
 pack/<slug>/
   meta.json
   fine/<tx>_<ty>.png        1 m heights, 512 x 512 samples per tile, resort area only
+  coarse/<tx>_<ty>.png      4 m heights, 512 x 512 samples per tile, over the fine area (optional, FEAT-229)
   mid/<tx>_<ty>.png         16 m heights, 512 x 512 samples per tile, 40 km square
   far/<tx>_<ty>.png         128 m heights, 512 x 512 samples per tile, 262 km square
   mask/<tx>_<ty>.png        2 m RGBA surface classes, 512 x 512 per tile, resort area
@@ -37,6 +38,13 @@ Tiles abut without overlap; a sampler reads the neighbour tile across an edge.
 tile (0,0) in local metres), `tilesX`, `tilesY`. Tile `<tx>_<ty>` covers
 `x in [minX + tx*size, minX + (tx+1)*size)`, `y in [minY + ty*size, ...)` with `size = res*tileSize`.
 Void samples are encoded as height -32768 (R=G=B=0) and must be treated as "no data".
+
+`coarse` (FEAT-229, optional, `pipeline/coarse_set.py`) is a 4 m set over the fine set's area, with the fine
+set's `minX`, `minY` (2 km tiles): each sample is the mean of the 4 x 4 fine samples it covers, void ones left out,
+so its centre is at `minX + (i + 0.5) * 4` like any set's. The game's 4 and 8 m terrain chunks read it instead of
+the 1 m tiles (only 1 and 2 m chunks and physics load `fine`); a pack without it behaves as before. Vail: 36 tiles,
+14 MB, against 529 fine tiles, 143 MB. At the Vail start the 4 and 8 m chunks (about 350 m to 1.7 km out) then load
+6 coarse tiles instead of 40 fine ones, and look the same. Add it to a built pack: `python pipeline/coarse_set.py packs/<slug>`.
 
 ## Mask tiles
 
@@ -310,6 +318,8 @@ FEAT-233 (`treeSpecies` 3, ids 8 bare hardwood and 9 eastern hemlock, the option
 every client since DATA-020 sends a species id past its table to 0 (`speciesFor`), so an older game loads a new pack and
 draws the new ids as spruce, the conifer forest those packs showed before; western packs hold no new id at all.
 
+Not a bump: the `coarse` height set (FEAT-229) is optional and a game before it ignores it.
+
 ## Contract
 
 FEAT-239. Every value the pipeline and the game must agree on, with where each side keeps it. The layout and
@@ -325,6 +335,7 @@ Lines are as of 2026-11-11 (the game at `51efba2`); search for the name if they 
 | Default treeline (`treeline` absent; `null` is none, FEAT-234) | `pipeline/species.py:23` `COLORADO_TREELINE` (3,480 m, what the species bands were tuned for) | `game/src/pack/treeline.ts:4` `DEFAULT_TREELINE`; `game/src/pack/types.ts:111` | `tests/test_contract.py`: must be equal |
 | `packs/index.json` `{"packs", "names"}` | `pipeline/packwriter.py:100` `index_packs` | `game/tools/get_pack.mjs:59` `writePackIndex` (rewrites it after an install); `game/src/resorts.ts:14` `PackIndex` | `tests/test_publish_pack.py` round trip through `get_pack.mjs` (needs the game checkout and node) |
 | `catalog.json` | `pipeline/publish_pack.py:94` `catalog_entry`, `:109` `update_catalog` | `game/tools/get_pack.mjs:19` `CATALOG_URL`, `:75` `getPack`; `game/src/ui/ResortPicker.ts:42` | `tests/test_publish_pack.py` round trip |
+| `terrain.coarse` (FEAT-229) | `pipeline/coarse_set.py`, `pipeline/build_pack.py` stage 1 | `game/src/pack/Pack.ts` `coarse`, `skipFine`; `game/src/terrain/Terrain.ts` `update` | not checked across repos |
 | Terrarium heights | `pipeline/packwriter.py:17` `encode_terrarium` | `game/src/pack/HeightSet.ts:88` | not checked across repos |
 
 `python pipeline/contract.py` prints the checked lines against the game's `main` (`--game-repo <dir>` for a
