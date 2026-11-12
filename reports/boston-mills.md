@@ -1,8 +1,8 @@
 # Pack report: Boston Mills / Brandywine (`boston-mills`)
 
-Build `20261112T013748Z-b77540`, pipeline `d3d9993+dirty`, format 1. Report 2026-11-12T01:37:52Z by `pipeline/pack_report.py` (FEAT-175).
+Build `20261112T023308Z-c4f25c`, pipeline `2a0b12f`, format 1. Report 2026-11-12T02:39:58Z by `pipeline/pack_report.py` (FEAT-175).
 
-**Preview**: MVP lines 12 hold it back.
+**Playable**: every DATA-022 MVP line passes.
 
 | # | Item | | Detail |
 |---|---|---|---|
@@ -18,8 +18,8 @@ Build `20261112T013748Z-b77540`, pipeline `d3d9993+dirty`, format 1. Report 2026
 | 8b | Far tree ring (lidar crowns round the resort) | ✅ | 0.50 M crowns in 209 cells |
 | 9 | features.json | ⚠️ | 3 runs without a difficulty; 16 lifts, 20 runs, 85 buildings, 587 roads, 43 water, 66 peaks, 0 labels |
 | 10 | Default start on a run, on snow, clear of trees | ✅ | on Outer Limits |
-| 11 | In the resort picker | ✅ | in packs/index.json |
-| 12 | Time trial courses | ❌ | 0 runs of 300 m and 60 m drop or more |
+| 11 | In the resort picker | ✅ | in packs/index.json, in the catalog |
+| 12 | Time trial courses | ✅ | 11 runs of 150 m and 30 m drop or more |
 | 13 | Attribution for every data set | ✅ | 8 lines |
 | 14 | Validated | ⚠️ | 4 advanced+ runs never over 15 deg; 23 crowns per km within 5 m of lift lines; ride from the start and views from the top not checked here (shoot.mjs) |
 | | **Polish (not gated)** | | |
