@@ -60,6 +60,8 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          # No token in .git/config while Claude reads board text; the push below passes it on the command line.
+          persist-credentials: false
 
       - name: Find what shipped
         id: scope
@@ -78,6 +80,16 @@ jobs:
             since=$last; from="the last change to README.md"
             if [ "$(git rev-list --parents -n1 "$last" | wc -w)" -gt 2 ] && git log -1 --format=%s "$last" | grep -q '/readme-update-'; then
               since=$(git merge-base "$last^1" "$last^2"); from="the main commit the last README update was made from"
+            else
+              # A squash-merged README update ("... (#N)"): its branch was one commit made from main, so start from
+              # that commit's parent (GitHub keeps a PR's commits after its branch is deleted).
+              n=$(git log -1 --format=%s "$last" | sed -nE 's/.*\(#([0-9]+)\)$/\1/p')
+              first=""
+              [ -z "$n" ] || first=$(gh pr view "$n" --repo "$REPO" --json headRefName,commits \
+                --jq 'select(.headRefName | startswith("readme-update-")) | .commits[0].oid' 2> /dev/null) || first=""
+              if [ -n "$first" ] && base=$(gh api "repos/$REPO/commits/$first" --jq '.parents[0].sha') && [ -n "$base" ]; then
+                since=$base; from="the main commit the last README update was made from"
+              fi
             fi
           elif c=$(git rev-parse --verify -q "${SINCE_INPUT}^{commit}"); then
             since=$c; from="$SINCE_INPUT"
@@ -176,6 +188,12 @@ jobs:
         run: git clone -q --depth 1 "https://github.com/$GAME" /tmp/game \
           || { mkdir -p /tmp/game; echo "::warning::could not clone the game; its lines go unchecked"; }
 
+      # Claude reads text anyone can write (PR and card bodies). A hook or config it was talked into writing would run
+      # at the commit below, so record .git's config, hooks and info now and stop the run if they change.
+      - name: Guard .git
+        if: steps.scope.outputs.go == 'true'
+        run: find .git/config .git/hooks .git/info -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/git-guard.sha
+
       # Claude only edits README.md. Commit, push and the PR happen in plain steps below.
       - if: steps.scope.outputs.go == 'true'
         uses: anthropics/claude-code-action@v1
@@ -213,8 +231,9 @@ jobs:
               - if you changed README.md: 2 to 8 markdown bullets, one per change, each naming the README section and the
                 PR or card it came from, e.g. "- Build a resort: added the --skip-ride flag of add_resort.cmd (#31)".
               - otherwise the line NO_CHANGES, then one line on why (e.g. "the merged PRs were stage internals and CI work").
+          # Edit rules cover every file-writing tool, Write included: README.md and the summary, nothing else.
           claude_args: |
-            --add-dir /tmp/game --allowedTools "Read,Edit,Write,Grep,Glob,Bash(git log:*),Bash(git diff:*),Bash(git show:*)"
+            --add-dir /tmp/game --allowedTools "Read,Grep,Glob,Edit(README.md),Edit(//tmp/readme-summary.md),Bash(git log:*),Bash(git diff:*),Bash(git show:*)"
 
       - name: Open the PR
         if: steps.scope.outputs.go == 'true'
@@ -224,12 +243,17 @@ jobs:
           FROM: ${{ steps.scope.outputs.from }}
         run: |
           set -euo pipefail
+          now=$(find .git/config .git/hooks .git/info -type f -print0 | sort -z | xargs -0 sha256sum)
+          [ "$now" = "$(cat /tmp/git-guard.sha)" ] \
+            || { echo "::error::.git/config, .git/hooks or .git/info changed during the Claude step; nothing committed"; exit 1; }
+          # git with no hooks and no fsmonitor, for the commands below.
+          g() { git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
           # Only README.md may change; drop anything else Claude touched.
-          git diff --name-only | grep -vx README.md | xargs -r git checkout -- || true
-          git clean -fdq
+          g diff --name-only | grep -vx README.md | xargs -r git -c core.hooksPath=/dev/null -c core.fsmonitor=false checkout -- || true
+          g clean -fdq
           first=$(head -n1 /tmp/readme-summary.md 2>/dev/null || true)
-          if git diff --quiet -- README.md || [ "$first" = NO_CHANGES ]; then
-            git checkout -- README.md
+          if g diff --quiet -- README.md || [ "$first" = NO_CHANGES ]; then
+            g checkout -- README.md
             why=$(sed -n 2p /tmp/readme-summary.md 2>/dev/null || true)
             { echo "## README update"; echo
               echo "README.md is already current for main since \`$SHORT\` ($FROM). No PR opened."
@@ -242,13 +266,13 @@ jobs:
           [ -s /tmp/readme-summary.md ] || echo "- README.md updated (Claude wrote no summary; see the diff)" > /tmp/readme-summary.md
 
           branch="readme-update-$(date -u +%F)"
-          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then branch="$branch-$GITHUB_RUN_NUMBER"; fi
-          git config user.name "Drew Keriazes"
-          git config user.email "35705219+drewkeriazes@users.noreply.github.com"
-          git switch -q -c "$branch"
-          git add README.md
-          git commit -q -m "README: bring up to date with main since $SHORT" -m "$(cat /tmp/readme-summary.md)"
-          git push -q origin "HEAD:refs/heads/$branch"
+          if g ls-remote --exit-code --heads origin "$branch" > /dev/null; then branch="$branch-$GITHUB_RUN_NUMBER"; fi
+          g config user.name "Drew Keriazes"
+          g config user.email "35705219+drewkeriazes@users.noreply.github.com"
+          g switch -q -c "$branch"
+          g add README.md
+          g commit -q -m "README: bring up to date with main since $SHORT" -m "$(cat /tmp/readme-summary.md)"
+          g push -q "https://x-access-token:${GH_TOKEN}@github.com/$REPO.git" "HEAD:refs/heads/$branch"
 
           {
             echo "Brings \`README.md\` up to date with what shipped on \`main\` since \`$SHORT\` ($FROM)."
