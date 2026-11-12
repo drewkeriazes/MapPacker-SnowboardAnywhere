@@ -9,6 +9,10 @@ Steps
   3. Far ring: Mapterhorn z11 WebP tiles (Terrarium, Web Mercator) -> reprojected to a 128 m UTM grid -> far set
   4. Lidar: EPT LAZ nodes -> DSM (max per 2 m cell) -> canopy height model = DSM - DEM
   5. NAIP: 4-band 1 m -> NDVI, brightness -> canopy / aspen / rock / scree / meadow classes
+  FEAT-225 Silver and Bronze (tiers.py, tier_sources.py), read from the config: `dem.source` "Mapterhorn" builds
+  steps 1 and 2 from Mapterhorn tiles at the plan's zooms; no `lidar` makes step 4's canopy height model the ETH
+  10 m canopy height on WorldCover tree cover, with no crowns (the trees are all stands, step 8) and no far tree
+  ring; no `naip` makes step 5's masks from the WorldCover classes. `meta.json` records `tier` and `sources`.
   6. OSM: pistes, lifts (+pylons, stations), buildings, roads, water, peaks -> features.json
   7. Masks (2 m): rock, scree, groomed piste corridors, canopy cover; piste direction for the groomers
   8. Trees: crown detection on the CHM/NDVI, species 0..7 (species.py: LANDFIRE class, elevation, aspect,
@@ -29,6 +33,8 @@ from canopy_spots import run_half_width   # run corridor half widths, shared wit
 import species as spc
 import paths
 import stands
+import tiers
+import tier_sources as ts
 from species import evt_luts
 
 slug = sys.argv[1]
@@ -84,15 +90,33 @@ merc_to_utm = Transformer.from_crs("EPSG:3857", crs, always_xy=True)
 def read_tiff(path):
     return tifffile.imread(path)
 
+# FEAT-225: which source builds each layer (tiers.py): Mapterhorn terrain outside the US, stands from the ETH canopy
+# height without lidar, masks from WorldCover without NAIP
+LIDAR = bool(cfg.get("lidar"))
+NAIP = bool(cfg.get("naip"))
+SOURCES = tiers.layer_sources(cfg)
+if REL.source_slugs() and not (LIDAR and NAIP):
+    # landcover2() reads this resort's own WorldCover and ETH canopy only, so a move cut from another place's raw
+    # data (FEAT-268) would get this frame's cover pasted at its new place
+    sys.exit("a relocate move with a `source` needs lidar and NAIP: the WorldCover and ETH layers a Silver or Bronze "
+             "build reads are not taken from the source's raw data yet")
+log("sources: " + tiers.summary(SOURCES) + f"; tier {tiers.tier_of({k: v['tier'] for k, v in SOURCES.items()})[0]}")
+
 # ------------------------------------------------------------------ 1. fine DEM (1 m)
 log("DEM mosaic")
 FX0, FY0, FX1, FY1 = FRAME
 
 
-def mosaic_dem(raw, manifest, frame):
-    """the 1 m DEM chunks of a raw folder on its fetched frame (row 0 = north), small voids filled"""
+def mosaic_dem(raw, manifest, frame, dem_cfg=None):
+    """the 1 m DEM of a raw folder on its fetched frame (row 0 = north), small voids filled: the 3DEP chunks, on
+    Mapterhorn's tiles at the plan's zoom when `dem_cfg` names Mapterhorn (FEAT-225)"""
     FX0, FY0, FX1, FY1 = frame
     dem = np.full((int(FY1 - FY0), int(FX1 - FX0)), np.nan, np.float32)
+    mt = tiers.uses_mapterhorn(dem_cfg)
+    if mt:
+        # FEAT-225: Mapterhorn's tiles at the plan's zoom (about 0.8 m at 47 deg for z16), bilinear onto the 1 m frame
+        dem, _n = ts.mapterhorn_grid(raw, dem_cfg["zoom"], to_ll, FX0, FY1, 1.0, dem.shape[1], dem.shape[0])
+        log(f"  Mapterhorn z{dem_cfg['zoom']}: {_n} tiles")
     for it in manifest["items"]:
         if not it["path"].startswith("dem1m/"):
             continue
@@ -115,15 +139,18 @@ def mosaic_dem(raw, manifest, frame):
         # fill small voids by nearest neighbour
         idx = ndimage.distance_transform_edt(void, return_distances=False, return_indices=True)
         dem = dem[tuple(idx)]
+    if mt:
+        dem = ndimage.gaussian_filter(dem, ts.DEQUANT_SIGMA_M).astype(np.float32)   # FEAT-225: Mapterhorn's height steps
     return dem
 
 
-dem = mosaic_dem(raw, manifest, FRAME)
+dem = mosaic_dem(raw, manifest, FRAME, cfg["dem"])
 # FEAT-268: {move index: (DEM, frame)} for the moves cut from another place's raw data
 SRC_DEM = {}
 for _s in REL.source_slugs():
     log(f"  relocate source {_s}")
-    _g = (mosaic_dem(SRC_RAW[_s], SRC_MAN[_s], SRC_CFG[_s]["utm_bbox"]), [float(v) for v in SRC_CFG[_s]["utm_bbox"]])
+    _g = (mosaic_dem(SRC_RAW[_s], SRC_MAN[_s], SRC_CFG[_s]["utm_bbox"], SRC_CFG[_s].get("dem")),
+          [float(v) for v in SRC_CFG[_s]["utm_bbox"]])
     SRC_DEM.update({k: _g for k, m in enumerate(REL.moves) if m.source == _s})
 dem_f = None    # the frame's DEM, kept while the lidar returns are set on the composed ground
 REL_DZ = []
@@ -147,11 +174,19 @@ log("  coarse written", coarse_meta["tilesX"], "x", coarse_meta["tilesY"])
 # ------------------------------------------------------------------ 2. mid (16 m from the 10 m export)
 log("mid ring")
 mid_items = [i for i in manifest["items"] if i["path"].startswith("dem10m/")]
-mx0 = min(i["meta"]["bbox"][0] for i in mid_items); my0 = min(i["meta"]["bbox"][1] for i in mid_items)
-mx1 = max(i["meta"]["bbox"][2] for i in mid_items); my1 = max(i["meta"]["bbox"][3] for i in mid_items)
-MR = mid_items[0]["meta"]["res"]
-mW = int(round((mx1 - mx0) / MR)); mH = int(round((my1 - my0) / MR))
-m = np.full((mH, mW), np.nan, np.float32)
+if tiers.uses_mapterhorn(cfg["mid_ring"]):
+    # FEAT-225: the mid ring from Mapterhorn at the plan's zoom (z13 is about 6.5 m at 47 deg) on the 10 m grid
+    _S = cfg["mid_ring"]["size_m"]; MR = float(cfg["mid_ring"]["res_m"])
+    mx0, my0, mx1, my1 = OX - _S / 2, OY - _S / 2, OX + _S / 2, OY + _S / 2
+    mW = int(round((mx1 - mx0) / MR)); mH = int(round((my1 - my0) / MR))
+    m, _n = ts.mapterhorn_grid(raw, cfg["mid_ring"]["zoom"], to_ll, mx0, my1, MR, mW, mH)
+    log(f"  Mapterhorn z{cfg['mid_ring']['zoom']}: {_n} tiles")
+else:
+    mx0 = min(i["meta"]["bbox"][0] for i in mid_items); my0 = min(i["meta"]["bbox"][1] for i in mid_items)
+    mx1 = max(i["meta"]["bbox"][2] for i in mid_items); my1 = max(i["meta"]["bbox"][3] for i in mid_items)
+    MR = mid_items[0]["meta"]["res"]
+    mW = int(round((mx1 - mx0) / MR)); mH = int(round((my1 - my0) / MR))
+    m = np.full((mH, mW), np.nan, np.float32)
 for it in mid_items:
     p = os.path.join(raw, it["path"])
     if not os.path.exists(p):
@@ -182,12 +217,13 @@ ys = fy0 + (np.arange(nf)[::-1] + 0.5) * FR   # row 0 = north
 GX, GY = np.meshgrid(xs, ys)
 lon, lat = to_ll.transform(GX, GY)
 z = cfg["far_ring"]["mapterhorn_zoom"]; n = 2 ** z
+FAR_DIR = f"mapterhorn/{z}/"      # FEAT-225: the resort box and the mid ring may have tiles at other zooms
 px = (lon + 180) / 360 * n * 512
 py = (1 - np.log(np.tan(np.radians(lat)) + 1 / np.cos(np.radians(lat))) / np.pi) / 2 * n * 512
 far = np.full((nf, nf), np.nan, np.float32)
 tiles = {}
 for it in manifest["items"]:
-    if it["path"].startswith("mapterhorn/"):
+    if it["path"].startswith(FAR_DIR):
         p = os.path.join(raw, it["path"])
         if os.path.exists(p):
             tx, ty = os.path.basename(it["path"])[:-5].split("_")
@@ -201,17 +237,9 @@ for (ax, ay), arr in tiles.items():
 log(f"  far coverage {np.isfinite(far).mean()*100:.1f}% from {len(tiles)} tiles")
 far_meta = write_height_set(out, "far", far, FR, fx0 - OX, fy0 - OY)
 
-# ------------------------------------------------------------------ 4. canopy height model from lidar
-log("lidar -> DSM")
-import laspy
+# ------------------------------------------------------------------ 4. canopy height model from lidar (or ETH, FEAT-225)
 R2 = 2.0
 H2, W2 = H // 2, W // 2
-dsm = np.full((H2, W2), -1e9, np.float32)
-cnt = np.zeros((H2, W2), np.int32)
-dtm_l = np.full((H2, W2), 1e9, np.float32)
-n_pts = 0
-ept = json.load(open(os.path.join(raw, "ept/ept.json"), encoding="utf-8"))
-scale = None
 PACK_BOX = [X0, Y0, X1, Y1]
 
 
@@ -252,6 +280,23 @@ def place_returns(ux, uy, zz, cls, src=None):
 
 
 
+FH2, FW2 = int(FY1 - FY0) // 2, int(FX1 - FX0) // 2      # the fetched frame at 2 m (FEAT-249)
+_lc = {}
+
+
+def landcover2():
+    """FEAT-225: WorldCover classes and ETH canopy height on the pack's 2 m grid (frame read, then composed)"""
+    if not _lc:
+        wc_f, eth_f = ts.landcover_grid(raw, to_ll, FX0, FY1, R2, FW2, FH2)
+        if COMPOSED:
+            wc_f = relocate.compose_classes(wc_f, FRAME, R2, PACK_BOX, REL)
+            eth_f = relocate.compose_classes(eth_f, FRAME, R2, PACK_BOX, REL)
+        _lc["wc"], _lc["eth"] = wc_f[:H2, :W2], eth_f[:H2, :W2]
+        v, c_ = np.unique(_lc["wc"], return_counts=True)
+        log("  WorldCover on the pack: " + ", ".join(f"class {int(k)} {n / c_.sum() * 100:.0f}%" for n, k in sorted(zip(c_, v), reverse=True)[:6]))
+    return _lc["wc"], _lc["eth"]
+
+
 def add_laz(p, src=None):
     """one EPT node's returns into the 2 m DSM (`src`: a relocate source's node, FEAT-268)"""
     global n_pts
@@ -282,31 +327,50 @@ def laz_files(raw):
     return sorted(glob.glob(os.path.join(raw, "ept", "*.laz")) + glob.glob(os.path.join(raw, "ept", "*", "*.laz")))
 
 
-for p in laz_files(raw):
-    add_laz(p)
-for _s in REL.source_slugs():
-    _n0 = n_pts
-    for p in laz_files(SRC_RAW[_s]):
-        add_laz(p, _s)
-    log(f"  relocate source {_s}: {(n_pts - _n0) / 1e6:.1f} M points")
-log(f"  {n_pts/1e6:.1f} M points, cells with data {np.mean(cnt>0)*100:.1f}%")
-del dem_f, SRC_DEM
-dsm[cnt == 0] = np.nan
-# cells with a lidar return (dilated by one cell): canopy is only believed where the lidar actually saw something
-has_pts = ndimage.binary_dilation(cnt > 0, iterations=1)
-del cnt, dtm_l
-# DEM at 2 m (mean of 2x2)
-dem2 = dem[:H2 * 2, :W2 * 2].reshape(H2, 2, W2, 2).mean(axis=(1, 3)).astype(np.float32)
-chm = dsm - dem2
-del dsm
-chm[np.isnan(chm)] = 0
-chm = np.clip(chm, 0, 60).astype(np.float32)
-# fill isolated empty cells from neighbours
-chm = ndimage.grey_closing(chm, size=3)
-log(f"  CHM: {np.mean(chm>2)*100:.1f}% of cells > 2 m, p99 {np.percentile(chm, 99):.1f} m")
+if LIDAR:
+    log("lidar -> DSM")
+    import laspy
+    dsm = np.full((H2, W2), -1e9, np.float32)
+    cnt = np.zeros((H2, W2), np.int32)
+    dtm_l = np.full((H2, W2), 1e9, np.float32)
+    n_pts = 0
+    for p in laz_files(raw):
+        add_laz(p)
+    for _s in REL.source_slugs():
+        _n0 = n_pts
+        for p in laz_files(SRC_RAW[_s]):
+            add_laz(p, _s)
+        log(f"  relocate source {_s}: {(n_pts - _n0) / 1e6:.1f} M points")
+    log(f"  {n_pts/1e6:.1f} M points, cells with data {np.mean(cnt>0)*100:.1f}%")
+    del dem_f, SRC_DEM
+    dsm[cnt == 0] = np.nan
+    # cells with a lidar return (dilated by one cell): canopy is only believed where the lidar actually saw something
+    has_pts = ndimage.binary_dilation(cnt > 0, iterations=1)
+    del cnt, dtm_l
+    # DEM at 2 m (mean of 2x2)
+    dem2 = dem[:H2 * 2, :W2 * 2].reshape(H2, 2, W2, 2).mean(axis=(1, 3)).astype(np.float32)
+    chm = dsm - dem2
+    del dsm
+    chm[np.isnan(chm)] = 0
+    chm = np.clip(chm, 0, 60).astype(np.float32)
+    # fill isolated empty cells from neighbours
+    chm = ndimage.grey_closing(chm, size=3)
+    log(f"  CHM: {np.mean(chm>2)*100:.1f}% of cells > 2 m, p99 {np.percentile(chm, 99):.1f} m")
+else:
+    # FEAT-225 (Silver trees): no lidar, so no crowns. The canopy height model is the ETH 10 m model, smoothed and
+    # kept on WorldCover tree cover; every cell may hold canopy (no lidar return test); the stems come from stage 8.
+    log("no lidar: canopy height from the ETH 10 m canopy height on WorldCover tree cover (no crowns)")
+    del dem_f, SRC_DEM
+    dem2 = dem[:H2 * 2, :W2 * 2].reshape(H2, 2, W2, 2).mean(axis=(1, 3)).astype(np.float32)
+    _wc2, _eth2 = landcover2()
+    # on WorldCover tree cover only, also with NAIP: the smooth ETH model reads 3 to 5 m over every meadow and run next
+    # to a stand, which NAIP's NDVI alone (summer grass is green) can't tell from forest (Boston Mills: 75 % canopy
+    # on the run centre lines instead of 1 %)
+    chm = ts.canopy_height(_eth2, _wc2, R2)
+    has_pts = np.ones((H2, W2), bool)
+    log(f"  CHM (ETH): {np.mean(chm>2)*100:.1f}% of cells > 2 m, p99 {np.percentile(chm, 99):.1f} m")
 
 # ------------------------------------------------------------------ 5. NAIP classes (1 m)
-log("NAIP")
 # The Planetary Computer crop endpoint capped every crop at 2048 px, so the crops are ~2 m.
 # Work at the 2 m grid directly: resample each crop onto its bbox.
 def mosaic_naip(raw, manifest, frame):
@@ -341,62 +405,111 @@ def mosaic_naip(raw, manifest, frame):
     return naip2, have2
 
 
-naip2, have2 = mosaic_naip(raw, manifest, FRAME)
-if COMPOSED:
-    SRC_NAIP, SRC_HAVE = {}, {}     # FEAT-268: {move index: (grid, frame)} for the sourced moves
-    for _s in REL.source_slugs():
-        _f = [float(v) for v in SRC_CFG[_s]["utm_bbox"]]
-        _n, _h = mosaic_naip(SRC_RAW[_s], SRC_MAN[_s], _f)
-        for k, m in enumerate(REL.moves):
-            if m.source == _s:
-                SRC_NAIP[k], SRC_HAVE[k] = (_n, _f), (_h, _f)
-    naip2 = relocate.compose_classes(naip2, FRAME, R2, PACK_BOX, REL, SRC_NAIP)
-    have2 = relocate.compose_classes(have2, FRAME, R2, PACK_BOX, REL, SRC_HAVE)
-    del SRC_NAIP, SRC_HAVE
-log(f"  NAIP coverage {have2.mean()*100:.1f}%")
-red2 = naip2[0].astype(np.float32); grn2 = naip2[1].astype(np.float32); blu2 = naip2[2].astype(np.float32); nir2 = naip2[3].astype(np.float32)
-del naip2
-ndvi2 = ((nir2 - red2) / np.maximum(nir2 + red2, 1)).astype(np.float32)
-bright2 = ((red2 + grn2 + blu2) / 3).astype(np.float32)
-
 # slope at 2 m
 gy, gx = np.gradient(dem2, R2)
 slope2 = np.degrees(np.arctan(np.hypot(gx, gy))).astype(np.float32)
 # gx, gy stay alive for the mogul aspect term (freed after scoring)
-
-mx2 = np.maximum(np.maximum(red2, grn2), blu2); mn2 = np.minimum(np.minimum(red2, grn2), blu2)
-sat2 = ((mx2 - mn2) / np.maximum(mx2, 1)).astype(np.float32)
-del mx2, mn2
-# FEAT-175: the NDVI, saturation and brightness thresholds below were measured on Vail's 2023 NAIP; each one is
-# moved to the same percentile of this resort's own imagery over two lidar-defined anchors (naip_calib.py), so
-# another state's or year's NAIP (Big Sky 2021 is darker and greyer) is read on its own scale. Vail gets its own.
 import naip_calib
-_forest_a, _bare_a, _z_forest = naip_calib.anchors(chm, dem2, have2 & has_pts & np.isfinite(dem2))
-NT, _nt_info = naip_calib.derive({"ndvi": ndvi2, "sat": sat2, "bright": bright2}, _forest_a, _bare_a, cfg.get("naip_thresholds"))
-log(f"  NAIP thresholds from {int(_forest_a.sum())} forest and {int(_bare_a.sum())} low bare cells (below {_z_forest or 0:.0f} m):")
-for _l in _nt_info:
-    log(f"    {_l}")
-del _forest_a, _bare_a
+if NAIP:
+    log("NAIP")
+    naip2, have2 = mosaic_naip(raw, manifest, FRAME)
+    if COMPOSED:
+        SRC_NAIP, SRC_HAVE = {}, {}     # FEAT-268: {move index: (grid, frame)} for the sourced moves
+        for _s in REL.source_slugs():
+            _f = [float(v) for v in SRC_CFG[_s]["utm_bbox"]]
+            _n, _h = mosaic_naip(SRC_RAW[_s], SRC_MAN[_s], _f)
+            for k, m in enumerate(REL.moves):
+                if m.source == _s:
+                    SRC_NAIP[k], SRC_HAVE[k] = (_n, _f), (_h, _f)
+        naip2 = relocate.compose_classes(naip2, FRAME, R2, PACK_BOX, REL, SRC_NAIP)
+        have2 = relocate.compose_classes(have2, FRAME, R2, PACK_BOX, REL, SRC_HAVE)
+        del SRC_NAIP, SRC_HAVE
+    log(f"  NAIP coverage {have2.mean()*100:.1f}%")
+    red2 = naip2[0].astype(np.float32); grn2 = naip2[1].astype(np.float32); blu2 = naip2[2].astype(np.float32); nir2 = naip2[3].astype(np.float32)
+    del naip2
+    ndvi2 = ((nir2 - red2) / np.maximum(nir2 + red2, 1)).astype(np.float32)
+    bright2 = ((red2 + grn2 + blu2) / 3).astype(np.float32)
 
-# classes
-# canopy needs (a) height above ground AND (b) vegetation in NAIP AND (c) a lidar return nearby. (b) and (c)
-# stop steep bare slopes above treeline reading as forest: the DSM is the max point in a 2 m cell and the DEM
-# the mean, so a 35 deg slope alone gives > 2 m of "height", and grey_closing spread that into empty cells.
-canopy = ((chm > 2.5) | ((ndvi2 > NT["canopy.leaf_ndvi"]) & (chm > 1.2))) & (ndvi2 > NT["canopy.veg_ndvi"]) & has_pts & have2
-# BUG-028: that rule finds about a third of the closed stands at Born Free, Mid-Vail and Prima. The lidar return
-# test (has_pts) was not the cause (every forest cell has one within a cell); these two were:
-#  - grey beetle-killed lodgepole: NAIP NDVI under 5 m+ canopy is 0.2 to 0.35 there, under the 0.30 floor;
-#  - the subsampled cloud (about one return per 4 m2) hits a crown at one point, often the ground beside it.
-# So a 5 m+ return counts with NDVI over 0.15 (canopy.grow_ndvi) and stands for a crown about 2 m round, and gaps under 8 m inside a
-# stand close. Steep bare slopes stay out: their DSM-over-DEM artefact is under 2 m and cured meadow has no 5 m
-# returns. This grown part is dropped again on every non-glade run corridor in stage 7, so it never narrows a run.
-crown = ndimage.binary_dilation(chm > 5.0, iterations=1) & (ndvi2 > NT["canopy.grow_ndvi"]) & has_pts & have2
-grown = canopy | crown
-grown |= ndimage.binary_closing(grown, iterations=2) & (ndvi2 > NT["canopy.grow_ndvi"]) & have2
-canopy_grown = grown & ~canopy
-log(f"  canopy {canopy.mean()*100:.1f}% from the lidar and NAIP rule, {canopy_grown.mean()*100:.1f}% more from 5 m+ returns over grey crowns and closed gaps (BUG-028)")
-canopy |= canopy_grown
-del has_pts, crown, grown
+    mx2 = np.maximum(np.maximum(red2, grn2), blu2); mn2 = np.minimum(np.minimum(red2, grn2), blu2)
+    sat2 = ((mx2 - mn2) / np.maximum(mx2, 1)).astype(np.float32)
+    del mx2, mn2
+    # FEAT-175: the NDVI, saturation and brightness thresholds below were measured on Vail's 2023 NAIP; each one is
+    # moved to the same percentile of this resort's own imagery over two lidar-defined anchors (naip_calib.py), so
+    # another state's or year's NAIP (Big Sky 2021 is darker and greyer) is read on its own scale. Vail gets its own.
+    # Without lidar (FEAT-225 Silver) the anchors are read on the ETH canopy height instead.
+    _forest_a, _bare_a, _z_forest = naip_calib.anchors(chm, dem2, have2 & has_pts & np.isfinite(dem2))
+    NT, _nt_info = naip_calib.derive({"ndvi": ndvi2, "sat": sat2, "bright": bright2}, _forest_a, _bare_a, cfg.get("naip_thresholds"))
+    log(f"  NAIP thresholds from {int(_forest_a.sum())} forest and {int(_bare_a.sum())} low bare cells (below {_z_forest or 0:.0f} m):")
+    for _l in _nt_info:
+        log(f"    {_l}")
+    del _forest_a, _bare_a
+
+    # classes
+    # canopy needs (a) height above ground AND (b) vegetation in NAIP AND (c) a lidar return nearby. (b) and (c)
+    # stop steep bare slopes above treeline reading as forest: the DSM is the max point in a 2 m cell and the DEM
+    # the mean, so a 35 deg slope alone gives > 2 m of "height", and grey_closing spread that into empty cells.
+    canopy = ((chm > 2.5) | ((ndvi2 > NT["canopy.leaf_ndvi"]) & (chm > 1.2))) & (ndvi2 > NT["canopy.veg_ndvi"]) & has_pts & have2
+    if LIDAR:
+        # BUG-028: that rule finds about a third of the closed stands at Born Free, Mid-Vail and Prima. The lidar return
+        # test (has_pts) was not the cause (every forest cell has one within a cell); these two were:
+        #  - grey beetle-killed lodgepole: NAIP NDVI under 5 m+ canopy is 0.2 to 0.35 there, under the 0.30 floor;
+        #  - the subsampled cloud (about one return per 4 m2) hits a crown at one point, often the ground beside it.
+        # So a 5 m+ return counts with NDVI over 0.15 (canopy.grow_ndvi) and stands for a crown about 2 m round, and gaps under 8 m inside a
+        # stand close. Steep bare slopes stay out: their DSM-over-DEM artefact is under 2 m and cured meadow has no 5 m
+        # returns. This grown part is dropped again on every non-glade run corridor in stage 7, so it never narrows a run.
+        crown = ndimage.binary_dilation(chm > 5.0, iterations=1) & (ndvi2 > NT["canopy.grow_ndvi"]) & has_pts & have2
+        grown = canopy | crown
+        grown |= ndimage.binary_closing(grown, iterations=2) & (ndvi2 > NT["canopy.grow_ndvi"]) & have2
+        canopy_grown = grown & ~canopy
+        log(f"  canopy {canopy.mean()*100:.1f}% from the lidar and NAIP rule, {canopy_grown.mean()*100:.1f}% more from 5 m+ returns over grey crowns and closed gaps (BUG-028)")
+        canopy |= canopy_grown
+        del crown, grown
+    else:
+        # FEAT-225: the ETH model is 10 m and smooth, so a 5 m+ "return" covers whole meadows beside a stand; the
+        # NAIP rule alone decides, at the imagery's own edges
+        canopy_grown = np.zeros_like(canopy)
+        log(f"  canopy {canopy.mean()*100:.1f}% from the ETH canopy height and the NAIP rule")
+    # rock: low NDVI, GREY (low colour saturation), not snow. Late-summer NAIP shows cured meadow and
+    # groomed pistes as tan grass with NDVI < 0.18 too; saturation 0.22..0.42 for grass vs < 0.15 for rock
+    # (measured on the Vail 2023 imagery, rock.grey_sat). Without the saturation test 25 % of the resort came out as rock.
+    snowfield = (bright2 > naip_calib.SNOW_BRIGHT) & (ndvi2 < 0.1)
+    grey = sat2 < NT["rock.grey_sat"]
+    rock = (ndvi2 < NT["rock.ndvi"]) & (bright2 > NT["rock.dark"]) & (bright2 < naip_calib.SNOW_BRIGHT) & grey & have2 & (chm < 1.5)
+    meadow = (ndvi2 < NT["rock.bare_ndvi"]) & ~grey & have2 & (chm < 1.5)   # cured grass; no trees, no rock
+    del sat2, red2, blu2
+    # very steep bare ground is rock whatever colour the imagery gives it (shadowed cliff bands read as dark, not grey)
+    rock_steep = (rock & (slope2 > 28)) | ((slope2 > 38) & (ndvi2 < NT["rock.bare_ndvi"]) & (chm < 1.5) & have2)
+    scree = rock & (slope2 <= 28) & (slope2 > 12)
+    # aspen vs conifer (DATA-015): leaf-on aspen is brighter than conifer in visible and NIR, and lower in NDVI.
+    # Per 2 m cell, the canopy's mean brightness and NIR over ~8 m reads a stand through its crown shadows; the
+    # thresholds are fitted below (stage 5b) on this pack's own natural aspen and conifer LANDFIRE classes.
+    # Leafy crowns only (NDVI > LEAF_NDVI): the BUG-028 canopy also holds a ring of cured grass round every crown,
+    # bright and high in NIR, which read as aspen at every forest edge.
+    leaf = canopy & (ndvi2 > spc.LEAF_NDVI)
+    bright_s2 = spc.canopy_mean(bright2, leaf)
+    nir_s2 = spc.canopy_mean(nir2, leaf)
+    ndvi_s2 = spc.canopy_mean(ndvi2, leaf)       # lodgepole against spruce-fir on built classes (stage 5b)
+    del grn2, nir2, snowfield
+    log(f"  canopy {canopy.mean()*100:.1f}%  rock {rock.mean()*100:.1f}%  meadow {meadow.mean()*100:.1f}%")
+else:
+    # FEAT-225 (Bronze surface): no NAIP. Canopy is WorldCover tree cover the ETH model has at 3 m or more, rock and
+    # scree are its bare / sparse ground by slope (tier_sources.bronze_surface). No imagery means no NDVI: the class's
+    # typical NDVI stands in where the shrubs read it, Vail's thresholds are logged as the pack's (none derived), no
+    # NAIP aspen and no snags.
+    log("no NAIP: canopy, rock and scree from ESA WorldCover 10 m")
+    _wc2, _eth2 = landcover2()
+    _bs = ts.bronze_surface(_wc2, chm, slope2, R2)
+    have2, canopy, rock, rock_steep, scree = _bs["have"], _bs["canopy"], _bs["rock"], _bs["rock_steep"], _bs["scree"]
+    if LIDAR:      # a lidar canopy height model, but no imagery: the lidar's height keeps the WorldCover edges honest
+        canopy &= has_pts & (chm > 2.5)
+    ndvi2 = ts.pseudo_ndvi(_wc2, R2)
+    NT = naip_calib.vail_thresholds()
+    canopy_grown = np.zeros_like(canopy)
+    leaf = np.zeros_like(canopy)
+    bright_s2 = nir_s2 = ndvi_s2 = np.zeros(canopy.shape, np.float32)
+    del _bs
+    log(f"  canopy {canopy.mean()*100:.1f}%  rock {rock.mean()*100:.1f}%  scree {scree.mean()*100:.1f}%  (WorldCover covers {have2.mean()*100:.1f}%)")
+del has_pts
 # DATA-021: the resort's own treeline for the client's procedural forest and snow-ghost band (Colorado's 3,480 m
 # put Big Sky's bare upper bowls in forest); cfg["treeline_m"] overrides, None when the box never leaves the forest
 import treeline as _tl
@@ -410,17 +523,6 @@ elif treeline_m is None:
     log("  treeline none found (no forest belt in the box); the client uses its 3,480 m default")
 else:
     log(f"  treeline {treeline_m} m ({'config' if cfg.get('treeline_m') else 'from the canopy by elevation'})")
-# rock: low NDVI, GREY (low colour saturation), not snow. Late-summer NAIP shows cured meadow and
-# groomed pistes as tan grass with NDVI < 0.18 too; saturation 0.22..0.42 for grass vs < 0.15 for rock
-# (measured on the Vail 2023 imagery, rock.grey_sat). Without the saturation test 25 % of the resort came out as rock.
-snowfield = (bright2 > naip_calib.SNOW_BRIGHT) & (ndvi2 < 0.1)
-grey = sat2 < NT["rock.grey_sat"]
-rock = (ndvi2 < NT["rock.ndvi"]) & (bright2 > NT["rock.dark"]) & (bright2 < naip_calib.SNOW_BRIGHT) & grey & have2 & (chm < 1.5)
-meadow = (ndvi2 < NT["rock.bare_ndvi"]) & ~grey & have2 & (chm < 1.5)   # cured grass; no trees, no rock
-del sat2, red2, blu2
-# very steep bare ground is rock whatever colour the imagery gives it (shadowed cliff bands read as dark, not grey)
-rock_steep = (rock & (slope2 > 28)) | ((slope2 > 38) & (ndvi2 < NT["rock.bare_ndvi"]) & (chm < 1.5) & have2)
-scree = rock & (slope2 <= 28) & (slope2 > 12)
 # R carries rock the imagery saw, nothing else (FEAT-020): full weight on steep bare ground, half on
 # grey rock on gentler slopes, where winter snow covers most of it. The renderer adds rock from slope
 # (> ~45 deg) and wind-scoured ridges itself and breaks the weight into crisp patches with noise; a
@@ -428,17 +530,7 @@ scree = rock & (slope2 <= 28) & (slope2 > 12)
 rock_w = rock_steep.astype(np.float32) + (rock & ~rock_steep).astype(np.float32) * 0.5
 rock_w = np.clip(ndimage.gaussian_filter(rock_w, 0.75), 0, 1)
 scree_w = np.clip(scree.astype(np.float32) * 0.8, 0, 1) * (1 - rock_w)
-# aspen vs conifer (DATA-015): leaf-on aspen is brighter than conifer in visible and NIR, and lower in NDVI.
-# Per 2 m cell, the canopy's mean brightness and NIR over ~8 m reads a stand through its crown shadows; the
-# thresholds are fitted below (stage 5b) on this pack's own natural aspen and conifer LANDFIRE classes.
-# Leafy crowns only (NDVI > LEAF_NDVI): the BUG-028 canopy also holds a ring of cured grass round every crown,
-# bright and high in NIR, which read as aspen at every forest edge.
-leaf = canopy & (ndvi2 > spc.LEAF_NDVI)
-bright_s2 = spc.canopy_mean(bright2, leaf)
-nir_s2 = spc.canopy_mean(nir2, leaf)
-ndvi_s2 = spc.canopy_mean(ndvi2, leaf)       # lodgepole against spruce-fir on built classes (stage 5b)
-del grn2, nir2, snowfield, scree
-log(f"  canopy {canopy.mean()*100:.1f}%  rock {rock.mean()*100:.1f}%  meadow {meadow.mean()*100:.1f}%")
+del scree
 
 # ------------------------------------------------------------------ 5b. LANDFIRE EVT (30 m) species, optional
 # raw/<slug>/landfire/*.tif from fetch_landfire.mjs (LFPS, any LF version) + its .tif.vat.dbf class table.
@@ -602,10 +694,11 @@ aspen_like = canopy & (bright_s2 > tb) & (nir_s2 > tn)
 del bright_s2, nir_s2
 lodgepole_like = (canopy & (ndvi_s2 < t_lp) & ~aspen_like) if evt is not None and t_lp is not None else None
 del ndvi_s2, leaf
-log(f"  NAIP aspen: canopy brightness > {tb:.1f} and NIR > {tn:.1f} over ~8 m on {aspen_like.sum() / max(canopy.sum(), 1) * 100:.1f}% of the canopy; "
-    + (f"fitted on {fit['aspen']} aspen and {fit['conifer']} conifer cells: aspen found {fit['hit'] * 100:.0f}%, conifer taken for aspen {fit['false'] * 100:.1f}%"
-       if fit["fitted"] else f"Vail's fit (this pack's fit doesn't separate them: aspen found {fit['hit'] * 100:.0f}%, conifer taken for aspen {fit['false'] * 100:.1f}%)" if fit.get("weak")
-       else f"Vail's fit (too few labelled cells: {fit['aspen']} aspen, {fit['conifer']} conifer)"))
+if NAIP:
+    log(f"  NAIP aspen: canopy brightness > {tb:.1f} and NIR > {tn:.1f} over ~8 m on {aspen_like.sum() / max(canopy.sum(), 1) * 100:.1f}% of the canopy; "
+        + (f"fitted on {fit['aspen']} aspen and {fit['conifer']} conifer cells: aspen found {fit['hit'] * 100:.0f}%, conifer taken for aspen {fit['false'] * 100:.1f}%"
+           if fit["fitted"] else f"Vail's fit (this pack's fit doesn't separate them: aspen found {fit['hit'] * 100:.0f}%, conifer taken for aspen {fit['false'] * 100:.1f}%)" if fit.get("weak")
+           else f"Vail's fit (too few labelled cells: {fit['aspen']} aspen, {fit['conifer']} conifer)"))
 if evt is not None and t_lp is not None:
     log(f"  NAIP lodgepole on built classes: canopy NDVI < {t_lp:.3f} over ~8 m where the forest around is {spc.LODGEPOLE_MIN_SHARE * 100:.0f}%+ lodgepole; "
         f"fitted on {fit_lp['lodgepole']} lodgepole and {fit_lp['spruce_fir']} spruce-fir cells: lodgepole found {fit_lp['hit'] * 100:.0f}%, spruce-fir taken for it {fit_lp['false'] * 100:.0f}%")
@@ -1084,6 +1177,11 @@ log("trees")
 chm_s = ndimage.gaussian_filter(chm, 0.8)
 maxf = ndimage.maximum_filter(chm_s, size=3)
 peaks_mask = (chm_s == maxf) & (chm_s > 2.5) & canopy
+if not LIDAR:
+    # FEAT-225: the ETH model's smooth 10 m heights have no crowns to find (its flat tops would each read as one);
+    # every tree is a stand stem, generated by the client from stands/ (below)
+    peaks_mask[:] = False
+    log("  no lidar: no detected crowns, the stands carry every tree")
 pr, pc = np.nonzero(peaks_mask)
 # BUG-023: the smoothed CHM finds the peaks, but a crown's height is the tallest return within one cell of it.
 # A lone tree is one return in one 2 m cell, and the blur kept about 0.6 of it (median 6 m drawn against 10 m
@@ -1113,6 +1211,8 @@ rows = np.concatenate(tree_rows); cols = np.concatenate(tree_cols); hgt = np.con
 forest_here = lf_forest2 if evt is not None else ndimage.binary_dilation(canopy, iterations=5)
 snag_c = ((chm_s == maxf) & (chm_s > 6.0) & (ndvi2 < NT["canopy.grow_ndvi"]) & have2 & forest_here & (slope2 < 40)
           & ~built_any & ~rock_steep & (lift_f == 0))
+if not (LIDAR and NAIP):
+    snag_c[:] = False     # FEAT-225: a snag is a lidar crown the imagery sees grey; without either there are none
 del lift_f, forest_here
 sr, sc = np.nonzero(snag_c)
 del snag_c
@@ -1179,10 +1279,10 @@ cells_x = int(math.ceil(W / CELL)); cells_y = int(math.ceil(H / CELL))
 inst = {"cellSize": CELL, "minX": X0 - OX, "minY": Y0 - OY, "cellsX": cells_x, "cellsY": cells_y}
 inst["treeCount"] = write_instances(out, "trees", trees, CELL, X0 - OX, Y0 - OY, cells_x, cells_y)
 cnt = np.bincount(species.astype(np.int64), minlength=spc.N_SPECIES)
-log(f"  trees {inst['treeCount']}: " + ", ".join(f"{spc.SPECIES_NAMES[i]} {cnt[i]} ({cnt[i] / n_t * 100:.1f}%)" for i in range(spc.N_SPECIES)))
+log(f"  trees {inst['treeCount']}: " + ", ".join(f"{spc.SPECIES_NAMES[i]} {cnt[i]} ({cnt[i] / max(n_t, 1) * 100:.1f}%)" for i in range(spc.N_SPECIES)))
 lp = species == spc.LODGEPOLE
-log(f"  spruce + fir {(cnt[spc.SPRUCE] + cnt[spc.FIR]) / n_t * 100:.1f}%, lodgepole below 3,100 m {np.mean(elev[lp] < 3100) * 100 if lp.any() else 0:.0f}%, "
-    f"krummholz above 3,350 m {np.mean(elev[species == spc.KRUMMHOLZ] > 3350) * 100 if cnt[spc.KRUMMHOLZ] else 0:.0f}%, snags {cnt[spc.SNAG] / n_t * 100:.1f}%, "
+log(f"  spruce + fir {(cnt[spc.SPRUCE] + cnt[spc.FIR]) / max(n_t, 1) * 100:.1f}%, lodgepole below 3,100 m {np.mean(elev[lp] < 3100) * 100 if lp.any() else 0:.0f}%, "
+    f"krummholz above 3,350 m {np.mean(elev[species == spc.KRUMMHOLZ] > 3350) * 100 if cnt[spc.KRUMMHOLZ] else 0:.0f}%, snags {cnt[spc.SNAG] / max(n_t, 1) * 100:.1f}%, "
     f"median height above 3,350 m {np.median(hgt[elev > 3350]) if (elev > 3350).any() else 0:.1f} m")
 for line in spc.band_report(species, elev):
     log("   ", line)
@@ -1206,6 +1306,8 @@ det4 = np.zeros((H4, W4), np.float32)
 okp = (pr < H4 * 2) & (pc < W4 * 2)
 np.add.at(det4, (pr[okp] // 2, pc[okp] // 2), 1)
 h4 = blk(chm_s).max(axis=(1, 3))
+if not LIDAR:
+    h4 *= ts.ETH_STAND_K        # FEAT-225: the ETH canopy top stands taller than the trees under it
 if lf_height is not None:
     # lidar gaps under the stand: LANDFIRE EVH (DATA-010) where the CHM reads under 4 m
     evh4 = lf_height.on2(slice(0, H4 * 2, 2), slice(0, W4 * 2, 2))
@@ -1332,12 +1434,19 @@ if (gnis_states or census_towns) and NAMES_ATTRIBUTION not in meta["attribution"
     meta["attribution"] = meta["attribution"] + [NAMES_ATTRIBUTION]
 if lf_tifs and LANDFIRE_ATTRIBUTION not in meta["attribution"]:   # FEAT-175: pack_report.py line 13 checks every credit
     meta["attribution"] = meta["attribution"] + [LANDFIRE_ATTRIBUTION]
+# FEAT-225: the pack's tier and the source of each layer (optional fields; the client ignores them). WorldCover and
+# ETH credits go in whenever they built the trees or the masks, not only the far cover levels (cover.py)
+meta["sources"] = SOURCES
+meta["tier"] = tiers.tier_of({k: v["tier"] for k, v in SOURCES.items()})[0]
+if not (LIDAR and NAIP):
+    from cover import ATTRIBUTION as COVER_ATTRIBUTION
+    meta["attribution"] = meta["attribution"] + [a for a in COVER_ATTRIBUTION if a not in meta["attribution"]]
 if treeline_m:
     meta["treeline"] = round(float(treeline_m))
 elif treeline_none:
     meta["treeline"] = None   # FEAT-234: measured, none; absent still means an older pack (or no forest to measure)
 # FEAT-175: the values this build derived for the resort instead of copying Vail's (pack_report.py line 20)
-meta["derived"] = {**{k: round(v, 4) for k, v in NT.items()},
+meta["derived"] = {**({k: round(v, 4) for k, v in NT.items()} if NAIP else {}),     # FEAT-225: no NAIP, none read
                    **({"treeline": round(float(treeline_m))} if treeline_m and not cfg.get("treeline_m") else {}),
                    **({"treeline": None} if treeline_none else {})}
 if REL:
@@ -1359,13 +1468,14 @@ write_meta(out, meta)
 # ------------------------------------------------------------------ 9b. the far tree ring (BUG-081)
 # the lidar crowns on the ridges round the resort (far_trees.py), before the cover, whose land cover levels take
 # their forest from them; needs lidar.far in the config and its nodes in raw/<slug>/ept_far/ (ept_select.py)
-if cfg["lidar"].get("far") and glob.glob(os.path.join(raw, "ept_far", "*.laz")):
+if (cfg.get("lidar") or {}).get("far") and glob.glob(os.path.join(raw, "ept_far", "*.laz")):
     log("far tree ring")
     import far_trees
     far_trees.main([slug, raw, out])
     meta = json.load(open(os.path.join(out, "meta.json"), encoding="utf-8"))
 else:
-    log("  no far tree ring (lidar.far and raw/<slug>/ept_far/): the ridges round the resort keep the land cover alone")
+    log("  no far tree ring (lidar.far and raw/<slug>/ept_far/): the ridges round the resort keep the land cover alone"
+        + ("" if LIDAR else " (no lidar here, FEAT-225)"))
 
 # ------------------------------------------------------------------ 10. forest cover levels for the far terrain (FEAT-153)
 log("cover")

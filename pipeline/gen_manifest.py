@@ -5,10 +5,12 @@ Reads resorts/<slug>/<slug>.json and writes manifests/<slug>.json, a flat
 list of {url, path, method?, body?} items that fetch.ps1 downloads on the PC.
 
 Sources:
-  - USGS 3DEP ImageServer exportImage  -> 1 m DEM chunks (F32 GeoTIFF, UTM) + 10 m mid ring
-  - Microsoft Planetary Computer       -> NAIP 4-band 1 m crops per quarter-quad (GeoTIFF, UTM)
-  - Mapterhorn                         -> z11 Terrarium WebP tiles for the far ring
-  - AWS usgs-lidar-public (EPT)        -> selected LAZ nodes (pre-selected node list)
+  - USGS 3DEP ImageServer exportImage  -> 1 m DEM chunks (F32 GeoTIFF, UTM) + 10 m mid ring (the US)
+  - Microsoft Planetary Computer       -> NAIP 4-band 1 m crops per quarter-quad (GeoTIFF, UTM), when the config has `naip`
+  - Mapterhorn                         -> z11 Terrarium WebP tiles for the far ring; outside the US (FEAT-225,
+                                          `dem.source` / `mid_ring.source` "Mapterhorn") also the resort box at
+                                          `dem.zoom` and the mid ring at `mid_ring.zoom`, in place of 3DEP
+  - AWS usgs-lidar-public (EPT)        -> selected LAZ nodes (pre-selected node list), when the config has `lidar`
   - Overpass                           -> OSM features (pistes, lifts, buildings, roads, natural, peaks)
   - USGS GNIS, US Census               -> place names: summits per state, towns (placenames.py, FEAT-235)
 """
@@ -23,6 +25,28 @@ import paths  # noqa: E402
 # (DATA-022 item 3: Breckenridge was fetched before land cover existed). Written into every manifest.
 # 2: names/ (FEAT-235: GNIS for every state the far ring touches, Census towns)
 MANIFEST_VERSION = 2
+MAPTERHORN_URL = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp"
+
+
+def lonlat_to_tile(lon, lat, z):
+    """fractional web mercator tile coordinates at zoom z"""
+    n = 2 ** z
+    xt = (lon + 180) / 360 * n
+    yt = (1 - math.log(math.tan(math.radians(lat)) + 1 / math.cos(math.radians(lat))) / math.pi) / 2 * n
+    return xt, yt
+
+
+def mapterhorn_tiles(to_ll, box, z, margin_px=2):
+    """(x, y) of every Mapterhorn tile at zoom z under a UTM box (corners and edge midpoints), with `margin_px`
+    tile pixels to spare on every side so a bilinear sample at the edge has its neighbours"""
+    x0, y0, x1, y1 = box
+    pts = [to_ll.transform(x, y) for x in (x0, (x0 + x1) / 2, x1) for y in (y0, (y0 + y1) / 2, y1)]
+    t = [lonlat_to_tile(lo, la, z) for lo, la in pts]
+    m = margin_px / 512
+    tx0, tx1 = min(p[0] for p in t) - m, max(p[0] for p in t) + m
+    ty0, ty1 = min(p[1] for p in t) - m, max(p[1] for p in t) + m
+    return [(tx, ty) for ty in range(int(math.floor(ty0)), int(math.floor(ty1)) + 1)
+            for tx in range(int(math.floor(tx0)), int(math.floor(tx1)) + 1)]
 
 
 def manifest_items(cfg, resorts_dir=None):
@@ -39,7 +63,6 @@ def manifest_items(cfg, resorts_dir=None):
 
     # ---------------------------------------------------------------- 1 m DEM chunks
     x0, y0, x1, y1 = cfg["utm_bbox"]
-    res = cfg["dem"]["res_m"]; chunk = cfg["dem"]["chunk_px"]
     EXPORT = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?"
     epsg = crs.split(":")[1]
     def export_url(bx0, by0, bx1, by1, w, h):
@@ -48,31 +71,47 @@ def manifest_items(cfg, resorts_dir=None):
             "size": f"{w},{h}", "format": "tiff", "pixelType": "F32", "noData": "-9999",
             "interpolation": "RSP_BilinearInterpolation", "f": "image"})
 
-    nx = math.ceil((x1 - x0) / (chunk * res)); ny = math.ceil((y1 - y0) / (chunk * res))
-    for j in range(ny):
-        for i in range(nx):
-            bx0 = x0 + i * chunk * res; by0 = y0 + j * chunk * res
-            bx1 = min(bx0 + chunk * res, x1); by1 = min(by0 + chunk * res, y1)
-            w = int(round((bx1 - bx0) / res)); h = int(round((by1 - by0) / res))
-            add(export_url(bx0, by0, bx1, by1, w, h), f"dem1m/dem_{i}_{j}.tif",
-                meta={"bbox": [bx0, by0, bx1, by1], "size": [w, h], "res": res})
+    def mapterhorn(box, z, what):
+        for tx, ty in mapterhorn_tiles(to_ll, box, z):
+            add(MAPTERHORN_URL.format(z=z, x=tx, y=ty), f"mapterhorn/{z}/{tx}_{ty}.webp",
+                meta={"z": z, "x": tx, "y": ty, "for": what})
+
+    if cfg["dem"].get("source") == "Mapterhorn":
+        # FEAT-225: no 3DEP here; the resort box from Mapterhorn's tiles at the plan's zoom (build_pack.py stage 1)
+        mapterhorn(cfg["utm_bbox"], cfg["dem"]["zoom"], "fine")
+    else:
+        res = cfg["dem"]["res_m"]; chunk = cfg["dem"]["chunk_px"]
+        nx = math.ceil((x1 - x0) / (chunk * res)); ny = math.ceil((y1 - y0) / (chunk * res))
+        for j in range(ny):
+            for i in range(nx):
+                bx0 = x0 + i * chunk * res; by0 = y0 + j * chunk * res
+                bx1 = min(bx0 + chunk * res, x1); by1 = min(by0 + chunk * res, y1)
+                w = int(round((bx1 - bx0) / res)); h = int(round((by1 - by0) / res))
+                add(export_url(bx0, by0, bx1, by1, w, h), f"dem1m/dem_{i}_{j}.tif",
+                    meta={"bbox": [bx0, by0, bx1, by1], "size": [w, h], "res": res})
 
     # ---------------------------------------------------------------- 10 m mid ring
     ox, oy = cfg["origin"]; S = cfg["mid_ring"]["size_m"]; r = cfg["mid_ring"]["res_m"]
     mx0, my0 = ox - S / 2, oy - S / 2; mx1, my1 = ox + S / 2, oy + S / 2
-    # Split into 2x2 chunks: the ImageServer returns HTTP 500 for single exports much above ~1500 px of
-    # full-resolution data. Processing mosaics dem10m/mid_{i}_{j}.tif back together (rasterio.merge).
-    half = S / 2
-    for j in range(2):
-        for i in range(2):
-            bx0 = mx0 + i * half; by0 = my0 + j * half; bx1 = bx0 + half; by1 = by0 + half
-            n = int(half / r)
-            add(export_url(bx0, by0, bx1, by1, n, n), f"dem10m/mid_{i}_{j}.tif", meta={"bbox": [bx0, by0, bx1, by1], "size": [n, n], "res": r})
+    if cfg["mid_ring"].get("source") == "Mapterhorn":
+        mapterhorn([mx0, my0, mx1, my1], cfg["mid_ring"]["zoom"], "mid")
+    else:
+        # Split into 2x2 chunks: the ImageServer returns HTTP 500 for single exports much above ~1500 px of
+        # full-resolution data. Processing mosaics dem10m/mid_{i}_{j}.tif back together (rasterio.merge).
+        half = S / 2
+        for j in range(2):
+            for i in range(2):
+                bx0 = mx0 + i * half; by0 = my0 + j * half; bx1 = bx0 + half; by1 = by0 + half
+                n = int(half / r)
+                add(export_url(bx0, by0, bx1, by1, n, n), f"dem10m/mid_{i}_{j}.tif",
+                    meta={"bbox": [bx0, by0, bx1, by1], "size": [n, n], "res": r})
 
     # ---------------------------------------------------------------- NAIP crops
+    # FEAT-225: no `naip` (outside the US): the masks come from WorldCover, fetched with the land cover below
     CROP = "https://planetarycomputer.microsoft.com/api/data/v1/item/crop/"
-    nres = cfg["naip"]["res_m"]; maxpx = cfg["naip"]["max_px"]
-    for item, (ilon0, ilat0, ilon1, ilat1) in cfg["naip"]["item_bboxes_ll"].items():
+    naip = cfg.get("naip") or {"res_m": 1, "max_px": 4000, "item_bboxes_ll": {}}
+    nres = naip["res_m"]; maxpx = naip["max_px"]
+    for item, (ilon0, ilat0, ilon1, ilat1) in naip["item_bboxes_ll"].items():
         # item footprint in UTM (inner box to avoid nodata edges)
         cs = [to_utm.transform(lo, la) for lo, la in [(ilon0, ilat0), (ilon1, ilat0), (ilon1, ilat1), (ilon0, ilat1)]]
         xs = [c[0] for c in cs]; ys = [c[1] for c in cs]
@@ -95,11 +134,6 @@ def manifest_items(cfg, resorts_dir=None):
 
     # ---------------------------------------------------------------- Mapterhorn far ring
     z = cfg["far_ring"]["mapterhorn_zoom"]; F = cfg["far_ring"]["size_m"]
-    def lonlat_to_tile(lon, lat, z):
-        n = 2 ** z
-        xt = (lon + 180) / 360 * n
-        yt = (1 - math.log(math.tan(math.radians(lat)) + 1 / math.cos(math.radians(lat))) / math.pi) / 2 * n
-        return xt, yt
     fl = [to_ll.transform(ox - F / 2, oy - F / 2), to_ll.transform(ox + F / 2, oy + F / 2)]
     tx0, ty1 = lonlat_to_tile(fl[0][0], fl[0][1], z); tx1, ty0 = lonlat_to_tile(fl[1][0], fl[1][1], z)
     for ty in range(int(math.floor(ty0)), int(math.floor(ty1)) + 1):
@@ -108,18 +142,20 @@ def manifest_items(cfg, resorts_dir=None):
 
     # ---------------------------------------------------------------- Lidar EPT nodes
     # The main source goes to ept/, each of cfg["lidar"]["extra"] (a second dataset over the part the first one
-    # misses, e.g. Big Sky's east strip) to ept/<dataset>/: node keys repeat between datasets.
-    for k_src, src in enumerate([cfg["lidar"]] + list(cfg["lidar"].get("extra", []))):
+    # misses, e.g. Big Sky's east strip) to ept/<dataset>/: node keys repeat between datasets. No `lidar` (FEAT-225
+    # Silver and Bronze): the trees are stands from the ETH canopy height, fetched with the land cover below.
+    lidar = cfg.get("lidar")
+    for k_src, src in enumerate([lidar] + list(lidar.get("extra", [])) if lidar else []):
         ept = src["ept"]; sub = "ept" if k_src == 0 else f"ept/{src['dataset']}"
         add(ept + "ept.json", f"{sub}/ept.json")
         nodes = open(os.path.join(resorts_dir, src["nodes_file"])).read().split()
         for k in nodes:
             add(f"{ept}ept-data/{k}.laz", f"{sub}/{k}.laz")
     # BUG-081: the far tree ring's nodes (ept_select.py, lidar.far) to ept_far/, read by far_trees.py
-    far = cfg["lidar"].get("far")
+    far = (lidar or {}).get("far")
     if far and os.path.exists(os.path.join(resorts_dir, far["nodes_file"])):
         for k in open(os.path.join(resorts_dir, far["nodes_file"])).read().split():
-            add(f"{cfg['lidar']['ept']}ept-data/{k}.laz", f"ept_far/{k}.laz")
+            add(f"{lidar['ept']}ept-data/{k}.laz", f"ept_far/{k}.laz")
 
     # ---------------------------------------------------------------- Overpass
     lon0, lat0, lon1, lat1 = cfg["lonlat_bbox"]

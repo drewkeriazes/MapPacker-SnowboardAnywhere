@@ -1,0 +1,88 @@
+{
+  "slug": "atzmannig",
+  "name": "Atzmännig",
+  "country": "CH",
+  "region": "Saint Gallen",
+  "osm_ski_area_way": 911466485,
+  "crs": "EPSG:32632",
+  "utm_zone": "32N",
+  "lonlat_bbox": [
+    8.9904427,
+    47.2773656,
+    9.0138316,
+    47.2875552
+  ],
+  "buffer_m": 600,
+  "utm_bbox": [
+    498600,
+    5235300,
+    501700,
+    5237800
+  ],
+  "origin": [
+    500150,
+    5236550
+  ],
+  "elevation_range_m": [
+    700,
+    1300
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10,
+    "source": "Mapterhorn",
+    "zoom": 13
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "Mapterhorn",
+    "res_m": 1,
+    "zoom": 16,
+    "native_zoom": 17
+  },
+  "attribution": [
+    "Elevation: Mapterhorn (mapterhorn.com) terrain tiles at z16, from swissALTI3D, Federal Office of Topography swisstopo (Open Government Data)",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "osm": {
+    "geofabrik": "switzerland",
+    "pbf": "https://download.geofabrik.de/europe/switzerland-latest.osm.pbf"
+  },
+  "openskidata": {
+    "ids": [
+      "27c943529e7f72139a749bd67b1a0b621a66840f",
+      "ed1dc3eea539c61f394bd02c508be3f2367859ab"
+    ],
+    "names": [
+      "Atzmännig",
+      "Atzmännig"
+    ],
+    "iso3166_2": "CH-SG",
+    "websites": [
+      "https://www.atzmaennig.ch",
+      "https://www.atzmaennig.ch/"
+    ],
+    "lifts": 10,
+    "runs": 15
+  },
+  "tier": "bronze",
+  "sources": {
+    "terrain": {
+      "source": "Mapterhorn z16, 0.8 m",
+      "tier": "silver"
+    },
+    "trees": {
+      "source": "stands from ETH canopy height + WorldCover",
+      "tier": "silver"
+    },
+    "surface": {
+      "source": "WorldCover 10 m",
+      "tier": "bronze"
+    }
+  }
+}

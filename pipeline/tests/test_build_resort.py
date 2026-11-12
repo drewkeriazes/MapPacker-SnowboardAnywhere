@@ -14,6 +14,7 @@ from gen_manifest import MANIFEST_VERSION  # noqa: E402
 
 CFG = {"slug": "demo", "name": "Demo", "country": "US", "crs": "EPSG:26913", "utm_bbox": [0, 0, 1000, 1000],
        "lonlat_bbox": [-106.1, 39.4, -106.0, 39.5], "terrain_status_url": "https://www.demo.example/x.aspx",
+       "naip": {"res_m": 1, "items": []},
        "lidar": {"ept": "https://x/", "dataset": "D", "nodes_file": "demo_ept_nodes.txt",
                  "far": {"pad_m": 5000, "max_depth": 9, "nodes_file": "demo_ept_far_nodes.txt"}}}
 
