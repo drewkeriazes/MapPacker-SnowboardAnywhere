@@ -117,7 +117,7 @@ The packs are built from these sources. OpenStreetMap-derived parts of a pack (`
 - Terrain tiles: Mapterhorn, built from USGS 3DEP
 - Imagery: USDA NAIP via Microsoft Planetary Computer (public domain)
 - Vegetation type, cover and height: LANDFIRE, USGS and U.S. Forest Service (public domain)
-- Geographic names: USGS GNIS (public domain)
+- Geographic names: USGS GNIS (public domain); town names and sizes: US Census Bureau Gazetteer and population estimates (public domain)
 - Map data © OpenStreetMap contributors, ODbL; ski area data: OpenSkiMap.org
 - Land cover: © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium (CC BY 4.0)
 - Canopy height: Lang, Jetz, Schindler, Wegner, "A high-resolution canopy height model of the Earth", Nature Ecology & Evolution 7, 1778-1789 (2023), ETH Global Sentinel-2 10 m Canopy Height 2020 (CC BY 4.0)

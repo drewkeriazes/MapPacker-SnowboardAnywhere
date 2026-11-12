@@ -62,7 +62,8 @@ TEMPLATE = "/the-mountain/mountain-conditions/terrain-and-lift-status.aspx"   # 
 # bytes per manifest item (or per pixel for the rasters), measured on Vail's raw data 2026-11-11
 # (LAZ: 8.8 bytes per point in both ept/ and ept_far/; per node only when the hierarchy was not walked)
 BYTES = {"dem1m_px": 4.22, "dem10m_px": 4.06, "naip1m_px": 1.97, "mapterhorn": 105e3, "ept_pt": 8.8,
-         "ept_node": 1.16e6, "ept_far_node": 1.32e6, "osm": 3.8e6, "worldcover": 89e6, "eth_canopy": 284e6}
+         "ept_node": 1.16e6, "ept_far_node": 1.32e6, "osm": 3.8e6, "worldcover": 89e6, "eth_canopy": 284e6,
+         "gnis": 1.5e6, "gazetteer": 1.2e6, "population": 7.1e6}   # names/ (FEAT-235): a state's GNIS zip, 2024 files
 LANDFIRE_BYTES = 2e6
 
 
@@ -645,6 +646,8 @@ def estimate_bytes(items, ept_points=None):
             b = 0 if it["path"].endswith("ept.json") else BYTES["ept_node"]
         elif top == "ept_far":
             b = BYTES["ept_far_node"]
+        elif top == "names":
+            b = BYTES["population"] if "sub-est" in it["path"] else BYTES["gazetteer"] if "_Gaz_" in it["path"] else BYTES["gnis"]
         else:
             b = BYTES.get(top, 0)
         out[top] = out.get(top, 0) + b
@@ -880,6 +883,10 @@ def plan(stub, hosts, walk_nodes=True, log=print):
     if stub.get("exclude"):
         cfg["exclude"] = stub["exclude"]
     cfg["openskidata"] = stub.get("openskidata")
+    import placenames                         # FEAT-235: the GNIS states the far ring touches, the resort's own first
+    names = placenames.plan_names(cfg)
+    if names:
+        cfg["names"] = names
     tier, why = tier_of(facts["layers"])
     cfg["tier"] = tier
     facts["tier"], facts["tier_why"] = tier, why
@@ -975,6 +982,8 @@ def plan_md(cfg, facts, walked=True):
     L.append(f"| Vegetation type | LANDFIRE EVT, EVC, EVH (`fetch_landfire.mjs`) | | 30 m | | {mb(LANDFIRE_BYTES)} | |")
     osm = cfg.get("osm", {})
     row("Runs, lifts, buildings", f"OSM via Overpass (Geofabrik extract: {osm.get('geofabrik', 'none')})", "", "", "osm", "")
+    if cfg.get("names"):
+        row("Place names", f"USGS GNIS summits ({', '.join(cfg['names']['states'])}), Census towns", "", "", "names", "")
     L.append(f"| Grooming | {cfg.get('terrain_status_url') or 'none'} | | | | | |")
     total = sum(b for _, b in m.values()) + LANDFIRE_BYTES
     L += ["", f"Total about **{mb(total)}**" + ("" if walked else " plus the lidar (node lists not walked: `--no-nodes`)") + ".",

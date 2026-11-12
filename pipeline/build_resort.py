@@ -230,7 +230,7 @@ def check_raw(r):
     """the pack-build skill's raw checks: every layer there, the OSM files real JSON (an Overpass error page is
     HTML or a JSON "remark" with no elements). Land cover and pistes_wide are required unless the config turns
     land cover off (DATA-022 item 8: cover.py skips the far levels without them, and the far terrain reads as camo),
-    and the far ring's lidar when the config has lidar.far (item 8b)"""
+    the far ring's lidar when the config has lidar.far (item 8b), and place names in the US (FEAT-235)"""
     miss = []
     need = dict(RAW_NEED)
     osm_need = list(OSM_NEED)
@@ -240,6 +240,9 @@ def check_raw(r):
         osm_need.append("pistes_wide")
     if (r.cfg.get("lidar") or {}).get("far"):
         need["far ring lidar (ept_far)"] = ("ept_far", None)
+    import placenames
+    if placenames.states_of(r.cfg):           # FEAT-235: GNIS summits and Census towns (US only)
+        need["place names (GNIS)"] = ("names", None)
     for name, (d, f) in need.items():
         p = os.path.join(r.raw, d)
         if not os.path.isdir(p) or not os.listdir(p) or (f and not os.path.isfile(os.path.join(p, f))):

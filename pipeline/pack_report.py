@@ -663,8 +663,16 @@ class Report:
         self.line("15", "Grooming history", PASS if g else FAIL,
                   f"{g:.0%} of runs with a grooming record" + ("" if graw is None else f", {graw} reports in raw"), mvp=False)
         if raw:
-            self.line("16", "Place names", PASS if self.raw_has("names") else FAIL,
-                      "raw/names present" if self.raw_has("names") else "no raw/names", mvp=False)
+            # FEAT-235: GNIS for the resort's states (names/DomesticNames_<ST>_Text.zip, or Vail's gnis.json) and
+            # the names in features.json
+            gn = sorted(os.path.basename(p).split("_")[1] for p in glob.glob(os.path.join(raw, "names", "DomesticNames_*_Text.zip")))
+            if self.raw_has("names", "gnis.json"):
+                gn.append("gnis.json")
+            np_, nl = len(self.features.get("peaks", [])), len(self.features.get("labels", []))
+            ok = bool(gn) and np_ + nl > 0
+            self.line("16", "Place names", PASS if ok else FAIL,
+                      (f"GNIS {', '.join(gn)}" if gn else "no GNIS file in raw/names") + f"; {np_} peaks, {nl} town labels",
+                      mvp=False)
         else:
             self.line("16", "Place names", SKIP, "pass --raw", mvp=False)
         if self.has_game:

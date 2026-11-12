@@ -117,7 +117,12 @@
     "dataset": "USGS_LPC_CO_Central_Western_2016_LAS_2018",
     "max_depth_resort": 9,
     "max_depth_outside": 8,
-    "nodes_file": "breckenridge_ept_nodes.txt"
+    "nodes_file": "breckenridge_ept_nodes.txt",
+    "far": {
+      "pad_m": 5000,
+      "max_depth": 9,
+      "nodes_file": "breckenridge_ept_far_nodes.txt"
+    }
   },
   "attribution": [
     "Elevation: USGS 3DEP 1 m lidar DEM, public domain",
@@ -127,5 +132,13 @@
     "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
   ],
   "start_run": "Four O'Clock",
-  "notes": "Ski-area box spans Peak 6 (north) to Peak 10 (south) and the town base (east); OSM way id not looked up (Overpass unreachable from the cloud sandbox) and unused by the build. NAIP items from a Planetary Computer STAC search 2026-11-05; EPT node list from /tmp ept_select walk, depth 9 over the ski area and 8 in the buffer (350 nodes, 33M points over the ski box)."
+  "notes": "Ski-area box spans Peak 6 (north) to Peak 10 (south) and the town base (east); OSM way id not looked up (Overpass unreachable from the cloud sandbox) and unused by the build. NAIP items from a Planetary Computer STAC search 2026-11-05; EPT node list from /tmp ept_select walk, depth 9 over the ski area and 8 in the buffer (350 nodes, 33M points over the ski box).",
+  "names": {
+    "states": [
+      "CO"
+    ],
+    "source": "USGS GNIS",
+    "towns": "US Census 2024 Gazetteer and population estimates"
+  },
+  "terrain_status_url": "https://www.breckenridge.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx"
 }
