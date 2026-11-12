@@ -104,9 +104,12 @@ def default_raw_root(repo=REPO) -> str:
 # fingerprint has the game's pipeline code and the game checkout's packs/<slug>) still counts here, so the packs
 # built before the move are not built again: only while this checkout's build code is still the moved code
 # (`code`, pipeline_code() right after the move; any later change to the build code builds again, as it should).
+# `same`: later build code that differs from the moved code only in where it reads files, so it builds the same
+# packs (FEAT-244, a folder per resort). build_resort.py is not build code, so listing one here does not change it.
 MOVED = {"from": "SnowboardAnywhere 2a0b12f",
          "game_code": "80d9391a499fed00",
-         "code": "1df239f500ce0922"}
+         "code": "1df239f500ce0922",
+         "same": ("1cdddd3bff92c566",)}
 MOVED_WHY = "built before the move to MapPacker (FEAT-238), inputs unchanged"
 
 
@@ -309,7 +312,7 @@ def built_before_move(r, seen):
     """FEAT-238: True when the recorded build fingerprint `seen` is this build's inputs as SnowboardAnywhere saw
     them (the game's pipeline code at the move, the pack in the game checkout's packs/), this checkout's build code
     is still the moved code, and the pack here is that build (the same build id as the game checkout's copy)"""
-    if pipeline_code() != MOVED["code"]:
+    if pipeline_code() not in (MOVED["code"], *MOVED.get("same", ())):
         return False
     old_out = os.path.join(paths.game_repo(), "packs", r.slug)
     if seen != build_inputs(r, MOVED["game_code"], old_out):
