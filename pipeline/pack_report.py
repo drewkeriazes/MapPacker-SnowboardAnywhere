@@ -683,7 +683,9 @@ class Report:
         derived = meta.get("derived") or {}
         tl = meta.get("treeline")
         parts = [f"treeline {tl:.0f} m measured" if tl else "no measured treeline (client uses Colorado's 3,480 m)"]
-        parts += [f"{k} {v}" for k, v in sorted(derived.items())]
+        parts += [f"{k} {v}" for k, v in sorted(derived.items()) if k != "relocated"]
+        parts += [f"{r['name']} relocated (turned {r.get('turnDeg', 0):+.0f} deg, height shift {r.get('dzM') or 0:+.1f} m)"
+                  for r in derived.get("relocated", [])]     # FEAT-249
         tuned = bool(tl) and {"rock", "canopy"} <= {k.split(".")[0] for k in derived}
         self.line("20", "Values derived for the resort, not copied from Vail", PASS if tuned else FAIL,
                   "; ".join(parts) + ("" if tuned else "; rock and canopy thresholds are Vail's (FEAT-175 step 2)"), mvp=False)

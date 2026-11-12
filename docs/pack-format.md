@@ -238,7 +238,8 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "build": "20261110T171500Z-3fa2c1",                      // FEAT-177: new on every write by any stage (packwriter.stamp_build)
   "pipeline": "1e2e586",                                   // FEAT-175: commit of the pipeline that wrote it, "+dirty" with local changes; optional
   "crs": "EPSG:26913", "origin": [384300, 4384250], "lonlat": [-106.35, 39.60],
-  "bounds": { "minX", "minY", "maxX", "maxY" },           // resort area, local metres
+  "bounds": { "minX", "minY", "maxX", "maxY" },           // resort area, local metres: the config's pack_bbox (FEAT-249,
+                                                           // else utm_bbox) minus origin; need not be centred on it
   "zRange": [2300, 3700],
   "terrain": { "fine": {...}, "mid": {...}, "far": {...} },
   "mask": { "res": 2, "tileSize": 512, "minX", "minY", "tilesX", "tilesY" },
@@ -256,7 +257,9 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "start": { "x", "y", "heading" },                       // default drop-in
   "treeline": 2700,                                       // optional, m (DATA-021): measured from the canopy; absent = 3,480 (Colorado)
   "derived": { "rock.grey_sat": 0.093, "treeline": 2700, ... }, // optional (FEAT-175): values the build derived for this resort instead of
-                                                           // copying Vail's (naip_calib.py thresholds, treeline); a log, the client ignores it
+                                                           // copying Vail's (naip_calib.py thresholds, treeline); a log, the client ignores it.
+                                                           // "relocated": [{ "name", "from", "to", "turnDeg", "featherM", "dzM" }] lists
+                                                           // the areas moved next to the rest (FEAT-249, relocate.py), UTM metres
   "sun": { "azimuth": 160, "elevation": 32 },             // degrees, default lighting
   "attribution": ["..."]
 }

@@ -1055,9 +1055,9 @@ def compare(derived, hand):
 # ------------------------------------------------------------------------------------------------ CLI
 
 def keep_hand_fields(new, old):
-    """fields a person set on the config (start_run, grooming aliases, notes, their own exclude entries) survive
-    a re-plan"""
-    for k in ("start_run", "grooming_aliases", "notes", "landcover"):
+    """fields a person set on the config (start_run, grooming aliases, notes, their own exclude entries, FEAT-249's
+    relocate moves and the pack box from them) survive a re-plan"""
+    for k in ("start_run", "grooming_aliases", "notes", "landcover", "relocate", "pack_bbox"):
         if old.get(k) is not None:
             new[k] = old[k]
     mine = {e["name"] for e in new.get("exclude", [])}
