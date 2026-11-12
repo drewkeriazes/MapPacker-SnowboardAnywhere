@@ -52,7 +52,7 @@ The same publish step is also what FEAT-245's build-pack workflow (a resort buil
 Same command and flags as today (`publish_pack.py packs/<slug>`, `--synth`, `--test`, `--status`, `--tier`, `--dry-run`), plus `--accept-change` (FEAT-264, below). It no longer needs the main checkout or `main`; it runs from any checkout or worktree. Steps:
 
 1. **Refuse an unreproducible build.** The commit checked is the one that built the pack: `meta.json`'s `pipeline` stamp (`packwriter.pipeline_commit`), not the publisher's checkout. It must be present, carry no `+dirty`, and exist on `origin/main`. The catalog's `pipeline` becomes that build stamp (today it is the publisher's `HEAD`). A pack built from a branch, or from uncommitted pipeline code, is not published; a pack with no stamp (today `packs/bigsky`, `packs/breckenridge`) is rebuilt before it can be republished.
-2. **Version and tag.** Next version for the slug from the existing tags (drafts included), tag `<slug>/v<N>` per FEAT-271.
+2. **Version and tag.** Next version for the slug from the repo's release list, drafts included (`gh release list` names a draft's intended tag even though GitHub creates the git tag only when the release is published), so two publishes in flight never pick the same number. Tag `<slug>/v<N>` per FEAT-271.
 3. **Zip and upload a draft release** with the zip, `meta.json` and the report, title `<Name> v<N>`, notes that include the FEAT-264 diff. The draft is invisible to players and to the catalog.
 4. **Build the PR branch in a throwaway worktree** off a fresh `origin/main` (never the publisher's checkout): `catalog.json` with the new entry, `RELEASES.md` regenerated (FEAT-271), `reports/<slug>.md`, and the resort's own files (`resorts/<slug>/`, `manifests/<slug>.json`), exactly the files today's publish commit carries. Branch `publish/<slug>-v<N>`. Commit message as today: `<slug> v<N>: <status>, <MB> MB, pipeline <sha>`.
 5. **Open the PR** with label `publish` (and `automerge` when the publisher is trusted, section 4), body: the report's gate summary, the FEAT-264 before/after table, the draft release link, size and sha256, who started it and from where (local or run link). GitHub's native auto-merge is not turned on; `publish-merge.yml` does the merge (section 3).
@@ -73,7 +73,7 @@ New job `publish-check` in `checks.yml`, runs when `catalog.json` changed, skips
 
 `format-check` already compares the pack format with the game's `main`; it runs when `pipeline/` changed, which a publish PR does not touch, so the pack lint's `formatVersion` line is the publish-time version of it.
 
-`pr-review.yml` skips PRs labelled `publish` (my call: the checks are the gate; a model review of a catalog entry costs tokens and adds nothing).
+`pr-review.yml` skips a PR only when it is labelled `publish` **and** changes nothing outside the publish file set (section 3). A `publish` PR that touches anything else gets the normal review, so the label can't switch review off. (My call: for a pure publish the checks are the gate; a model review of a catalog entry costs tokens and adds nothing.)
 
 ### 3. Merge, then the release goes live
 
@@ -151,8 +151,8 @@ Order: the publish card, then FEAT-265 and FEAT-264 (its checks), then FEAT-271 
 2. The merge is done by `publish-merge.yml`, not GitHub's native auto-merge, and the `automerge` label is the trust marker; an untrusted publish is approved by a maintainer adding the label.
 3. Pack lint plus size ceilings replace the ride as the load check; `--ride` stays for local debugging.
 4. `publish_pack.py` refuses (not warns) a pack whose build stamp is missing, `+dirty`, or not on `origin/main`; the catalog's `pipeline` becomes the build stamp.
-8. The `automerge` and `accept-change` labels count only when a maintainer added them (or the App, for a run a maintainer started); a `publish` PR that changes anything outside the publish file set never merges itself; the check scripts run from `main`.
-9. Accepting a FEAT-264 big change is a label on the open PR, not a republish.
-5. The Claude reviewer skips `publish` PRs.
+5. The Claude reviewer skips a `publish` PR only when it changes nothing outside the publish file set.
 6. Maintainers list in `.github/maintainers.txt`.
 7. A GitHub App, not a personal token, as the workflow's identity.
+8. The `automerge` and `accept-change` labels count only when a maintainer added them (or the App, for a run a maintainer started); a `publish` PR that changes anything outside the publish file set never merges itself; the check scripts run from `main`.
+9. Accepting a FEAT-264 big change is a label on the open PR, not a republish.
