@@ -1,6 +1,7 @@
 """FEAT-272: decide whether a publish PR releases its draft and merges itself (design section 3 and 4).
 
     python pipeline/publish_merge.py ready <pr>     refresh onto main, release the draft then merge, wait, or refuse
+    python pipeline/publish_merge.py pure <pr>      print true when it is a publish PR changing only the publish file set
     python pipeline/publish_merge.py closed <pr>    merged: publish a draft still unpublished; unmerged: delete it
 
 `ready` merges only a `publish/<slug>-v<N>` PR from this repo (not a fork) into main, labelled `publish` and
@@ -408,12 +409,32 @@ def closed(n: int, repo: str) -> int:
     return 0
 
 
+def pure(n: int, repo: str) -> bool:
+    """a `publish`-labelled publish/<slug>-v<N> PR whose every changed path (renames count both names) is in the
+    publish file set: the Claude reviewer has nothing to review there. Anything unreadable or odd is False."""
+    try:
+        pr = api(f"repos/{repo}/pulls/{n}")
+        parsed = parse_branch(pr["head"]["ref"])
+        if not parsed or "publish" not in [lb["name"] for lb in pr.get("labels", [])]:
+            return False
+        listed = api_pages(f"repos/{repo}/pulls/{n}/files")
+        if len(listed) != pr.get("changed_files"):
+            return False
+        files = [f["filename"] for f in listed] + [f["previous_filename"] for f in listed if f.get("previous_filename")]
+        return files_ok(files, parsed[0])
+    except (SystemExit, KeyError, TypeError, ValueError):
+        return False
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("action", choices=["ready", "closed"])
+    ap.add_argument("action", choices=["ready", "closed", "pure"])
     ap.add_argument("pr", type=int)
     a = ap.parse_args(argv)
     repo = os.environ.get("GITHUB_REPOSITORY") or RESORTS_REPO
+    if a.action == "pure":
+        print("true" if pure(a.pr, repo) else "false")
+        return 0
     if a.action == "closed":
         return closed(a.pr, repo)
     return ready(a.pr, repo, os.environ.get("PUBLISH_APP_LOGIN", ""))

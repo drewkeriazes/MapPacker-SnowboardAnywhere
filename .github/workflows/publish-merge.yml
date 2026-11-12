@@ -1,0 +1,91 @@
+# Publish-merge (FEAT-272): a pack goes out through a pull request, and this workflow finishes it.
+# pipeline/publish_merge.py does the work (README > Publishing a pack, docs/ > publish design):
+#   ready <pr>   once the Checks have finished (or `automerge` was just added): refresh the branch onto main when
+#                main moved, then release the draft and squash-merge, only for a trusted publish PR; otherwise
+#                wait, or refuse with one comment
+#   closed <pr>  merged: publish a draft still unpublished; closed unmerged: delete the draft
+#
+# Security: this runs on workflow_run / pull_request_target, so it holds a write token. It checks out main and
+# nothing else; no step checks out or runs the PR's code. The tool reads the PR through the API only.
+#
+# One-time setup (Drew, by hand): a GitHub App "MapPacker publisher", no webhook, repository permissions
+# Contents: write, Pull requests: write, Issues: read, Actions: read, Metadata: read, installed on this repo only.
+#   secrets   PUBLISH_APP_ID, PUBLISH_APP_KEY (the App's id and a generated private key, PEM)
+#   variable  PUBLISH_APP_LOGIN (the App's bot login, e.g. mappacker-publisher[bot])
+# The refresh commit's author is that login with its noreply address; publish_merge.py looks up the App's user id
+# itself (gh api users/<login>), so there is no PUBLISH_APP_USER_ID.
+
+name: Publish merge
+
+on:
+  workflow_run:
+    workflows: [Checks]
+    types: [completed]
+  pull_request_target:
+    types: [labeled, closed]
+
+concurrency:
+  group: publish-merge
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish-merge:   # the tool leaves this job's own check run out of the checks it waits for, by this name
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       startsWith(github.event.workflow_run.head_branch, 'publish/') &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.pull_requests[0].number != null) ||
+      (github.event_name == 'pull_request_target' &&
+       startsWith(github.event.pull_request.head.ref, 'publish/') &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       (github.event.action == 'closed' || github.event.label.name == 'automerge'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30   # a branch refresh, then the draft zip is waited for
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+      ACTION: ${{ github.event.action == 'closed' && 'closed' || 'ready' }}
+    steps:
+      - name: The App is set up
+        env:
+          APP_ID: ${{ secrets.PUBLISH_APP_ID }}
+          APP_KEY: ${{ secrets.PUBLISH_APP_KEY }}
+          APP_LOGIN: ${{ vars.PUBLISH_APP_LOGIN }}
+        run: |
+          missing=""
+          [ -n "$APP_ID" ] || missing="$missing secret:PUBLISH_APP_ID"
+          [ -n "$APP_KEY" ] || missing="$missing secret:PUBLISH_APP_KEY"
+          [ -n "$APP_LOGIN" ] || missing="$missing variable:PUBLISH_APP_LOGIN"
+          if [ -n "$missing" ]; then
+            echo "::error::Publishing by pull request needs the GitHub App (FEAT-272). Missing:$missing. See the top of .github/workflows/publish-merge.yml."
+            exit 1
+          fi
+
+      - id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.PUBLISH_APP_ID }}
+          private-key: ${{ secrets.PUBLISH_APP_KEY }}
+
+      # main, never the PR: the script that holds the token is main's. Full history, and the App's token so the
+      # refresh's git push to the publish/ branch is made as the App (the tool's trust rule counts on that).
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install numpy pillow   # publish_merge imports publish_pack, which imports packwriter
+
+      - name: publish_merge.py
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PUBLISH_APP_LOGIN: ${{ vars.PUBLISH_APP_LOGIN }}
+        run: python pipeline/publish_merge.py "$ACTION" "$PR_NUMBER"
