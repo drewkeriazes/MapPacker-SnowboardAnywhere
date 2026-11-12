@@ -106,7 +106,7 @@ def default_raw_root(repo=REPO) -> str:
 # (`code`, pipeline_code() right after the move; any later change to the build code builds again, as it should).
 MOVED = {"from": "SnowboardAnywhere 2a0b12f",
          "game_code": "80d9391a499fed00",
-         "code": "MOVED_CODE"}
+         "code": "1df239f500ce0922"}
 MOVED_WHY = "built before the move to MapPacker (FEAT-238), inputs unchanged"
 
 
