@@ -29,6 +29,32 @@ python pipeline\resort.py add --help
 
 Every stage is skipped when its inputs have not changed, so both are safe to re-run. The first `add_resort.cmd` run for a new resort stops after the data plan (`resorts/<slug>/<slug>-plan.md`) so it can be read before a 1+ GB fetch.
 
+### Add a resort yourself, step by step
+
+Without Claude, on Windows, US resorts (the gold tier needs USGS lidar):
+
+1. **Set up once.**
+   - Install Python 3.13 and run `pip install -r pipeline\requirements.txt`, then install Node.
+   - Clone the game next to this repo (`..\SnowboardAnywhere`) and run `npm install` in its `game\` folder; the ride stage builds the game.
+   - Optional: set `SBA_RAW_ROOT` to a drive with room (a resort's raw data is a few GB) and `LANDFIRE_EMAIL` to skip the LANDFIRE email question.
+   - To publish you need `gh auth login` with push access to this repo. Without it, add `--no-publish` (step 5).
+2. **Find the name.** Use the resort's name as [OpenSkiMap](https://openskimap.org) shows it ("Boston Mills", "Park City"); case and accents don't matter.
+3. **First run: resolve and plan.** Double-click `add_resort.cmd` and type the name, or run `add_resort.cmd "Park City"`. It may ask two things (BUG-103):
+   - *Several ski areas match*: type the number of the one you mean.
+   - *Neighbours in its box or sold with it* (Park City lists Deer Valley, Solitude, Brighton, Alta): type the numbers of any to build into the same pack, commas between, or press Enter to leave their runs and lifts out. It prints the flags that give the same answer (`--with "<name>"`, `--alone`) for scripts.
+
+   It then writes `resorts\<slug>\<slug>.json` and the data plan `resorts\<slug>\<slug>-plan.md`, and stops.
+4. **Read the plan.** It shows the box, the tier (gold needs 1 m terrain and lidar over the box), each layer's source, year and size, and the total download. If the tier or the box looks wrong, stop here and open an issue.
+5. **Second run: everything else.** Run `add_resort.cmd` again with the same name. It does not ask again: the config remembers your answers (`--force resolve` asks again). Then:
+   - It fetches (the long part; resumable).
+   - It asks the LANDFIRE email once.
+   - It builds the pack into `packs\<slug>\` (about 10 minutes for Vail).
+   - It writes the scorecard `packs\<slug>\report.md`, rides the pack headless in the game, and publishes the release.
+
+   After the report it prints the DATA-022 gate: *playable* when every MVP line passes, else *preview* with the lines that hold it back. Add `--no-publish` to stop before the release.
+6. **When a stage stops,** the message says which stage and what to do. Fix that and run the same command again: finished stages are skipped. `add_resort.cmd "<name>" --force <stage>` reruns one stage, and `python pipeline\resort.py add --help` lists the rest.
+7. **Ride it.** In the game: `cd game`, then `npm run get <slug>` once it is published, or `npm run get -- --from ..\..\MapPacker-SnowboardAnywhere\packs\<slug>` for the local build. Then `npm run dev` and open `/?pack=<slug>`.
+
 - **Raw data** goes to `SBA_RAW_ROOT`, else `raw\` in the main checkout (worktrees share it). It is gitignored and never committed. On Drew's PC `SBA_RAW_ROOT` points at the raw data still in the game's clone, `C:\Users\Drew\git\SnowboardAnywhere\raw`, until it is moved here.
 - **Moving an area** (FEAT-249): a config's `relocate` list cuts an area out and pastes it next to the rest (Brandywine beside Boston Mills), and `pack_bbox` is the box the pack is built on while `utm_bbox` stays the box the raw data was fetched for, so moving an area needs no new download. `python pipeline\relocate.py <slug> [--write]` works out `pack_bbox` from the runs and lifts after the move (`--write` puts it in the config).
 - **The game** must be cloned next to this repo (`..\SnowboardAnywhere`) for the headless ride, the game-side lines of the build report and a few tests. `--game-repo <path>` or `SBA_GAME_REPO` points elsewhere; without it those parts say so and stop or skip.
