@@ -1,0 +1,456 @@
+# Checks in CI (FEAT-240, EPIC-16 #9; ported from SnowboardAnywhere's FEAT-172 checks.yml). Every job shows as its own
+# check on the PR. README > Checks says what runs where.
+#
+#   pipeline-tests    pytest pipeline/tests, without the game                     pipeline/ changed
+#   format-check      the pack format contract (FEAT-239: pipeline/contract.py,      pipeline/ changed
+#                     docs/pack-format.md > Contract) against the game's main on
+#                     GitHub, then the tests marked `game` (pipeline/tests/conftest.py)
+#                     against a checkout of it: the contract tests, the course rule,
+#                     get_pack.mjs
+#   synth-pack        the synthetic pack (pipeline/synth_pack.py), cached on          pipeline/ changed
+#                     tools/ci/synth_key.sh
+#   render-budgets    the game's main, built once, draws the synthetic pack from      PRs, pipeline/ changed
+#                     this repo's main (before) and from the PR (after) with its
+#                     game/tools/cishot.mjs: shader compile, scene budget counts
+#                     (fails on a count more than 10% over main); the game's
+#                     tools/ci/render_report.py writes the report and
+#                     render-budgets-comment posts it. Before / after stills only
+#                     when asked for: the `stills` label, or a manual run with
+#                     `stills` ticked. Skipped (still green) when
+#                     tools/ci/local_render_budgets.mjs passed on Drew's GPU for the
+#                     same commit, merge base, tools, synthetic pack and game commit
+#   repo-rules        no em dashes in added Markdown, plain commit messages,          always (PRs)
+#                     docs-travel warning
+#   public-guards     no .env files, no packs, raw data or data files in git, files   always
+#                     <= 2 MB, images <= 1 MB under docs/ or reports/, gitleaks
+#
+# Rerun: the PR's Checks tab > Re-run jobs, or Actions > Checks > Run workflow (give the PR number to get the PR
+# comment; tick stills for the before / after stills). pr-feedback.yml dispatches this workflow after it pushes,
+# since its GITHUB_TOKEN push does not start a pull_request run.
+
+name: Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number (optional; compares against its base and comments there)
+        required: false
+        type: string
+      stills:
+        description: Compare the before / after stills too (with a PR number)
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number || inputs.pr || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+  BASE_REF: ${{ github.base_ref || 'main' }}
+  # the game: public, so its main is checked out with no token
+  GAME_REPO: ${{ github.repository_owner }}/SnowboardAnywhere
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      pipeline: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.f.outputs.pipeline }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
+        id: f
+        with:
+          filters: |
+            pipeline:
+              - '.github/workflows/checks.yml'
+              - 'tools/ci/**'
+              - 'pipeline/**'
+
+  pipeline-tests:
+    needs: changes
+    if: needs.changes.outputs.pipeline == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r pipeline/requirements.txt pytest
+      - name: pytest (the game's tests run in format-check)
+        run: python -m pytest pipeline/tests -v -m "not game"
+
+  format-check:
+    needs: changes
+    if: needs.changes.outputs.pipeline == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ env.GAME_REPO }}
+          ref: main
+          path: game-main
+          sparse-checkout: |
+            game/src
+            game/tools
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r pipeline/requirements.txt pytest
+      # exit 1 on a mismatch, 2 when GitHub can't be reached: either fails the job
+      - name: Pack format contract (pipeline/contract.py, the game's main on GitHub)
+        run: python pipeline/contract.py
+      - name: pytest -m game (the game's main, checked out)
+        env:
+          SBA_GAME_REPO: ${{ github.workspace }}/game-main
+          SBA_REQUIRE_GAME: '1'
+        run: |
+          echo "::notice::checked against $GAME_REPO main at $(git -C game-main rev-parse HEAD)"
+          python -m pytest pipeline/tests -v -m game
+
+  # The synthetic pack (pipeline/synth_pack.py, about 2 min to build), cached on a hash of the pipeline's Python so it
+  # is rebuilt only when the pipeline changes. render-budgets restores it with the same key.
+  synth-pack:
+    needs: changes
+    if: needs.changes.outputs.pipeline == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      key: ${{ steps.key.outputs.key }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: key
+        run: echo "key=$(bash tools/ci/synth_key.sh pipeline)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: packs/synth
+          key: ${{ steps.key.outputs.key }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          pip install -r pipeline/requirements.txt
+          python pipeline/synth_pack.py packs/synth
+
+  render-budgets:
+    needs: [changes, synth-pack]
+    if: >-
+      (github.event_name == 'pull_request' || inputs.pr != '') && needs.changes.outputs.pipeline == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: read # the PR's labels (`stills`)
+      statuses: read # a `render-budgets/local` pass on the head commit
+    outputs:
+      skipped: ${{ steps.local.outputs.skip }}
+      local_sha: ${{ steps.local.outputs.sha }}
+    env:
+      OUT: ${{ github.workspace }}/ci-stills
+      MAIN: ${{ github.workspace }}/../main-src
+      GAME: ${{ github.workspace }}/game-main
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Stills asked for?
+        id: want
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          want=${{ inputs.stills == true && 'true' || 'false' }}
+          if [ "$want" != true ] && gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/labels" --jq '.[].name' | grep -qx stills; then want=true; fi
+          echo "stills=$want" | tee -a "$GITHUB_OUTPUT"
+
+      # one game commit for the whole job (and for the local pass below to match)
+      - name: The game's main
+        id: game
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "sha=$(gh api "repos/$GAME_REPO/commits/main" --jq .sha)" | tee -a "$GITHUB_OUTPUT"
+
+      # Skip the rest when tools/ci/local_render_budgets.mjs already passed on Drew's PC for this exact commit, with
+      # the same merge base, tools, synthetic pack and game commit, and no stills asked for. The job still reports
+      # success. Only the repo owner's statuses count (the repo is public).
+      - name: Passed locally on this commit?
+        id: local
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TRUSTED: ${{ github.repository_owner }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          STILLS: ${{ steps.want.outputs.stills }}
+          SYNTH_KEY: ${{ needs.synth-pack.outputs.key }}
+          GAME_SHA: ${{ steps.game.outputs.sha }}
+        run: |
+          skip=false
+          # newest first: the latest success the owner set for this context on this commit. Any API error leaves a
+          # field empty, which runs the check here.
+          desc=$(gh api "repos/$REPO/commits/$HEAD_SHA/statuses?per_page=100" --jq \
+            "[.[] | select(.context == \"render-budgets/local\" and .creator.login == \"$TRUSTED\" and .state == \"success\")] | first | .description // empty") || desc=""
+          field() { echo "$desc" | tr ' ' '\n' | sed -n "s/^$1=//p"; }
+          if [ -z "$desc" ]; then echo "no local pass from $TRUSTED on $HEAD_SHA: running here"
+          elif [ "$STILLS" = true ]; then echo "stills asked for: running here"
+          else
+            base=$(gh api "repos/$REPO/compare/$BASE_REF...$HEAD_SHA" --jq .merge_base_commit.sha) || base=""
+            tools=$(bash tools/ci/render_budgets_key.sh HEAD) || tools=""
+            echo "local pass: $desc"
+            echo "here:       base=$base tools=$tools synth=$SYNTH_KEY game=${GAME_SHA:0:12}"
+            if [ -z "$base" ] || [ "$(field base)" != "$base" ]; then echo "merge base moved (or unknown): running here"
+            elif [ -z "$tools" ] || [ "$(field tools)" != "$tools" ]; then echo "the render-budgets tools differ: running here"
+            elif [ -z "$SYNTH_KEY" ] || [ "$(field synth)" != "$SYNTH_KEY" ]; then echo "the synthetic pack differs: running here"
+            elif [ -z "$GAME_SHA" ] || [ "$(field game)" != "${GAME_SHA:0:12}" ]; then echo "the game's main moved: running here"
+            else skip=true; echo "::notice::render-budgets passed locally at $HEAD_SHA: skipped in CI"; fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          echo "sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+      - if: steps.local.outputs.skip != 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.GAME_REPO }}
+          ref: ${{ steps.game.outputs.sha }}
+          path: game-main
+      - if: steps.local.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: game-main/game/package-lock.json
+      - if: steps.local.outputs.skip != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - if: steps.local.outputs.skip != 'true'
+        run: npm ci
+        working-directory: game-main/game
+      - if: steps.local.outputs.skip != 'true'
+        run: pip install numpy pillow
+
+      # main's source, for its synthetic pack key (and the pack itself on a cache miss)
+      - if: steps.local.outputs.skip != 'true'
+        name: Check out main
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          git worktree add "$MAIN" FETCH_HEAD
+          echo "main_key=$(bash tools/ci/synth_key.sh "$MAIN/pipeline")" >> "$GITHUB_ENV"
+
+      # main's synthetic pack: the same as the PR's unless the PR changed the pipeline's Python
+      - uses: actions/cache/restore@v4
+        id: main-synth
+        if: steps.local.outputs.skip != 'true' && (env.main_key != needs.synth-pack.outputs.key)
+        with:
+          path: packs/synth
+          key: ${{ env.main_key }}
+      - if: steps.local.outputs.skip != 'true'
+        name: Main's synthetic pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/main-packs"
+          if [ "$main_key" = "${{ needs.synth-pack.outputs.key }}" ]; then
+            echo "MAIN_PACKS=$GITHUB_WORKSPACE/packs" >> "$GITHUB_ENV"
+          else
+            if [ "${{ steps.main-synth.outputs.cache-hit }}" = "true" ]; then
+              mv packs/synth "$RUNNER_TEMP/main-packs/synth"
+            else
+              pip install -r "$MAIN/pipeline/requirements.txt"
+              python "$MAIN/pipeline/synth_pack.py" "$RUNNER_TEMP/main-packs/synth"
+            fi
+            echo "MAIN_PACKS=$RUNNER_TEMP/main-packs" >> "$GITHUB_ENV"
+          fi
+      - if: steps.local.outputs.skip != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: packs/synth
+          key: ${{ needs.synth-pack.outputs.key }}
+          fail-on-cache-miss: true
+      - if: steps.local.outputs.skip != 'true'
+        name: Pack lists
+        run: |
+          echo '{"packs":["synth"]}' > packs/index.json
+          echo '{"packs":["synth"]}' > "$MAIN_PACKS/index.json"
+
+      - if: steps.local.outputs.skip != 'true'
+        id: pw
+        working-directory: game-main/game
+        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - if: steps.local.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ steps.pw.outputs.version }}
+      - if: steps.local.outputs.skip != 'true'
+        run: npx playwright install --with-deps chromium
+        working-directory: game-main/game
+      - if: steps.local.outputs.skip != 'true'
+        run: npx vite build
+        working-directory: game-main/game
+
+      - if: steps.local.outputs.skip != 'true'
+        name: Render main's pack (before)
+        working-directory: game-main/game
+        continue-on-error: true
+        run: SHOT_PACKS="$MAIN_PACKS" node tools/cishot.mjs synth "$OUT/before" --cpu
+      - if: steps.local.outputs.skip != 'true'
+        name: Render the PR's pack (after)
+        id: after
+        working-directory: game-main/game
+        continue-on-error: true
+        run: SHOT_PACKS="$GITHUB_WORKSPACE/packs" node tools/cishot.mjs synth "$OUT/after" --cpu
+
+      - if: steps.local.outputs.skip != 'true'
+        name: Report
+        id: report
+        continue-on-error: true
+        env:
+          GAME_SHA: ${{ steps.game.outputs.sha }}
+          SAME: ${{ env.main_key == needs.synth-pack.outputs.key && '--same-pack' || '' }}
+        run: |
+          rc=0
+          python "$GAME/tools/ci/render_report.py" "$OUT/before" "$OUT/after" "$OUT/report" \
+            ${{ steps.want.outputs.stills == 'true' && '--stills' || '' }} \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || rc=$?
+          if [ -f "$OUT/report/report.md" ]; then
+            python tools/ci/render_note.py "$OUT/report/report.md" --game-repo "$GAME_REPO" --game-sha "$GAME_SHA" $SAME
+          fi
+          exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.local.outputs.skip != 'true'
+        with:
+          name: ci-stills
+          path: ci-stills
+          retention-days: 14
+          if-no-files-found: ignore
+      - if: steps.local.outputs.skip != 'true'
+        name: Result
+        run: |
+          [ "${{ steps.after.outcome }}" = "success" ] || { echo "::error::cishot on the PR's pack failed (shader message, page error or crash): see 'Render the PR's pack'"; exit 1; }
+          [ "${{ steps.report.outcome }}" = "success" ] || { echo "::error::scene budget over main, or no stats: see 'Report'"; exit 1; }
+
+  # Posts (or updates) one comment on the PR with the report. Separate from `render-budgets` so the job that can write
+  # to the PR runs none of the PR's code. The comment is the bot's, or the owner's when
+  # tools/ci/local_render_budgets.mjs wrote it; the newest one is updated.
+  render-budgets-comment:
+    needs: render-budgets
+    if: >-
+      always() && (github.event_name == 'pull_request' || inputs.pr != '') &&
+      (needs.render-budgets.result == 'success' || needs.render-budgets.result == 'failure') &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      LOCAL_SHA: ${{ needs.render-budgets.outputs.local_sha }}
+    steps:
+      # a run for a commit the PR has moved past writes nothing: it would overwrite the newer commit's report (a local
+      # pass posted while this run was still going, for one)
+      - name: Find the comment
+        id: find
+        env:
+          RUN_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          now=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq .head.sha)
+          if [ "$now" != "$RUN_SHA" ]; then echo "the PR is at $now now, this run is for $RUN_SHA: not commenting"; echo "stale=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          id=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments?per_page=100" --paginate \
+            --jq '.[] | select((.user.login == "github-actions[bot]" or .user.login == "${{ github.repository_owner }}") and (.body | startswith("<!-- ci-stills -->"))) | .id' | tail -n1)
+          echo "id=$id" | tee -a "$GITHUB_OUTPUT"
+      - if: needs.render-budgets.outputs.skipped != 'true' && steps.find.outputs.stale != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-stills
+          path: art
+      - name: Comment
+        if: needs.render-budgets.outputs.skipped != 'true' && steps.find.outputs.stale != 'true'
+        env:
+          ID: ${{ steps.find.outputs.id }}
+        run: |
+          body=art/report/report.md
+          if [ ! -f "$body" ]; then
+            printf '<!-- ci-stills -->\n## Shader compile and scene budgets (synthetic pack)\n\nThe render-budgets job failed before it wrote a report: [run log](%s).\n' \
+              "$RUN_URL" > report.md
+            body=report.md
+          fi
+          if [ -n "$ID" ] && gh api -X PATCH "repos/$REPO/issues/comments/$ID" -F "body=@$body" > /dev/null; then :
+          else gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$body"; fi
+      # the local run already wrote the report: add one line to it, once per commit
+      - name: Note the local pass
+        if: needs.render-budgets.outputs.skipped == 'true' && steps.find.outputs.stale != 'true'
+        env:
+          ID: ${{ steps.find.outputs.id }}
+        run: |
+          line="skipped in CI: passed locally at $LOCAL_SHA ([run]($RUN_URL))"
+          if [ -z "$ID" ]; then
+            printf '<!-- ci-stills -->\n## Shader compile and scene budgets (synthetic pack)\n\n%s\n' "$line" > body.md
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file body.md; exit 0
+          fi
+          gh api "repos/$REPO/issues/comments/$ID" --jq .body > body.md
+          if grep -qF "passed locally at $LOCAL_SHA" body.md; then echo "already noted"; exit 0; fi
+          printf '\n%s\n' "$line" >> body.md
+          gh api -X PATCH "repos/$REPO/issues/comments/$ID" -F "body=@body.md" > /dev/null || echo "::warning::could not add the line to comment $ID"
+
+  repo-rules:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Repo rules
+        run: python tools/ci/repo_rules.py --base "origin/${{ github.base_ref || 'main' }}" --head HEAD
+
+  public-guards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: .env files, packs and data, file sizes
+        run: |
+          base=${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}
+          git cat-file -e "$base^{commit}" 2>/dev/null || base=$(git rev-list --max-parents=0 HEAD | tail -n1)
+          echo "BASE=$base" >> "$GITHUB_ENV"
+          python tools/ci/public_guards.py --base "$base" --head HEAD
+      - name: gitleaks
+        if: always()
+        env:
+          GITLEAKS: '8.30.1'
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS}/gitleaks_${GITLEAKS}_linux_x64.tar.gz"
+          curl -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS}/gitleaks_${GITLEAKS}_checksums.txt"
+          grep "linux_x64.tar.gz" "gitleaks_${GITLEAKS}_checksums.txt" | sha256sum -c -
+          tar -xzf "gitleaks_${GITLEAKS}_linux_x64.tar.gz" gitleaks
+          cd "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/gitleaks" git --no-banner --redact -v --log-opts="$BASE..HEAD" .
