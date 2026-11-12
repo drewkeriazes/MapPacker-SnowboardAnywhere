@@ -670,8 +670,16 @@ class Report:
         self.line("15", "Grooming history", PASS if g else FAIL,
                   f"{g:.0%} of runs with a grooming record" + ("" if graw is None else f", {graw} reports in raw"), mvp=False)
         if raw:
-            self.line("16", "Place names", PASS if self.raw_has("names") else FAIL,
-                      "raw/names present" if self.raw_has("names") else "no raw/names", mvp=False)
+            # FEAT-235: GNIS for the resort's states (names/DomesticNames_<ST>_Text.zip, or Vail's gnis.json) and
+            # the names in features.json
+            gn = sorted(os.path.basename(p).split("_")[1] for p in glob.glob(os.path.join(raw, "names", "DomesticNames_*_Text.zip")))
+            if self.raw_has("names", "gnis.json"):
+                gn.append("gnis.json")
+            np_, nl = len(self.features.get("peaks", [])), len(self.features.get("labels", []))
+            ok = bool(gn) and np_ + nl > 0
+            self.line("16", "Place names", PASS if ok else FAIL,
+                      (f"GNIS {', '.join(gn)}" if gn else "no GNIS file in raw/names") + f"; {np_} peaks, {nl} town labels",
+                      mvp=False)
         else:
             self.line("16", "Place names", SKIP, "pass --raw", mvp=False)
         if self.has_game:
@@ -689,9 +697,14 @@ class Report:
                 self.line(i, item, SKIP, why, mvp=False)
         derived = meta.get("derived") or {}
         tl = meta.get("treeline")
-        parts = [f"treeline {tl:.0f} m measured" if tl else "no measured treeline (client uses Colorado's 3,480 m)"]
-        parts += [f"{k} {v}" for k, v in sorted(derived.items())]
-        tuned = bool(tl) and {"rock", "canopy"} <= {k.split(".")[0] for k in derived}
+        tl_none = "treeline" in meta and tl is None   # FEAT-234: measured, the box is forest to the top
+        parts = [f"treeline {tl:.0f} m measured" if tl else
+                 "no treeline: forested to the top of the box (measured)" if tl_none else
+                 "no measured treeline (client uses Colorado's 3,480 m)"]
+        parts += [f"{k} {v}" for k, v in sorted(derived.items()) if k != "relocated" and v is not None]
+        parts += [f"{r['name']} relocated (turned {r.get('turnDeg', 0):+.0f} deg, height shift {r.get('dzM') or 0:+.1f} m)"
+                  for r in derived.get("relocated", [])]     # FEAT-249
+        tuned = (bool(tl) or tl_none) and {"rock", "canopy"} <= {k.split(".")[0] for k in derived}
         self.line("20", "Values derived for the resort, not copied from Vail", PASS if tuned else FAIL,
                   "; ".join(parts) + ("" if tuned else "; rock and canopy thresholds are Vail's (FEAT-175 step 2)"), mvp=False)
 

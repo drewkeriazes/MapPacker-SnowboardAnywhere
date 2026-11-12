@@ -103,6 +103,21 @@ def test_start_in_trees_and_cover(tmp_path):
     assert line(rep, "13")["status"] == pr.FAIL                    # mid / far cover without the WorldCover credit
 
 
+def test_line_20_passes_on_a_measured_treeline_or_a_measured_none(tmp_path):
+    """FEAT-234: `treeline: null` is measured (forest to the top of the box); absent is an older pack"""
+    pack = make_pack(tmp_path / "packs")
+    meta = json.load(open(pack / "meta.json", encoding="utf-8"))
+    derived = {"canopy.veg_ndvi": 0.41, "rock.ndvi": 0.25}
+    for tl, want, words in ((None, pr.PASS, "forested to the top"), (2700, pr.PASS, "2700 m measured"), ("absent", pr.FAIL, "3,480")):
+        m = dict(meta, derived=dict(derived, **({} if tl == "absent" else {"treeline": tl})))
+        if tl != "absent":
+            m["treeline"] = tl
+        write_meta(str(pack), m)
+        got = line(pr.build_report(str(pack), repo=str(tmp_path)), "20")
+        assert got["status"] == want and words in got["detail"], (tl, got)
+        assert "treeline None" not in got["detail"]
+
+
 def test_main_writes_json_and_markdown(tmp_path):
     pack = make_pack(tmp_path / "packs")
     with pytest.raises(SystemExit):

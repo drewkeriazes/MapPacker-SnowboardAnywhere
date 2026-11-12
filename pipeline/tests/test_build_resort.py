@@ -10,6 +10,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import build_resort as B  # noqa: E402
 from packwriter import FORMAT_VERSION  # noqa: E402
+from gen_manifest import MANIFEST_VERSION  # noqa: E402
 
 CFG = {"slug": "demo", "name": "Demo", "country": "US", "crs": "EPSG:26913", "utm_bbox": [0, 0, 1000, 1000],
        "lonlat_bbox": [-106.1, 39.4, -106.0, 39.5], "terrain_status_url": "https://www.demo.example/x.aspx",
@@ -35,7 +36,7 @@ class Fake:
                 open(p, "w").write("0-0-0-0 1-0-0-0")
         elif script == "gen_manifest.py":
             box = json.load(open(r.cfg_path))["utm_bbox"]      # the real manifest follows the box
-            json.dump({"slug": "demo", "manifestVersion": 1, "items": [{"url": f"u{box}", "path": "dem1m/a.tif"}]},
+            json.dump({"slug": "demo", "manifestVersion": MANIFEST_VERSION, "items": [{"url": f"u{box}", "path": "dem1m/a.tif"}]},
                       open(r.man_path, "w"))
         elif script == "fetch.ps1":
             if self.fetch_code:
@@ -137,7 +138,7 @@ def test_existing_outputs_are_adopted_on_the_first_run(resort):
 
 def test_a_new_manifest_fetches_again(resort):
     go(resort, Fake(resort))
-    json.dump({"slug": "demo", "manifestVersion": 1, "items": [{"url": "u2", "path": "landcover/x.tif"}]},
+    json.dump({"slug": "demo", "manifestVersion": MANIFEST_VERSION, "items": [{"url": "u2", "path": "landcover/x.tif"}]},
               open(resort.man_path, "w"))                 # a layer added to the download list
     r = B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests)
     f = Fake(r)

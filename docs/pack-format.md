@@ -94,10 +94,11 @@ cleared strips (areas filled, lines at 0.6 of their corridor width; gladed runs 
 mask's rock, and the mean tree height per 16 m from the tree instances. The forest is then weighted by
 the pack's tree instances (BUG-069), so a sparse stand the lidar canopy reads as closed is not a dark patch
 around its few trees. R, the forest seen from far off, is weighted by the share of the ground under the
-crowns (averaged over 16 m, full weight from 0.2 up). The level's optional `stands` image (greyscale, same
+crowns, the generated stems' in expectation included (averaged over 16 m, full weight from 0.2 up). The level's optional `stands` image (greyscale, same
 grid, `cover/pack-stands.png`) is the forest seen from near, where single trees show: only closed stands
-keep it (the crown share averaged over 10 m passes 0.05 to 0.14, and the stand is at least 40 m across:
-smaller clumps are dropped, holes that size inside a stand filled). The shader shows `stands` to 1.2 km and
+keep it (the detected trees' crown share averaged over 10 m passes 0.05 to 0.14, and the stand is at least 40 m across:
+smaller clumps are dropped, holes that size inside a stand filled; BUG-101: the generated stems do not count here,
+the thresholds were tuned without them). The shader shows `stands` to 1.2 km and
 R from 2.8 km. With `"crowns": true` on the level the image is RGB and its G is where the drawn trees
 stand: the share of each cell under their crowns, each tree weighted by its height over 12 m (FEAT-168; the
 shader throws their shadows on the snow from it). A pack without tree instances keeps the canopy as is.
@@ -237,8 +238,8 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "buildings": [{ "name", "points": [[x,y],...], "zBase", "zMax", "height", "heightDefault", "kind" }],  // zMax: highest ground under the footprint, absent in packs before BUG-024; heightDefault: true when OSM had no height or levels and the pipeline used its 5.5 / 9 m fallback (absent in older packs, where the client guesses from those values)
   "roads":     [{ "name", "kind", "points": [[x,y,z],...], "width" }],
   "water":     [{ "name", "points": [[x,y],...], "z" }],
-  "peaks":     [{ "name", "x", "y", "z" }],
-  "labels":    [{ "name", "kind", "x", "y", "z" }]
+  "peaks":     [{ "name", "x", "y", "z" }],                 // OSM peaks, plus USGS GNIS summits OSM lacks (FEAT-235; z: the highest ground near it)
+  "labels":    [{ "name", "kind", "x", "y", "z" }]          // towns: OSM places_far, else US Census places (FEAT-235); kind city (100,000 people), town (10,000) or village
 }
 ```
 
@@ -251,7 +252,8 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "build": "20261110T171500Z-3fa2c1",                      // FEAT-177: new on every write by any stage (packwriter.stamp_build)
   "pipeline": "1e2e586",                                   // FEAT-175: commit of the pipeline that wrote it, "+dirty" with local changes; optional
   "crs": "EPSG:26913", "origin": [384300, 4384250], "lonlat": [-106.35, 39.60],
-  "bounds": { "minX", "minY", "maxX", "maxY" },           // resort area, local metres
+  "bounds": { "minX", "minY", "maxX", "maxY" },           // resort area, local metres: the config's pack_bbox (FEAT-249,
+                                                           // else utm_bbox) minus origin; need not be centred on it
   "zRange": [2300, 3700],
   "terrain": { "fine": {...}, "mid": {...}, "far": {...} },
   "mask": { "res": 2, "tileSize": 512, "minX", "minY", "tilesX", "tilesY" },
@@ -270,13 +272,24 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "stands": { "res": 4, "size": 250, "zBase", "zScale": 32, "hStep": 0.25,  // optional, FEAT-074
               "cells": ["cx_cy", ...], "stems" },          // cells with an image; stems over the pack at full density
   "start": { "x", "y", "heading" },                       // default drop-in
-  "treeline": 2700,                                       // optional, m (DATA-021): measured from the canopy; absent = 3,480 (Colorado)
+  "treeline": 2700,                                       // optional, m (DATA-021): measured from the canopy; absent = 3,480 (Colorado);
+                                                           // null = measured none (FEAT-234), see below
   "derived": { "rock.grey_sat": 0.093, "treeline": 2700, ... }, // optional (FEAT-175): values the build derived for this resort instead of
-                                                           // copying Vail's (naip_calib.py thresholds, treeline); a log, the client ignores it
+                                                           // copying Vail's (naip_calib.py thresholds, treeline); a log, the client ignores it.
+                                                           // "relocated": [{ "name", "from", "to", "turnDeg", "featherM", "dzM" }] lists
+                                                           // the areas moved next to the rest (FEAT-249, relocate.py), UTM metres
   "sun": { "azimuth": 160, "elevation": 32 },             // degrees, default lighting
   "attribution": ["..."]
 }
 ```
+
+`treeline` (DATA-021, FEAT-234) has three states. A number is the elevation where the canopy share by 25 m band falls
+under half its peak (`pipeline/treeline.py`); the game puts its procedural treeline, its open valley floor (1,030 to
+830 m under it) and the snow-ghost band (30 m under to 80 m over it) there. `null` means the build measured no
+treeline: the box is forest from the bottom to the top (Boston Mills, 192 to 311 m; `treeline.forested_to_top`), so
+the game draws no snow-ghost band and its procedural forest opens by slope and land cover only, not by elevation.
+Absent means an older pack, or a box with no forest belt to measure; the game uses Colorado's 3,480 m. A game from
+before FEAT-234 reads `null` as absent (`meta.treeline ?? 3480`), so `null` needed no format bump.
 
 ## formatVersion
 
@@ -291,7 +304,7 @@ FEAT-222. `meta.json` `formatVersion` is the pack format a build wrote: `FORMAT_
 | formatVersion | Since | What |
 |---|---|---|
 | 0 | | Packs without the field (built before FEAT-222), whatever layers they have |
-| 1 | FEAT-222, 2026-11-11 | The format at FEAT-222: `stands/` (FEAT-074), `treeSpecies` 2 (DATA-020), `cover` levels (FEAT-153), `treeline` when measured (DATA-021), `build` (FEAT-177) |
+| 1 | FEAT-222, 2026-11-11 | The format at FEAT-222: `stands/` (FEAT-074), `treeSpecies` 2 (DATA-020), `cover` levels (FEAT-153), `treeline` when measured (DATA-021; `null` for a measured none since FEAT-234, read as absent by older games), `build` (FEAT-177) |
 
 FEAT-233 (`treeSpecies` 3, ids 8 bare hardwood and 9 eastern hemlock, the optional `vegetation` log) stays on format 1:
 every client since DATA-020 sends a species id past its table to 0 (`speciesFor`), so an older game loads a new pack and
@@ -309,7 +322,7 @@ Lines are as of 2026-11-11 (the game at `51efba2`); search for the name if they 
 | Species ids 0..9 (`treeSpecies` 3) | `pipeline/species.py:20` (ids), `:26` `TREE_SPECIES_VERSION` | `game/src/world/trees/species.ts:46` `SPECIES` (one row per id, in order), `:77` `speciesFor` (packs without `treeSpecies`: ids 0..2; an unknown id draws as 0); `game/src/pack/types.ts:106` | `tests/test_contract.py` (the ids are the rows of the crown radius table) |
 | Drawn crown radius / height per id | `pipeline/cover.py:67` and `pipeline/stands.py:31` `CROWN_RATIO` (the crowns the game will draw, for the cover and the stem chance) | `game/src/world/trees/species.ts:47`-`58` `SPECIES[].radius` | `tests/test_contract.py`: must be equal |
 | Record crown radius / height per id | `pipeline/species.py:29` `CROWN_K` (field 4 of `trees/*.bin`, the table under Instances) | `game/src/world/trees/species.ts:92` `crownRadius`: the drawn radius nudged by record / natural, clamped to 0.85..1.25 | not checked: it need not equal `SPECIES[].radius` |
-| Default treeline (no measured `treeline`) | `pipeline/species.py:21` `COLORADO_TREELINE` (3,480 m, what the species bands were tuned for) | `game/src/pack/treeline.ts:4` `DEFAULT_TREELINE`; `game/src/pack/types.ts:111` | `tests/test_contract.py`: must be equal |
+| Default treeline (`treeline` absent; `null` is none, FEAT-234) | `pipeline/species.py:23` `COLORADO_TREELINE` (3,480 m, what the species bands were tuned for) | `game/src/pack/treeline.ts:4` `DEFAULT_TREELINE`; `game/src/pack/types.ts:111` | `tests/test_contract.py`: must be equal |
 | `packs/index.json` `{"packs", "names"}` | `pipeline/packwriter.py:100` `index_packs` | `game/tools/get_pack.mjs:59` `writePackIndex` (rewrites it after an install); `game/src/resorts.ts:14` `PackIndex` | `tests/test_publish_pack.py` round trip through `get_pack.mjs` (needs the game checkout and node) |
 | `catalog.json` | `pipeline/publish_pack.py:94` `catalog_entry`, `:109` `update_catalog` | `game/tools/get_pack.mjs:19` `CATALOG_URL`, `:75` `getPack`; `game/src/ui/ResortPicker.ts:42` | `tests/test_publish_pack.py` round trip |
 | Terrarium heights | `pipeline/packwriter.py:17` `encode_terrarium` | `game/src/pack/HeightSet.ts:88` | not checked across repos |

@@ -5,7 +5,9 @@ snow-ghost band. Big Sky's is about 500 m lower, so the build measures it: the s
 25 m elevation bands, smoothed over three bands; the treeline is the first band above the most forested one where
 that share falls under half the peak and stays there (the middle of the forest's fade, which is
 where the client centres its procedural treeline). `build_pack.py` writes it to meta.json as `treeline`
-(a config `treeline_m` overrides it). Pure helpers, tested in tests/test_treeline.py."""
+(a config `treeline_m` overrides it). FEAT-234: a box that is forest from the bottom to the top (Boston Mills,
+192 to 311 m) has no treeline at all; `forested_to_top` says so, and the build writes `treeline: null` so the
+client does not fall back to Colorado's. Pure helpers, tested in tests/test_treeline.py."""
 import numpy as np
 
 BIN_M = 25.0
@@ -45,3 +47,17 @@ def derive_treeline(elev, forest, valid=None, bin_m=BIN_M, min_cells=MIN_CELLS, 
         if np.all(sm[i:] < lim):
             return float(z[i])
     return None
+
+
+def forested_to_top(elev, forest, valid=None, bin_m=BIN_M, min_cells=MIN_CELLS, drop=DROP):
+    """FEAT-234: True when the area has a forest belt that never fades: the bands `derive_treeline` reads have a
+    peak of at least 5 % canopy and the top one is still over `drop` of it. That is the one way `derive_treeline`
+    finds no treeline in an area that has forest (the others are no forest, or too few bands to say)."""
+    z, share, n = canopy_by_band(elev, forest, valid, bin_m)
+    keep = n >= min_cells
+    if keep.sum() < 4:
+        return False
+    share = share[keep]
+    sm = np.convolve(np.pad(share, 1, mode="edge"), np.ones(3) / 3, mode="valid")
+    peak = float(sm.max())
+    return peak >= 0.05 and float(sm[-1]) >= drop * peak

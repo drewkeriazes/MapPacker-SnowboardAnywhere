@@ -10,6 +10,7 @@ Sources:
   - Mapterhorn                         -> z11 Terrarium WebP tiles for the far ring
   - AWS usgs-lidar-public (EPT)        -> selected LAZ nodes (pre-selected node list)
   - Overpass                           -> OSM features (pistes, lifts, buildings, roads, natural, peaks)
+  - USGS GNIS, US Census               -> place names: summits per state, towns (placenames.py, FEAT-235)
 """
 import json, math, sys, os
 from urllib.parse import urlencode, quote
@@ -20,7 +21,8 @@ import paths  # noqa: E402
 
 # Bump when the manifest gains or changes a layer, so raw data fetched from an older manifest is known to lack it
 # (DATA-022 item 3: Breckenridge was fetched before land cover existed). Written into every manifest.
-MANIFEST_VERSION = 1
+# 2: names/ (FEAT-235: GNIS for every state the far ring touches, Census towns)
+MANIFEST_VERSION = 2
 
 
 def manifest_items(cfg, resorts_dir=None):
@@ -135,7 +137,8 @@ def manifest_items(cfg, resorts_dir=None):
     # Two light queries instead of one heavy one: the far box is ~200 km across and the combined
     # peaks+places scan was timing out (502/504) on every Overpass host.
     queries["peaks_far"] = "[out:json][timeout:300][maxsize:536870912];" + f'node["natural"="peak"]["ele"]({fbb});' + "out;"
-    # places_far (towns for horizon labels) dropped for now: optional, and it queued for minutes on every host.
+    # places_far (towns for horizon labels) dropped: it queued for minutes on every host. FEAT-235's Census towns
+    # (names/, below) replace it.
     # DATA-019: downhill pistes of every resort in view (Beaver Creek, Copper, Breckenridge, ...), burned into the
     # far land cover as cleared strips. One box cfg["landcover"]["pistes_km"] wide, geometry out.
     lc = cfg.get("landcover", {})
@@ -149,6 +152,13 @@ def manifest_items(cfg, resorts_dir=None):
         add("https://overpass-api.de/api/interpreter?data=" + enc, f"osm/{name}.json",
             alts=["https://overpass.private.coffee/api/interpreter?data=" + enc,   # kumi.systems removed: 502/504 on every try
                   "https://lz4.overpass-api.de/api/interpreter?data=" + enc])
+
+    # ---------------------------------------------------------------- place names (FEAT-235)
+    # GNIS domestic names for each state the far ring touches (summits), the Census Gazetteer and population
+    # estimates (towns): plain files on S3 and www2.census.gov. None outside the US.
+    import placenames
+    for it in placenames.manifest_items(cfg):
+        add(it["url"], it["path"])
 
     # ---------------------------------------------------------------- land cover for the far terrain (DATA-019)
     # ESA WorldCover 2021 v200 (10 m classes, AWS open data) and the ETH Global Sentinel-2 canopy height 2020
