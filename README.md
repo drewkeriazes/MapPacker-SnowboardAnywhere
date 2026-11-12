@@ -74,7 +74,7 @@ Every PR gets the jobs in `.github/workflows/checks.yml` (FEAT-240), each its ow
 |---|---|---|
 | `pipeline-tests` | `pipeline/` changed | pytest, without the game |
 | `format-check` | `pipeline/` changed | the pack format contract (`python pipeline/contract.py`, [`docs/pack-format.md`](docs/pack-format.md) > Contract) against the game's `main`, then the `game` tests against a checkout of it: the contract tests, the course rule and `get_pack.mjs` |
-| `render-budgets` | PRs, `pipeline/` changed | the game's `main` draws the synthetic pack from this repo's `main` and from the PR (its `cishot.mjs`, on SwiftShader): shader compile and scene budgets, more than 10% over `main` fails. The report goes on the PR as a comment. Add the `stills` label for before / after stills |
+| `render-budgets` | PRs, `pipeline/` changed | the game's `main` draws the synthetic pack from this repo's `main` and from the PR (its `cishot.mjs`, on SwiftShader): shader compile and scene budgets, more than 10% over `main` fails. The report goes on the PR as a comment. Add the `stills` label for before / after stills. Nothing is drawn when the PR builds the same synthetic pack as `main` (by content, `tools/ci/pack_content_key.py`), or when an earlier commit of the PR passed with the same two packs, game commit and tools: that run's report is reused, with a line saying so (FEAT-251) |
 | `repo-rules` | every PR | no em dashes in added Markdown, plain commit messages; warns when a new script or flag comes with no docs change |
 | `public-guards` | every PR | no `.env` files, no packs, raw data or data files in git, files up to 2 MB, images up to 1 MB under `docs/` or `reports/`, gitleaks |
 
