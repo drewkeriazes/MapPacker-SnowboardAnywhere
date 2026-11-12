@@ -189,10 +189,14 @@ jobs:
           || { mkdir -p /tmp/game; echo "::warning::could not clone the game; its lines go unchecked"; }
 
       # Claude reads text anyone can write (PR and card bodies). A hook or config it was talked into writing would run
-      # at the commit below, so record .git's config, hooks and info now and stop the run if they change.
+      # at the commit below. Save .git/config now and put it back after (BUG-098: the Claude action writes its own git
+      # login and bot user there before Claude starts, so a hash of it always differs; restoring drops those too), and
+      # stop the run if .git/hooks or .git/info change.
       - name: Guard .git
         if: steps.scope.outputs.go == 'true'
-        run: find .git/config .git/hooks .git/info -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/git-guard.sha
+        run: |
+          cp .git/config /tmp/git-config.saved
+          find .git/hooks .git/info -type f -print0 | sort -z | xargs -0 -r sha256sum > /tmp/git-guard.sha
 
       # Claude only edits README.md. Commit, push and the PR happen in plain steps below.
       - if: steps.scope.outputs.go == 'true'
@@ -243,9 +247,10 @@ jobs:
           FROM: ${{ steps.scope.outputs.from }}
         run: |
           set -euo pipefail
-          now=$(find .git/config .git/hooks .git/info -type f -print0 | sort -z | xargs -0 sha256sum)
+          cp /tmp/git-config.saved .git/config
+          now=$(find .git/hooks .git/info -type f -print0 | sort -z | xargs -0 -r sha256sum)
           [ "$now" = "$(cat /tmp/git-guard.sha)" ] \
-            || { echo "::error::.git/config, .git/hooks or .git/info changed during the Claude step; nothing committed"; exit 1; }
+            || { echo "::error::.git/hooks or .git/info changed during the Claude step; nothing committed"; exit 1; }
           # git with no hooks and no fsmonitor, for the commands below.
           g() { git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
           # Only README.md may change; drop anything else Claude touched.
