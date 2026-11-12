@@ -59,6 +59,10 @@ LC_LEVELS = (("mid", 16.0, 4), ("far", 100.0, 3))
 # in expectation, add about 3x that on Vail and turned 94% of the forest into closed stands (bowl clumps read
 # 0.29 instead of 0.07), so the dark ground came back under them. R counts the stems too: without them the
 # distant timber washes out.
+# FEAT-225: a pack built without lidar (Silver and Bronze trees) has no detected crowns, every tree is a stem, so its
+# stands test reads the stems' share times the part of all drawn trees the detected crowns are on Vail (BUG-101:
+# the stems add about 3x the detected share, so a quarter); without it no stand would ever close.
+DETECTED_OF_DRAWN = 0.25
 FAR_SIGMA = 16.0
 CROWN_FULL = 0.2
 CROWN_SIGMA = 10.0
@@ -258,7 +262,8 @@ def pack_level(pack_dir, meta, runs, log=print):
     if crowns.any():   # a pack without tree instances keeps its canopy (the ground then carries the forest)
         from scipy import ndimage
         before = forest.sum()
-        stands = forest * closed_stand(ndimage.gaussian_filter(detected, CROWN_SIGMA / PACK_RES))
+        test = detected if detected.any() else stems * DETECTED_OF_DRAWN     # FEAT-225: no lidar, no crowns
+        stands = forest * closed_stand(ndimage.gaussian_filter(test, CROWN_SIGMA / PACK_RES))
         forest *= np.clip(ndimage.gaussian_filter(crowns, FAR_SIGMA / PACK_RES) / CROWN_FULL, 0, 1)
         log(f"  drawn trees keep {forest.sum() / max(before, 1) * 100:.1f}% of the forest from far off, "
             f"closed stands {stands.sum() / max(before, 1) * 100:.1f}% from near (BUG-069)")

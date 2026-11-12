@@ -66,7 +66,7 @@ def test_crown_radii_as_client():
     assert np.allclose(out, [nat0, nat0 * 1.25, nat0 * 0.85, nat0, CROWN_RATIO[2] * 10, nat0, nat0])
 
 
-def _pack(tmp_path, spacing=None, size=400.0, stems=0.0):
+def _pack(tmp_path, spacing=None, size=400.0, stems=0.0, stem_h=10.0):
     """a pack of `size` m square, all lidar canopy (mask alpha 255), no runs, and spruce 10 m tall with their
     natural 1.3 m crowns on a `spacing` m grid (or no trees/ at all); `stems` > 0 adds FEAT-074 stands, that
     stem chance per 4 m cell everywhere (spruce, 10 m)"""
@@ -90,7 +90,7 @@ def _pack(tmp_path, spacing=None, size=400.0, stems=0.0):
         import stands
         k = int(size / stands.RES)
         f = lambda v: np.full((k, k), v, np.float32)
-        meta["stands"] = stands.write(str(tmp_path), f(stems), f(10.0), f(0).astype(np.uint8), f(2300.0),
+        meta["stands"] = stands.write(str(tmp_path), f(stems), f(stem_h), f(0).astype(np.uint8), f(2300.0),
                                       size, 0.0, 0.0, 1, 1, 2300.0)
         meta.setdefault("instances", {}).update({"cellSize": size, "minX": 0.0, "minY": 0.0})
     return str(tmp_path), meta
@@ -157,6 +157,22 @@ def test_sparse_clump_with_stems_is_not_closed(tmp_path):
     near = np.asarray(Image.open(os.path.join(pack_dir, lv["stands"])))[..., 0] / 255.0
     assert near[20:80, 20:80].max() < 0.1
     assert r[20:80, 20:80].min() > 0.8
+
+
+def test_stems_only_pack_closes_dense_stands(tmp_path):
+    """FEAT-225: a pack built without lidar has no detected crowns; its stems stand in for them at a quarter of their
+    share. Stems of a closed stand (20 m spruce at the K_CLOSE crown share, as stands.stem_chance gives on full
+    canopy) read closed from near; one stem in ten cells does not"""
+    from PIL import Image
+    import stands
+    r_ = stands.CROWN_RATIO[0] * 20.0
+    full = stands.K_CLOSE / (np.pi * r_ ** 2) * stands.RES ** 2
+    for chance, closed in ((full, True), (0.1, False)):
+        d = tmp_path / f"{chance:.2f}"
+        pack_dir, meta = _pack(d, stems=chance, stem_h=20.0)
+        r, lv = _pack_forest(pack_dir, meta)
+        near = np.asarray(Image.open(os.path.join(pack_dir, lv["stands"])))[..., 0] / 255.0
+        assert (near[20:80, 20:80].min() > 0.9) if closed else (near[20:80, 20:80].max() < 0.1), (chance, near.mean())
 
 
 # ------------------------------------------------------------------ BUG-081: land cover calibrated to the lidar

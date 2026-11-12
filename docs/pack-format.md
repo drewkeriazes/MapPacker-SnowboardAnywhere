@@ -110,7 +110,8 @@ crowns, the generated stems' in expectation included (averaged over 16 m, full w
 grid, `cover/pack-stands.png`) is the forest seen from near, where single trees show: only closed stands
 keep it (the detected trees' crown share averaged over 10 m passes 0.05 to 0.14, and the stand is at least 40 m across:
 smaller clumps are dropped, holes that size inside a stand filled; BUG-101: the generated stems do not count here,
-the thresholds were tuned without them). The shader shows `stands` to 1.2 km and
+the thresholds were tuned without them; a pack without lidar, FEAT-225, has no detected trees and reads its stems at a
+quarter of their share, the part the detected crowns are of all drawn trees on Vail). The shader shows `stands` to 1.2 km and
 R from 2.8 km. With `"crowns": true` on the level the image is RGB and its G is where the drawn trees
 stand: the share of each cell under their crowns, each tree weighted by its height over 12 m (FEAT-168; the
 shader throws their shadows on the snow from it). A pack without tree instances keeps the canopy as is.
