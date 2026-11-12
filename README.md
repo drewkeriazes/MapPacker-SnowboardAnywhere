@@ -32,7 +32,7 @@ Every stage is skipped when its inputs have not changed, so both are safe to re-
 - **Raw data** goes to `SBA_RAW_ROOT`, else `raw\` in the main checkout (worktrees share it). It is gitignored and never committed. On Drew's PC `SBA_RAW_ROOT` points at the raw data still in the game's clone, `C:\Users\Drew\git\SnowboardAnywhere\raw`, until it is moved here.
 - **The game** must be cloned next to this repo (`..\SnowboardAnywhere`) for the headless ride, the game-side lines of the build report and a few tests. `--game-repo <path>` or `SBA_GAME_REPO` points elsewhere; without it those parts say so and stop or skip.
 - **Publishing** (`pipeline\publish_pack.py`, the last stage of `add_resort.cmd`) runs in the main checkout on `main`: it makes the release `<slug>-v<N>` and commits `catalog.json` with the resort's config, node lists, plan, manifest and report straight to `main`.
-- **To ride a pack before publishing it**, copy `packs\<slug>` into the game's `packs\`.
+- **To ride a pack before publishing it**, in the game: `cd game && npm run get -- --from ..\..\MapPacker-SnowboardAnywhere\packs\<slug>` (FEAT-242; it copies the pack in as the release zip would carry it, and again after a rebuild). Don't junction or symlink it into a game worktree: `git worktree remove` follows the link and empties the pack.
 - **The synthetic pack** (`pipeline\synth_pack.py`, a made-up mountain the game's CI checks run on) is published the same way as a test pack, release `synth-v<N>`: `python pipeline\publish_pack.py --synth` on `main` builds it (about 2 minutes) and publishes it only if its content changed. Run it after merging a change to the pipeline or the pack format (FEAT-241).
 
 More in the `pack-build` skill (`.claude/skills/pack-build/SKILL.md`) and the notes in `CLAUDE.md`.
@@ -68,6 +68,7 @@ It needs the game clone next to this one with `npm ci` done in `game/`. Builds o
 |---|---|
 | `catalog.json` | Every published pack: slug, name, region, tier, status, and the release zip's version, pack format, size, sha256, URL and the pipeline commit that built it. Test packs (the synthetic pack) are in a separate `test` list the resort picker does not read, one entry per pack format, with a `content` hash |
 | `pipeline/` | The pipeline: `resort.py` (name to config and data plan, and `add`), `build_resort.py`, `build_pack.py` and its stages, `pack_report.py`, `publish_pack.py`, the fetch scripts, tests in `pipeline/tests/`. Moved from the game repo with its history (FEAT-238) |
+| `docs/pipeline-scripts.md` | Every script in `pipeline/`: what it reads and writes, its options (moved from the game's developer guide in FEAT-242) |
 | `docs/pack-format.md` | The pack format: the layout, the encodings, `formatVersion` and its bump rule, and the Contract, every value this repo and the game must agree on (FEAT-239) |
 | `resorts/<slug>/` | A folder per resort: `<slug>.json`, the config the pipeline reads, the EPT node lists it names (`nodes_file`, beside it) and the data plan (`<slug>-plan.md`) |
 | `manifests/<slug>.json` | The download manifest the raw data was fetched with |

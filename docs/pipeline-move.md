@@ -15,7 +15,7 @@ Researched 2026-11-11 against SnowboardAnywhere `main` at `2a0b12f`.
 | `docs/pack-format.md` (the contract, section 2) | the developer guide, with a link for the pipeline |
 | `raw/` on Drew's PC (later; `SBA_RAW_ROOT` bridges it) | |
 
-Undecided, picked in FEAT-242: `prep_textures.py` writes the game's own rock textures (`game/public/textures/`), not a pack, so it may stay as a game tool.
+Picked in FEAT-242: `prep_textures.py` writes the game's own rock textures (`game/public/textures/`), not a pack, so it stays in the game as `game/tools/prep_textures.py` and its copy here goes (BUG-092 keeps that from counting as a build code change).
 
 ## 2. The contract (FEAT-239)
 
