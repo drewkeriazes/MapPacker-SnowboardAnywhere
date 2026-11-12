@@ -21,8 +21,8 @@ CFG = {"slug": "demo", "name": "Demo", "country": "US", "crs": "EPSG:26913", "ut
 class Fake:
     """stands in for the scripts: records each command and writes what the script would"""
 
-    def __init__(self, r, fail=None, fetch_code=0, osm=None):
-        self.r, self.fail, self.fetch_code, self.osm = r, fail, fetch_code, osm
+    def __init__(self, r, fail=None, fetch_code=0, osm=None, finds=True):
+        self.r, self.fail, self.fetch_code, self.osm, self.finds = r, fail, fetch_code, osm, finds
         self.calls = []
 
     def __call__(self, cmd, cwd=None):
@@ -63,6 +63,10 @@ class Fake:
                        "build": "b1"}, open(os.path.join(r.out, "meta.json"), "w"))
         elif script == "gen_content.py":
             m = json.load(open(os.path.join(r.out, "meta.json")))
+            m["generated"] = {"start": self.finds, "shots": int(self.finds)}
+            if not self.finds:                                  # no start, no camera spot
+                json.dump(m, open(os.path.join(r.out, "meta.json"), "w"))
+                return 0
             m["start"] = {"x": 0, "y": 0, "heading": 0, "source": "generated"}
             json.dump(m, open(os.path.join(r.out, "meta.json"), "w"))
             os.makedirs(os.path.join(r.out, "attract"), exist_ok=True)
@@ -349,6 +353,21 @@ def test_content_attract_and_spots_with_the_game(resort, monkeypatch, tmp_path):
     f = Fake(resort)
     lines = go(B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests), f)
     assert f.calls == ["pack_report.py"]
+    assert "[content] skip: inputs unchanged" in lines and "[attract] skip: inputs unchanged" in lines
+
+
+def test_content_that_finds_nothing_is_still_done(resort, monkeypatch, tmp_path):
+    game = tmp_path / "game"
+    monkeypatch.setattr(B, "game_tool", lambda rel: str(game / rel))
+    monkeypatch.setattr(B.paths, "game_repo", lambda *a, **k: str(game))
+    (game / "docs" / "compare" / "demo" / "top").mkdir(parents=True)     # the game has spots: spots skip
+    (game / "docs" / "compare" / "demo" / "top" / "spot.json").write_text("{}")
+    f = Fake(resort, finds=False)
+    go(resort, f)
+    assert f.calls[-2:] == ["gen_content.py", "pack_report.py"]          # no shots: no still, no vite build
+    f = Fake(resort, finds=False)
+    lines = go(B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests), f)
+    assert f.calls == ["pack_report.py"]                                 # not the ray-march again
     assert "[content] skip: inputs unchanged" in lines and "[attract] skip: inputs unchanged" in lines
 
 

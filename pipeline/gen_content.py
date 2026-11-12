@@ -37,6 +37,7 @@ import json
 import math
 import os
 import re
+import shutil
 import sys
 
 import numpy as np
@@ -589,6 +590,19 @@ def write_attract(pack_dir, shots, log=print):
     return True
 
 
+def drop_attract(pack_dir, log=print):
+    """no shots this time: an attract/ an earlier run generated goes (its cameras are not this pack's); -> gone?"""
+    old = read_index(pack_dir)
+    if old is not None and not old.get("generated"):
+        log("  attract/ is hand-made (index.json without generated): left alone")
+        return False
+    d = os.path.join(pack_dir, "attract")
+    if old is not None and os.path.isdir(d):
+        shutil.rmtree(d)
+        log("  no shots: the attract/ an earlier run generated is removed")
+    return True
+
+
 def generate(pack_dir, config=None, count=SHOTS, dry=False, log=print):
     meta = load_json(os.path.join(pack_dir, "meta.json"))
     features = load_json(os.path.join(pack_dir, "features.json"))
@@ -613,10 +627,17 @@ def generate(pack_dir, config=None, count=SHOTS, dry=False, log=print):
             f"{s['eye']} m up ({s['note'].split(': ', 1)[1]})")
     if dry:
         return start, shots
-    if start:
-        meta["start"] = start
-    if shots and write_attract(pack_dir, shots, log=log):
-        meta["attract"] = {"generated": True}
+    # from scratch on every run: a rerun that finds no start or no shots takes back what an earlier one wrote
+    build_start = (meta.get("generated") or {}).get("buildStart", meta.get("start"))
+    if start or build_start:
+        meta["start"] = start or build_start
+    if shots:
+        if write_attract(pack_dir, shots, log=log):
+            meta["attract"] = {"generated": True}
+    elif drop_attract(pack_dir, log=log):
+        meta.pop("attract", None)
+    # done on this build, whatever it found (build_resort.py's content stage); a new build's meta.json has none
+    meta["generated"] = {"start": bool(start), "shots": len(shots), "buildStart": build_start}
     write_meta(pack_dir, meta, stamp=False)       # same build: a still rendered from it stays valid
     log(f"wrote meta.json (build {meta.get('build')} kept)" + (f", attract/ ({len(shots)} shots)" if shots else ""))
     return start, shots

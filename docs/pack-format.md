@@ -299,6 +299,8 @@ an older game: no format bump.
                                                            // gen_content.py (FEAT-175): source "generated", the top of the
                                                            // highest lift (`lift`) on `run`, `label` the menu's line
   "attract": { "generated": true },                       // optional (FEAT-175): the pack has attract/ (Main menu above)
+  "generated": { "start": true, "shots": 5, "buildStart": {...} },  // optional (FEAT-175): gen_content.py ran on this build,
+                                                           // what it found and the build's own start; a log, the client ignores it
   "treeline": 2700,                                       // optional, m (DATA-021): measured from the canopy; absent = 3,480 (Colorado);
                                                            // null = measured none (FEAT-234), see below
   "derived": { "rock.grey_sat": 0.093, "treeline": 2700, ... }, // optional (FEAT-175): values the build derived for this resort instead of

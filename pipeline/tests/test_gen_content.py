@@ -110,3 +110,28 @@ def test_rolls_on_needs_the_run_to_fall_on():
         def z(self, x, y):
             return bump(np.asarray(x, float))
     assert "rises" in gc.rolls_on(B(), pts, d, 0)
+
+
+def test_a_rerun_that_finds_nothing_takes_the_old_content_back(tmp_path, monkeypatch):
+    pack = make_pack(tmp_path / "packs")
+    build_start = meta_of(pack)["start"]
+    gc.generate(str(pack), log=lambda s: None)
+    m = meta_of(pack)
+    assert m["generated"]["start"] is True and m["generated"]["shots"] >= 1
+    assert m["generated"]["buildStart"] == build_start                         # the build's own, to go back to
+    monkeypatch.setattr(gc, "choose_start", lambda *a, **k: None)
+    monkeypatch.setattr(gc, "choose_shots", lambda *a, **k: [])
+    assert gc.generate(str(pack), log=lambda s: None) == (None, [])
+    m = meta_of(pack)
+    assert m["start"] == build_start and "attract" not in m                    # as if generated from scratch
+    assert not (pack / "attract").exists()
+    assert m["generated"] == {"start": False, "shots": 0, "buildStart": build_start}   # ran on this build: done
+
+
+def test_no_shots_leaves_a_hand_made_attract(tmp_path, monkeypatch):
+    pack = make_pack(tmp_path / "packs")
+    (pack / "attract").mkdir()
+    (pack / "attract" / "index.json").write_text(json.dumps({"shots": True}))
+    monkeypatch.setattr(gc, "choose_shots", lambda *a, **k: [])
+    gc.generate(str(pack), log=lambda s: None)
+    assert (pack / "attract" / "index.json").exists()

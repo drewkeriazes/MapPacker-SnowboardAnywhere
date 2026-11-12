@@ -415,7 +415,9 @@ def content_inputs(r):
 
 
 def content_present(r):
-    return ((meta(r) or {}).get("start") or {}).get("source") == "generated"
+    """gen_content.py ran on this build (meta.generated, also when it found no start or shots; a build drops it)"""
+    m = meta(r) or {}
+    return "generated" in m or (m.get("start") or {}).get("source") == "generated"
 
 
 def content_run(r, ctx):
@@ -443,6 +445,8 @@ def attract_inputs(r):
 
 def attract_present(r):
     idx = attract_index(r)
+    if idx is None:                     # done when gen_content.py found no camera spot: nothing to render
+        return ((meta(r) or {}).get("generated") or {}).get("shots") == 0
     return bool(idx) and (not idx.get("generated") or (bool(idx.get("stills")) and bool(idx.get("ghosts"))))
 
 
