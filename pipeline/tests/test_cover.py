@@ -66,9 +66,10 @@ def test_crown_radii_as_client():
     assert np.allclose(out, [nat0, nat0 * 1.25, nat0 * 0.85, nat0, CROWN_RATIO[2] * 10, nat0, nat0])
 
 
-def _pack(tmp_path, spacing=None, size=400.0):
+def _pack(tmp_path, spacing=None, size=400.0, stems=0.0):
     """a pack of `size` m square, all lidar canopy (mask alpha 255), no runs, and spruce 10 m tall with their
-    natural 1.3 m crowns on a `spacing` m grid (or no trees/ at all)"""
+    natural 1.3 m crowns on a `spacing` m grid (or no trees/ at all); `stems` > 0 adds FEAT-074 stands, that
+    stem chance per 4 m cell everywhere (spruce, 10 m)"""
     import json
     from PIL import Image
     n = int(size / 2)
@@ -85,6 +86,13 @@ def _pack(tmp_path, spacing=None, size=400.0):
         os.makedirs(tmp_path / "trees")
         t.tofile(tmp_path / "trees" / "0_0.bin")
         meta["instances"] = {"treeCells": ["0_0"]}
+    if stems:
+        import stands
+        k = int(size / stands.RES)
+        f = lambda v: np.full((k, k), v, np.float32)
+        meta["stands"] = stands.write(str(tmp_path), f(stems), f(10.0), f(0).astype(np.uint8), f(2300.0),
+                                      size, 0.0, 0.0, 1, 1, 2300.0)
+        meta.setdefault("instances", {}).update({"cellSize": size, "minX": 0.0, "minY": 0.0})
     return str(tmp_path), meta
 
 
@@ -100,7 +108,8 @@ def _pack_forest(pack_dir, meta):
 def test_pack_without_trees_keeps_canopy(tmp_path):
     from cover import crown_area
     pack_dir, meta = _pack(tmp_path)
-    area, shade = crown_area(pack_dir, meta, 100, 100)
+    det, stems, shade = crown_area(pack_dir, meta, 100, 100)
+    area = det + stems
     assert not area.any() and not shade.any()
     r, lv = _pack_forest(pack_dir, meta)
     assert r.min() == 1.0 and "stands" not in lv and "crowns" not in lv
@@ -110,7 +119,8 @@ def test_sparse_stand_fades_from_far(tmp_path):
     """a tree every 10 m (5.3 m2 of crown per 100 m2, about 0.05 share) keeps under 0.3 of the forest"""
     from cover import crown_area
     pack_dir, meta = _pack(tmp_path, spacing=10.0)
-    area, shade = crown_area(pack_dir, meta, 100, 100)
+    det, stems, shade = crown_area(pack_dir, meta, 100, 100)
+    area = det + stems
     share = area[20:80, 20:80].mean()
     assert 0.04 < share < 0.07
     # FEAT-168: the shadow raster weights each crown by its height over SHADOW_H (10 m trees here)
@@ -130,8 +140,23 @@ def test_dense_timber_keeps_full_forest(tmp_path):
     assert stands[20:80, 20:80, 0].min() > 0.95
     # FEAT-168: G of the stands image is the height-weighted crown share, flagged on the level
     from cover import crown_area
-    _, shade = crown_area(pack_dir, meta, stands.shape[1], stands.shape[0])
+    _, _, shade = crown_area(pack_dir, meta, stands.shape[1], stands.shape[0])
     assert lv["crowns"] and np.abs(stands[..., 1] - np.clip(shade, 0, 1)).max() <= 1 / 255 + 1e-6
+
+
+def test_sparse_clump_with_stems_is_not_closed(tmp_path):
+    """BUG-101: the closed-stand test runs on the detected crowns only (what BUG-069 was tuned on). A tree every
+    10 m plus generated stems whose expected crowns push the total share past CROWN_HI is still a sparse stand
+    from near, while from far off (R) the stems count and keep most of the forest"""
+    from PIL import Image
+    from cover import crown_area, CROWN_HI
+    pack_dir, meta = _pack(tmp_path, spacing=10.0, stems=0.5)
+    det, stems, _ = crown_area(pack_dir, meta, 100, 100)
+    assert det[20:80, 20:80].mean() < 0.07 and (det + stems)[20:80, 20:80].mean() > CROWN_HI
+    r, lv = _pack_forest(pack_dir, meta)
+    near = np.asarray(Image.open(os.path.join(pack_dir, lv["stands"])))[..., 0] / 255.0
+    assert near[20:80, 20:80].max() < 0.1
+    assert r[20:80, 20:80].min() > 0.8
 
 
 # ------------------------------------------------------------------ BUG-081: land cover calibrated to the lidar
