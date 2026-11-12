@@ -93,5 +93,31 @@
    },
    "report": null
   }
+ ],
+ "test": [
+  {
+   "slug": "synth",
+   "name": "Synthetic test mountain",
+   "region": "",
+   "country": "",
+   "lonlat": [
+    -106.35,
+    39.6
+   ],
+   "tier": null,
+   "status": "test",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261112T043433Z-cc16b5",
+    "built": "2026-11-11",
+    "pipeline": "ca90e25",
+    "bytes": 44885044,
+    "sha256": "56c16089c92c8914007c3c7ba91f65ad877495cd01187964946125cc4ebf26c6",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/synth-v1/synth.zip",
+    "content": "449fa328c5fdcb36"
+   },
+   "report": null
+  }
  ]
 }

@@ -65,8 +65,11 @@ def file_sha(path) -> str | None:
 
 # pipeline/ paths that do not shape the pack: inputs of their own, or tools around the build (pipeline/resorts and
 # pipeline/manifests are where the configs lived in SnowboardAnywhere: MOVED below fingerprints that tree)
+# BUG-092: contract.py checks the format against the game (FEAT-239); prep_textures.py wrote the game's own textures
+# and went back to the game (FEAT-242), so neither shapes a pack
 NOT_BUILD = ("pipeline/tests", "pipeline/resorts", "pipeline/manifests", "pipeline/build_resort.py",
-             "pipeline/resort.py", "pipeline/publish_pack.py", "pipeline/pack_report.py")
+             "pipeline/resort.py", "pipeline/publish_pack.py", "pipeline/pack_report.py", "pipeline/contract.py",
+             "pipeline/prep_textures.py")
 NOT_BUILD_SPEC = [f":!{p}" for p in NOT_BUILD]
 
 
@@ -105,11 +108,12 @@ def default_raw_root(repo=REPO) -> str:
 # built before the move are not built again: only while this checkout's build code is still the moved code
 # (`code`, pipeline_code() right after the move; any later change to the build code builds again, as it should).
 # `same`: later build code that differs from the moved code only in where it reads files, so it builds the same
-# packs (FEAT-244, a folder per resort). build_resort.py is not build code, so listing one here does not change it.
+# packs (FEAT-244, a folder per resort; BUG-092, FEAT-239's comment changes with contract.py and prep_textures.py
+# out of the build code). build_resort.py is not build code, so listing one here does not change it.
 MOVED = {"from": "SnowboardAnywhere 2a0b12f",
          "game_code": "80d9391a499fed00",
          "code": "1df239f500ce0922",
-         "same": ("1cdddd3bff92c566",)}
+         "same": ("1cdddd3bff92c566", "16675d25ca2bb68f")}
 MOVED_WHY = "built before the move to MapPacker (FEAT-238), inputs unchanged"
 
 

@@ -8,7 +8,7 @@ description: Build or rebuild a resort pack (packs/<slug>/) from raw downloads w
 ## Where things are (MapPacker-SnowboardAnywhere, FEAT-238)
 - Configs, EPT node lists and data plans: `resorts/<slug>/` (a folder per resort); download manifests: `manifests/`; packs: `packs/<slug>/` (gitignored).
 - Raw data: `SBA_RAW_ROOT`, else `raw/` in the main checkout (worktrees share it). On Drew's PC it stays in the game's clone until it is moved: `SBA_RAW_ROOT=C:\Users\Drew\git\SnowboardAnywhere\raw`.
-- The game is a sibling clone, `..\SnowboardAnywhere` (`--game-repo` or `SBA_GAME_REPO` overrides). Only the ride stage and `pack_report.py`'s game-side lines (11's `resorts.ts`, 17 to 19) read it; the contract tests (`tests/test_contract.py`) read the game's `main` on GitHub instead, or `SBA_GAME_REPO`. To look at a pack in the game, copy `packs/<slug>/` into the game's `packs/`, or publish it and run `npm run get <slug>` there.
+- The game is a sibling clone, `..\SnowboardAnywhere` (`--game-repo` or `SBA_GAME_REPO` overrides). Only the ride stage and `pack_report.py`'s game-side lines (11's `resorts.ts`, 17 to 19) read it; the contract tests (`tests/test_contract.py`) read the game's `main` on GitHub instead, or `SBA_GAME_REPO`. To look at a pack in the game, run `npm run get -- --from <this checkout>/packs/<slug>` in the game's `game/` (it copies the pack in), or publish it and run `npm run get <slug>` there. Never junction a pack into a game worktree: `git worktree remove` empties the target.
 - Usually you want `build_resort.cmd <slug>` (every stage, each skipped when done) or `add_resort.cmd "<name>"` (from a name to a published pack). The direct call below is for debugging one build.
 
 ## Run
