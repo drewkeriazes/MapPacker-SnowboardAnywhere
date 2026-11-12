@@ -36,6 +36,7 @@ from canopy_spots import run_half_width  # noqa: E402
 from packwriter import FORMAT_VERSION, decode_terrarium  # noqa: E402
 from species import UNKNOWN_WARN  # noqa: E402
 import paths  # noqa: E402
+import tiers  # noqa: E402
 
 REPO = paths.REPO
 REPORT_VERSION = 1
@@ -315,6 +316,13 @@ class Report:
         self.has_game = paths.has_game(self.game)
         self.ref = reference or REFERENCE
         self.slug = self.meta["slug"]
+        # FEAT-225: the source of each layer, as the build recorded it (packs before it: what the config names, and
+        # without a config Gold, the only tier built before)
+        self.sources = self.meta.get("sources") or tiers.layer_sources(cfg or {"lidar": True, "naip": True})
+        self.tier = self.meta.get("tier") or tiers.tier_of({k: v["tier"] for k, v in self.sources.items()})[0]
+        self.mapterhorn = self.sources["terrain"]["source"].startswith(tiers.MAPTERHORN)
+        self.lidar = "lidar" in self.sources["trees"]["source"]
+        self.naip = self.sources["surface"]["source"] == "NAIP"
         self.lines, self.numbers = [], {}
         self.bands, self.spots, self.layers, self.outliers = [], [], [], {}
 
@@ -475,7 +483,8 @@ class Report:
         if not cfg:
             self.line("1", "Resort config", FAIL, f"no resorts/{self.slug}/{self.slug}.json")
         else:
-            need = ["crs", "utm_zone", "utm_bbox", "origin", "elevation_range_m", "naip", "lidar", "attribution"]
+            need = ["crs", "utm_zone", "utm_bbox", "origin", "elevation_range_m", "attribution"]
+            need += [k for k, on in (("naip", self.naip), ("lidar", self.lidar)) if on]     # FEAT-225: by tier
             missing = [k for k in need if k not in cfg]
             bad = []
             if cfg.get("crs") and cfg["crs"] != meta.get("crs"):
@@ -493,6 +502,15 @@ class Report:
                     "NAIP": ("naip1m",), "Mapterhorn": ("mapterhorn",), "OSM ski": ("osm", "ski.json"),
                     "OSM built": ("osm", "built.json"), "OSM natural": ("osm", "natural.json"),
                     "OSM peaks_far": ("osm", "peaks_far.json")}
+            # FEAT-225: the layers this pack's tier is built from
+            for k, block in (("1 m DEM", (cfg or {}).get("dem")), ("10 m DEM", (cfg or {}).get("mid_ring"))):
+                if tiers.uses_mapterhorn(block):
+                    del need[k]
+                    need[f"Mapterhorn z{block['zoom']}"] = ("mapterhorn", str(block["zoom"]))
+            if not self.lidar:
+                del need["lidar (EPT)"]
+            if not self.naip:
+                del need["NAIP"]
             missing = [k for k, parts in need.items() if not self.raw_has(*parts)]
             done = os.path.isfile(os.path.join(raw, "FETCH_COMPLETE.txt"))
             self.line("2", "Raw: DEMs, lidar, NAIP, Mapterhorn, OSM", FAIL if missing else (PASS if done else WARN),
@@ -521,7 +539,10 @@ class Report:
         unk_note = "" if unk is None else (f"; {unk:.1%} of the forest in EVT classes the species rules don't name ({veg.get('region', '?')} rules)"
                                            + (f": over {UNKNOWN_WARN:.0%}, map them in species.classify_evt" if unk > UNKNOWN_WARN else ""))
         unk_warn = unk is not None and unk > UNKNOWN_WARN
-        if raw:
+        if (cfg or {}).get("country", "US") != "US":
+            self.line("4", "Raw: LANDFIRE", WARN, "outside the US, where LANDFIRE has no data: species from elevation and "
+                      "aspect only (FEAT-225)")
+        elif raw:
             evt = self.raw_has("landfire", pattern="*.tif")
             evc, evh = self.raw_has("landfire", "evc", pattern="*.tif"), self.raw_has("landfire", "evh", pattern="*.tif")
             st = PASS if evt and evc and evh else (WARN if evt else FAIL)
@@ -561,8 +582,8 @@ class Report:
 
         # 7 trees and shrubs
         probs = []
-        if not len(self.trees):
-            probs.append("no tree instances")
+        if not len(self.trees) and (self.lidar or not n.get("stems")):
+            probs.append("no tree instances")       # FEAT-225: without lidar the stands are the trees
         if not meta.get("stands"):
             probs.append("no stands/ (predates FEAT-074)")
         if meta.get("treeSpecies", 0) < 2:
@@ -573,6 +594,8 @@ class Report:
             detail += f" ({tk / ref:.0%} of the reference)"
         if not n.get("shrubs"):
             detail += ", no shrubs"
+        if not self.lidar:
+            detail += " (no lidar: every tree is a stand stem, from the ETH canopy height)"
         if probs:
             self.line("7", "Trees and shrubs with species", FAIL, "; ".join(probs) + "; " + detail)
         else:
@@ -586,7 +609,9 @@ class Report:
         ft = n.get("farTrees", 0)
         self.line("8b", "Far tree ring (lidar crowns round the resort)", PASS if ft else FAIL,
                   f"{ft / 1e6:.2f} M crowns in {len(meta['instances'].get('farTreeCells', []))} cells" if ft else
-                  "none: set lidar.far, ept_select.py, fetch, far_trees.py (BUG-081)")
+                  ("none: set lidar.far, ept_select.py, fetch, far_trees.py (BUG-081)" if self.lidar else
+                   "none: no lidar for a far ring at this tier, so the ridges round the resort keep the land cover "
+                   "alone (FEAT-225)"))
 
         # 9 features
         f = self.features
@@ -635,11 +660,13 @@ class Report:
         # 13 attribution
         want = []
         if have("fine heights"):
-            want.append(("3DEP", "elevation"))
-        if len(self.trees):
+            want.append(("Mapterhorn" if self.mapterhorn else "3DEP", "elevation"))
+        if len(self.trees) and self.lidar:
             want.append(("lidar", "lidar canopy"))
         if have("mask"):
-            want.append(("NAIP", "imagery"))
+            want.append(("NAIP", "imagery") if self.naip else ("WorldCover", "land cover (masks)"))
+        if not self.lidar and n.get("stems"):
+            want.append(("Canopy height", "ETH canopy height (stands)"))
         if have("far heights"):
             want.append(("Mapterhorn", "background terrain"))
         if self.runs:
@@ -775,7 +802,7 @@ class Report:
         playable, failing = gate(self.lines)
         return {"reportVersion": REPORT_VERSION, "slug": self.slug, "name": self.meta.get("name"),
                 "build": self.meta.get("build"), "pipeline": self.meta.get("pipeline"),
-                "formatVersion": self.meta.get("formatVersion", 0),
+                "formatVersion": self.meta.get("formatVersion", 0), "tier": self.tier, "sources": self.sources,
                 "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "reference": self.ref, "playable": playable, "failing": failing, "lines": self.lines,
                 "numbers": self.numbers, "outliers": self.outliers, "bands": self.bands, "spots": self.spots,
@@ -786,6 +813,9 @@ class Report:
         out = [f"# Pack report: {j['name']} (`{j['slug']}`)", "",
                f"Build `{j['build']}`" + (f", pipeline `{j['pipeline']}`" if j["pipeline"] else "") +
                f", format {j['formatVersion']}. Report {j['generated']} by `pipeline/pack_report.py` (FEAT-175).", "",
+               f"**Tier: {j['tier']}** (FEAT-225: the weakest layer's)", "", "| Layer | Source | Tier |", "|---|---|---|"]
+        out += [f"| {k} | {v['source']} | {v['tier']} |" for k, v in j["sources"].items()]
+        out += ["",
                f"**{'Playable' if j['playable'] else 'Preview'}**: " +
                ("every DATA-022 MVP line passes." if j["playable"] else f"MVP lines {', '.join(j['failing'])} hold it back."),
                "", "| # | Item | | Detail |", "|---|---|---|---|"]

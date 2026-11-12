@@ -55,6 +55,23 @@ RAW_NEED = {"1 m DEM": ("dem1m", None), "10 m DEM": ("dem10m", None), "lidar (EP
 OSM_NEED = ("ski", "built", "natural", "peaks_far")
 
 
+def raw_need(cfg):
+    """RAW_NEED for this config's sources (FEAT-225): Mapterhorn tiles at the plan's zooms in place of the 3DEP
+    DEMs, no lidar or NAIP when the config has none (the trees and masks then come from the land cover)"""
+    import tiers
+    need = dict(RAW_NEED)
+    for key, name, block in (("dem", "1 m DEM", cfg.get("dem")), ("mid_ring", "10 m DEM", cfg.get("mid_ring"))):
+        if tiers.uses_mapterhorn(block):
+            del need[name]
+            need[f"Mapterhorn z{block['zoom']} ({'resort box' if key == 'dem' else 'mid ring'})"] = (
+                os.path.join("mapterhorn", str(block["zoom"])), None)
+    if not cfg.get("lidar"):
+        del need["lidar (EPT)"]
+    if not cfg.get("naip"):
+        del need["NAIP"]
+    return need
+
+
 class Failed(Exception):
     """a stage failed; the message says what to do"""
 
@@ -256,8 +273,11 @@ def check_raw(r):
     land cover off (DATA-022 item 8: cover.py skips the far levels without them, and the far terrain reads as camo),
     the far ring's lidar when the config has lidar.far (item 8b), and place names in the US (FEAT-235)"""
     miss = []
-    need = dict(RAW_NEED)
+    need = raw_need(r.cfg)
     osm_need = list(OSM_NEED)
+    if not (r.cfg.get("lidar") and r.cfg.get("naip")) and not (r.cfg.get("landcover") or {}).get("enabled", True):
+        raise Failed("the config has no lidar or no NAIP, so its trees or masks come from the land cover (FEAT-225), "
+                     "but landcover.enabled is false: turn it on and run again with --force manifest")
     if (r.cfg.get("landcover") or {}).get("enabled", True):
         need["WorldCover land cover"] = (os.path.join("landcover", "worldcover"), None)
         need["ETH canopy height"] = (os.path.join("landcover", "eth_canopy"), None)

@@ -29,6 +29,7 @@ python pipeline/build_pack.py vail %SBA_RAW_ROOT%\vail packs\vail
 5. OSM: runs ~350, lifts ~33, buildings ~2,000 to 4,000, peaks a few hundred. Zero runs means `<raw root>/<slug>/osm/ski.json` is missing or is an Overpass error page.
 6. Masks: `mask/` tiles 12 x 12 at 2 m. Open one as an image: blue = groomed corridors should follow pistes, alpha = canopy should show the trail cuts.
 7. Trees: `treeCount` in `meta.json` between 500k and 3M for Vail; `trees/*.bin` sizes are 24 bytes per tree. Krummholz only above ~3,350 m, aspen only below ~3,150 m.
+Silver and Bronze packs (FEAT-225, first log line `sources: ...; tier ...`): the DEM line follows `Mapterhorn z16: N tiles` (Atzmannig: 56 tiles, void 0%); without lidar stage 3 reads `CHM (ETH): x% of cells > 2 m` (about the WorldCover tree share) and stage 7 has 0 crowns, the stands carry every tree (Atzmannig: 0.22 M stems, about 580 per hectare of canopy); without NAIP stage 4 reads `canopy x% rock y% scree z% (WorldCover covers 100%)`.
 8. `meta.json`: `start` should be the top of a named chair lift; `bounds` match `resorts/<slug>/<slug>.json` `pack_bbox` (else `utm_bbox`) minus origin.
 
 ## Moved areas (FEAT-249)

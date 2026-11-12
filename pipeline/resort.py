@@ -24,12 +24,13 @@ Geofabrik and the Internet Archive. The big index files are cached in `<raw root
 and re-downloaded after 30 days or with `--refresh`. Pure helpers, tested offline in tests/test_resort_plan.py.
 """
 import argparse, copy, datetime, difflib, io, json, math, os, re, subprocess, sys, tempfile, unicodedata
-import urllib.parse, urllib.request
+import urllib.error, urllib.parse, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import paths  # noqa: E402
+import tiers  # noqa: E402
 
 RESORTS_DIR = paths.RESORTS
 UA = "SnowboardAnywhere-pipeline/1.0"
@@ -40,7 +41,11 @@ INDEXES = {  # cached name: url
     "runs.geojson": OSD + "runs.geojson",
     "entwine_resources.geojson": "https://usgs.entwine.io/boundaries/resources.geojson",
     "geofabrik_index.json": "https://download.geofabrik.de/index-v1-nogeom.json",
+    "mapterhorn_attribution.json": "https://download.mapterhorn.com/attribution.json",
 }
+MAPTERHORN_TILE = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp"
+MAPTERHORN_COVERAGE = "https://single-archive-tiles.mapterhorn.com/coverage/{z}/{x}/{y}.mvt"
+COVERAGE_ZOOM = 14        # the coverage vector tiles (which source Mapterhorn draws where) go to z14
 MAX_AGE_DAYS = 30
 
 NEIGHBOUR_M = 3000        # a named ski area closer than this to the resort's runs and lifts is asked about
@@ -368,7 +373,7 @@ def resolve(query, features, lifts_path, runs_path, pick_id=None, with_=(), alon
 
     props = [by_id[i]["properties"] for i in chosen]
     region, iso, cc = place(props[0])
-    name = " / ".join(short_name(p["name"]) for p in props)
+    name = " / ".join(dict.fromkeys(short_name(p["name"]) for p in props))   # one name once (OpenSkiData twins)
     exclude = [{"name": by_id[i]["properties"]["name"], "openskidata_id": i,
                 "osm_ways": sorted(set(lifts[i]["osm"] + runs[i]["osm"]))} for i, _ in open_]
     exclude = [e for e in exclude if e["osm_ways"]]
@@ -611,32 +616,112 @@ def terrain_status_url(website):
     return f"https://{host}{TEMPLATE}"
 
 
-def attribution(dem_projects, lidar_names, naip_years):
+def attribution(dem_projects, lidar_names, naip_years, mapterhorn=None):
+    """one credit line per data set the pack is built from. `mapterhorn` (FEAT-225, terrain outside the US):
+    {"zoom", "sources": [{"name", "producer", "license"}]}, the national elevation models Mapterhorn draws there"""
     ys = sorted(set(naip_years), reverse=True)
-    yrs = f"{ys[0]}" + (f" ({', '.join(map(str, ys[1:]))} where {ys[0]} has none)" if len(ys) > 1 else "")
-    return [
-        f"Elevation: USGS 3DEP 1 m lidar DEM ({', '.join(dem_projects)}), public domain" if dem_projects
-        else "Elevation: USGS 3DEP 1/3 arc-second DEM, public domain",
-        f"Canopy: USGS 3DEP lidar point cloud{'s' if len(lidar_names) > 1 else ''} {' and '.join(lidar_names)} "
-        f"via AWS usgs-lidar-public, public domain",
-        f"Imagery: USDA NAIP {yrs} via Microsoft Planetary Computer, public domain",
-        "Background terrain: Mapterhorn (mapterhorn.com)",
-        "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)",
-    ]
+    yrs = (f"{ys[0]}" + (f" ({', '.join(map(str, ys[1:]))} where {ys[0]} has none)" if len(ys) > 1 else "")) if ys else ""
+    if mapterhorn:
+        srcs = "; ".join(f"{s['name']}, {s['producer']} ({s['license']})" for s in mapterhorn.get("sources", []))
+        elev = (f"Elevation: Mapterhorn (mapterhorn.com) terrain tiles at z{mapterhorn['zoom']}"
+                + (f", from {srcs}" if srcs else ""))
+    elif dem_projects:
+        elev = f"Elevation: USGS 3DEP 1 m lidar DEM ({', '.join(dem_projects)}), public domain"
+    else:
+        elev = "Elevation: USGS 3DEP 1/3 arc-second DEM, public domain"
+    out = [elev]
+    if lidar_names:
+        out.append(f"Canopy: USGS 3DEP lidar point cloud{'s' if len(lidar_names) > 1 else ''} {' and '.join(lidar_names)} "
+                   f"via AWS usgs-lidar-public, public domain")
+    if ys:
+        out.append(f"Imagery: USDA NAIP {yrs} via Microsoft Planetary Computer, public domain")
+    return out + ["Background terrain: Mapterhorn (mapterhorn.com)",
+                  "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"]
 
 
 def tier_of(layers):
     """the pack's tier is its weakest layer's (design section 4). `layers`: {layer: "gold"|"silver"|"bronze"}"""
-    rank = {"gold": 0, "silver": 1, "bronze": 2}
-    worst = max(layers.values(), key=lambda t: rank[t]) if layers else "bronze"
-    return worst, sorted(k for k, t in layers.items() if t == worst and worst != "gold")
+    return tiers.tier_of(layers)
+
+
+def tile_of(lon, lat, z):
+    """the web mercator tile (x, y) holding a point at zoom z"""
+    n = 2 ** z
+    return (int((lon + 180) / 360 * n),
+            int((1 - math.log(math.tan(math.radians(lat)) + 1 / math.cos(math.radians(lat))) / math.pi) / 2 * n))
+
+
+def probe_points(box_ll):
+    """the box's centre and corners, where plan asks Mapterhorn how fine its data goes"""
+    x0, y0, x1, y1 = box_ll
+    return [((x0 + x1) / 2, (y0 + y1) / 2), (x0, y0), (x1, y0), (x0, y1), (x1, y1)]
+
+
+def _varint(b, i):
+    v = s = 0
+    while True:
+        c = b[i]; i += 1
+        v |= (c & 0x7F) << s; s += 7
+        if c < 0x80:
+            return v, i
+
+
+def _fields(b):
+    """(field number, wire type, value) of one protobuf message; length-delimited values as bytes"""
+    i = 0
+    while i < len(b):
+        key, i = _varint(b, i)
+        f, wt = key >> 3, key & 7
+        if wt == 0:
+            v, i = _varint(b, i)
+        elif wt == 1:
+            v, i = b[i:i + 8], i + 8
+        elif wt == 2:
+            n, i = _varint(b, i)
+            v, i = b[i:i + n], i + n
+        elif wt == 5:
+            v, i = b[i:i + 4], i + 4
+        else:
+            raise ValueError(f"protobuf wire type {wt}")
+        yield f, wt, v
+
+
+def mvt_strings(data, layer="coverage"):
+    """the string values of one layer of a Mapbox vector tile (for Mapterhorn's coverage tiles: the source ids,
+    `swissalti3d`, `glo30`, drawn in the tile). Tile.layers = 3; Layer.name = 1, values = 4; Value.string = 1."""
+    import gzip
+    if data[:2] == bytes([0x1F, 0x8B]):
+        data = gzip.decompress(data)
+    out = []
+    for f, wt, lay in _fields(data):
+        if f != 3 or wt != 2:
+            continue
+        fs = list(_fields(lay))
+        if layer and not any(k == 1 and v.decode("utf-8", "replace") == layer for k, _, v in fs):
+            continue
+        for k, w, val in fs:
+            if k == 4 and w == 2:
+                out += [v.decode("utf-8", "replace") for kk, ww, v in _fields(val) if kk == 1 and ww == 2]
+    return out
+
+
+def mapterhorn_credits(source_ids, catalog):
+    """[{"source", "name", "producer", "license", "resolution"}] for the source ids, finest first, from Mapterhorn's
+    attribution.json (a list of {source, name, producer, license, resolution, ...}); unknown ids are kept by id"""
+    by_id = {c["source"]: c for c in catalog}
+    out = []
+    for sid in dict.fromkeys(source_ids):
+        c = by_id.get(sid, {})
+        out.append({"source": sid, "name": c.get("name", sid), "producer": c.get("producer", ""),
+                    "license": c.get("license", ""), "resolution": c.get("resolution")})
+    return sorted(out, key=lambda c: c["resolution"] if c["resolution"] is not None else 1e9)
 
 
 def estimate_bytes(items, ept_points=None):
     """{folder: bytes} for a manifest's items (BYTES, measured on Vail)"""
     out = {}
     for it in items:
-        top = it["path"].split("/")[0]
+        top = manifest_key(it)
         sz = (it.get("meta") or {}).get("size")
         if top in ("dem1m", "dem10m", "naip1m") and sz:
             b = sz[0] * sz[1] * BYTES[f"{top}_px"]
@@ -648,10 +733,20 @@ def estimate_bytes(items, ept_points=None):
             b = BYTES["ept_far_node"]
         elif top == "names":
             b = BYTES["population"] if "sub-est" in it["path"] else BYTES["gazetteer"] if "_Gaz_" in it["path"] else BYTES["gnis"]
+        elif top.startswith("mapterhorn"):
+            b = BYTES["mapterhorn"]
         else:
             b = BYTES.get(top, 0)
         out[top] = out.get(top, 0) + b
     return out
+
+
+def manifest_key(item):
+    """the data plan's row of a manifest item: its top folder, and for the Mapterhorn tiles that stand in for 3DEP
+    outside the US (FEAT-225) the layer they are for ("mapterhorn_fine", "mapterhorn_mid")"""
+    top = item["path"].split("/")[0]
+    what = (item.get("meta") or {}).get("for")
+    return f"{top}_{what}" if top == "mapterhorn" and what else top
 
 
 def mb(b):
@@ -692,6 +787,38 @@ class Hosts:
                 if m.any():
                     lo, hi = min(lo, float(h[m].min())), max(hi, float(h[m].max()))
         return lo, hi
+
+    def mapterhorn_zoom(self, box_ll, top=tiers.MAX_PROBE_ZOOM, bottom=10):
+        """FEAT-225: the finest zoom Mapterhorn has tiles for at every probe point of the box (it answers 404 past
+        the zoom its data there supports: z12 where only the 30 m Copernicus DEM covers, z18 on swissALTI3D)"""
+        best = top
+        for lon, lat in probe_points(box_ll):
+            z = min(best, top)
+            while z > bottom:
+                x, y = tile_of(lon, lat, z)
+                try:
+                    fetch(MAPTERHORN_TILE.format(z=z, x=x, y=y), timeout=60)
+                    break
+                except urllib.error.HTTPError as e:
+                    if e.code != 404:
+                        raise
+                    z -= 1
+            best = min(best, z)
+        return best
+
+    def mapterhorn_sources(self, box_ll):
+        """the Mapterhorn sources (its coverage tiles) under the box, with their credits, finest first"""
+        x0, y0 = tile_of(box_ll[0], box_ll[3], COVERAGE_ZOOM)
+        x1, y1 = tile_of(box_ll[2], box_ll[1], COVERAGE_ZOOM)
+        ids = []
+        for ty in range(y0, y1 + 1):
+            for tx in range(x0, x1 + 1):
+                try:
+                    ids += mvt_strings(fetch(MAPTERHORN_COVERAGE.format(z=COVERAGE_ZOOM, x=tx, y=ty)))
+                except urllib.error.HTTPError as e:
+                    if e.code != 404:
+                        raise
+        return mapterhorn_credits(ids, load_json(self.index("mapterhorn_attribution.json")))
 
     def dem_1m(self, box_ll):
         """TNM Access 1 m DEM tiles over the box: [{title, boundingBox, sizeInBytes}]"""
@@ -767,13 +894,33 @@ def plan(stub, hosts, walk_nodes=True, log=print):
     facts["elevation"] = [round(zmin), round(zmax)]
 
     # 1 m DEM: the ImageServer serves the best 3DEP has; TNM Access says whether that is 1 m everywhere
-    tiles = hosts.dem_1m(box_ll)
+    us = country == "US"
+    dem, mid, mt = dict(DEM), dict(MID_RING), None
+    tiles = hosts.dem_1m(box_ll) if us else []
     cover = dem_cover(tiles, box_ll)
     projects = sorted({dem_project(t["title"]) for t in tiles})
     facts["dem"] = {"projects": projects, "cover": cover, "tiles": len(tiles)}
-    facts["layers"]["terrain"] = "gold" if cover >= COVERED else "silver"
-    if cover < COVERED:
-        facts["notes"].append(f"1 m DEM covers {cover:.0%} of the box; the rest is 3DEP 1/3 arc-second (10 m)")
+    if us:
+        facts["layers"]["terrain"] = "gold" if cover >= COVERED else "silver"
+        if cover < COVERED:
+            facts["notes"].append(f"1 m DEM covers {cover:.0%} of the box; the rest is 3DEP 1/3 arc-second (10 m)")
+    else:
+        # FEAT-225: no 3DEP outside the US. Mapterhorn at the coarsest zoom that is 1 m or finer there (or the finest
+        # it has), the mid ring at the zoom for 10 m; Silver terrain from z15 (about 1.6 m), Bronze coarser
+        native = hosts.mapterhorn_zoom(box_ll)
+        z = min(native, tiers.zoom_for(DEM["res_m"], cy))
+        zm = min(native, tiers.zoom_for(MID_RING["res_m"], cy))
+        srcs = hosts.mapterhorn_sources(box_ll)
+        fine = [c for c in srcs if c["resolution"] is not None and c["resolution"] <= 5] or srcs
+        dem = {"source": tiers.MAPTERHORN, "res_m": DEM["res_m"], "zoom": z, "native_zoom": native}
+        mid = {**MID_RING, "source": tiers.MAPTERHORN, "zoom": zm}
+        mt = {"zoom": z, "native": native, "px_m": tiers.tile_px_m(z, cy), "mid_zoom": zm,
+              "mid_px_m": tiers.tile_px_m(zm, cy), "sources": fine}
+        facts["dem"]["mapterhorn"] = mt
+        facts["layers"]["terrain"] = tiers.terrain_tier({"dem": dem})
+        facts["notes"].append(
+            f"outside the US: terrain from Mapterhorn z{z} ({mt['px_m']:.1f} m; it has z{native} here, from "
+            f"{', '.join(c['name'] for c in fine) or 'unknown sources'}), the mid ring from z{zm} ({mt['mid_px_m']:.0f} m)")
 
     # lidar
     ent = load_json(hosts.index("entwine_resources.geojson"))
@@ -820,7 +967,8 @@ def plan(stub, hosts, walk_nodes=True, log=print):
     facts["lidar"] = lidar_facts
     facts["layers"]["trees"] = "gold" if lidar_cover >= COVERED else "silver"
     if not picked:
-        facts["notes"].append("no EPT lidar over the box: trees would come from ETH canopy height (Silver)")
+        facts["notes"].append("no EPT lidar over the box: the trees are stands from the ETH canopy height and "
+                              "WorldCover (Silver trees), no crowns and no far tree ring")
     else:
         far_depth, far_spacing = ept_depth(hosts.ept(lidar["ept"] + "ept.json"), cy, FAR_SPACING_M)
         far_depth = min(far_depth, lidar["max_depth_resort"])
@@ -835,8 +983,8 @@ def plan(stub, hosts, walk_nodes=True, log=print):
                 facts["notes"].append(f"{lf['dataset']} was flown {s['from']} to {s['to']}, across seasons: "
                                       "deciduous crowns may read low where it was flown leaf-off")
 
-    # NAIP
-    items = hosts.naip(box_ll)
+    # NAIP (the US only; elsewhere the masks come from WorldCover, FEAT-225)
+    items = hosts.naip(box_ll) if us else []
     naip_items = pick_naip(items, utm_bbox, crs)
     naip = None
     if naip_items:
@@ -848,9 +996,10 @@ def plan(stub, hosts, walk_nodes=True, log=print):
         naip_cover = 0.0
     facts["naip"] = {"items": len(naip_items), "years": sorted({t[2] for t in naip_items}, reverse=True), "cover": naip_cover}
     facts["layers"]["surface"] = "gold" if naip_cover >= COVERED else "bronze"
-    if country != "US":
-        facts["layers"]["data"] = "bronze"
-        facts["notes"].append("outside the US: no 3DEP, NAIP or LANDFIRE (FEAT-225 Silver and Bronze tiers)")
+    if not naip_items:
+        facts["notes"].append("no NAIP: rock, scree and canopy masks from ESA WorldCover 10 m (Bronze surface)")
+    if not us:
+        facts["notes"].append("outside the US: no LANDFIRE; tree species from elevation and aspect")
 
     # OSM extract, grooming feed
     gf_id, gf_url = geofabrik_for((stub.get("openskidata") or {}).get("iso3166_2"), country,
@@ -868,13 +1017,13 @@ def plan(stub, hosts, walk_nodes=True, log=print):
     cfg = {k: stub[k] for k in ("slug", "name", "country", "region", "osm_ski_area_way") if k in stub}
     cfg.update({
         "crs": crs, "utm_zone": zone, "lonlat_bbox": ll, "buffer_m": buf, "utm_bbox": utm_bbox, "origin": origin,
-        "elevation_range_m": erange, "mid_ring": dict(MID_RING), "far_ring": dict(FAR_RING), "dem": dict(DEM),
+        "elevation_range_m": erange, "mid_ring": mid, "far_ring": dict(FAR_RING), "dem": dem,
     })
     if naip:
         cfg["naip"] = naip
     if lidar:
         cfg["lidar"] = lidar
-    cfg["attribution"] = attribution(projects, [lf["dataset"] for lf in lidar_facts], [t[2] for t in naip_items])
+    cfg["attribution"] = attribution(projects, [lf["dataset"] for lf in lidar_facts], [t[2] for t in naip_items], mt)
     cfg["start_run"] = None
     if status_url:
         cfg["terrain_status_url"] = status_url
@@ -889,6 +1038,8 @@ def plan(stub, hosts, walk_nodes=True, log=print):
         cfg["names"] = names
     tier, why = tier_of(facts["layers"])
     cfg["tier"] = tier
+    # FEAT-225: the source and tier of each layer, read back by build_pack.py (meta.json) and pack_report.py
+    cfg["sources"] = tiers.layer_sources({**cfg, "sources": {k: {"tier": t} for k, t in facts["layers"].items()}})
     facts["tier"], facts["tier_why"] = tier, why
 
     # EPT nodes (the slow part: the hierarchy walk), then the manifest it implies for the sizes
@@ -925,16 +1076,11 @@ def sizes(cfg, node_lists):
         if far and far["nodes_file"] in node_lists:
             with open(os.path.join(d, far["nodes_file"]), "w") as f:
                 f.write(" ".join(node_lists[far["nodes_file"]]))
-        if "lidar" not in c:
-            c["lidar"] = {"ept": "", "dataset": "", "nodes_file": "none.txt"}
-            open(os.path.join(d, "none.txt"), "w").close()
         items = gen_manifest.manifest_items(c, d)
-    if "lidar" not in cfg:
-        items = [i for i in items if not i["path"].startswith("ept")]
     est = estimate_bytes(items)
     n = {}
     for it in items:
-        top = it["path"].split("/")[0]
+        top = manifest_key(it)
         n[top] = n.get(top, 0) + 1
     return {k: (n[k], est.get(k, 0)) for k in n}
 
@@ -955,9 +1101,16 @@ def plan_md(cfg, facts, walked=True):
         n, b = m.get(key, (0, 0))
         L.append(f"| {layer} | {source} | {year} | {res} | {n} | {mb(b)} | {tier} |")
     d = facts["dem"]
-    row("Terrain, resort", f"3DEP ImageServer; 1 m tiles: {', '.join(d['projects']) or 'none'} ({d['cover']:.0%} of the box)",
-        "", "1 m", "dem1m", facts["layers"]["terrain"])
-    row("Terrain, mid ring", "3DEP ImageServer", "", "10 m", "dem10m", "")
+    mt = d.get("mapterhorn")
+    if mt:      # FEAT-225: outside the US
+        row("Terrain, resort", f"Mapterhorn z{mt['zoom']} (finest there z{mt['native']}: "
+            f"{', '.join(c['name'] for c in mt['sources']) or 'unknown'})", "", f"{mt['px_m']:.1f} m", "mapterhorn_fine",
+            facts["layers"]["terrain"])
+        row("Terrain, mid ring", f"Mapterhorn z{mt['mid_zoom']}", "", f"{mt['mid_px_m']:.0f} m", "mapterhorn_mid", "")
+    else:
+        row("Terrain, resort", f"3DEP ImageServer; 1 m tiles: {', '.join(d['projects']) or 'none'} ({d['cover']:.0%} of the box)",
+            "", "1 m", "dem1m", facts["layers"]["terrain"])
+        row("Terrain, mid ring", "3DEP ImageServer", "", "10 m", "dem10m", "")
     row("Terrain, far ring", "Mapterhorn", "", f"z{FAR_RING['mapterhorn_zoom']}", "mapterhorn", "")
     for k, lf in enumerate(facts["lidar"]):
         s = lf["season"]
@@ -974,18 +1127,26 @@ def plan_md(cfg, facts, walked=True):
         L.append(f"| Lidar, far tree ring | same, {FAR_PAD_M} m round the box | | depth {cfg['lidar']['far']['max_depth']}: "
                  f"{facts.get('far_spacing', 0):.1f} m | {fn if fn is not None else '?'} | "
                  f"{mb(facts['far_points'] * BYTES['ept_pt']) if fn is not None else '?'} | |")
+    if not facts["lidar"]:
+        L.append(f"| Trees | stands from the ETH canopy height and WorldCover (no lidar: no crowns, no far tree ring) | "
+                 f"2020, 2021 | 10 m | | (land cover) | {facts['layers']['trees']} |")
     nf = facts["naip"]
-    row("Imagery", cfg.get("naip", {}).get("source", "none"), ", ".join(map(str, nf["years"])),
-        f"{NAIP_RES['res_m']} m", "naip1m", facts["layers"]["surface"])
-    row("Land cover, far terrain", "ESA WorldCover 2021 + ETH canopy height 2020 (3 degree tiles)", "2021, 2020", "10 m",
-        "landcover", "")
-    L.append(f"| Vegetation type | LANDFIRE EVT, EVC, EVH (`fetch_landfire.mjs`) | | 30 m | | {mb(LANDFIRE_BYTES)} | |")
+    if cfg.get("naip"):
+        row("Imagery", cfg["naip"]["source"], ", ".join(map(str, nf["years"])), f"{NAIP_RES['res_m']} m", "naip1m",
+            facts["layers"]["surface"])
+    else:
+        L.append(f"| Surface masks | ESA WorldCover 2021 classes (no NAIP) | 2021 | 10 m | | (land cover) | "
+                 f"{facts['layers']['surface']} |")
+    row("Land cover, far terrain" + ("" if cfg.get("naip") and cfg.get("lidar") else ", masks and stands"),
+        "ESA WorldCover 2021 + ETH canopy height 2020 (3 degree tiles)", "2021, 2020", "10 m", "landcover", "")
+    if cfg.get("country", "US") == "US":
+        L.append(f"| Vegetation type | LANDFIRE EVT, EVC, EVH (`fetch_landfire.mjs`) | | 30 m | | {mb(LANDFIRE_BYTES)} | |")
     osm = cfg.get("osm", {})
     row("Runs, lifts, buildings", f"OSM via Overpass (Geofabrik extract: {osm.get('geofabrik', 'none')})", "", "", "osm", "")
     if cfg.get("names"):
         row("Place names", f"USGS GNIS summits ({', '.join(cfg['names']['states'])}), Census towns", "", "", "names", "")
     L.append(f"| Grooming | {cfg.get('terrain_status_url') or 'none'} | | | | | |")
-    total = sum(b for _, b in m.values()) + LANDFIRE_BYTES
+    total = sum(b for _, b in m.values()) + (LANDFIRE_BYTES if cfg.get("country", "US") == "US" else 0)
     L += ["", f"Total about **{mb(total)}**" + ("" if walked else " plus the lidar (node lists not walked: `--no-nodes`)") + ".",
           "", "Lidar size is points x 8.8 bytes (LAZ), raster sizes are pixels x bytes per pixel, both measured on "
           "Vail's raw data."]

@@ -31,7 +31,7 @@ Every stage is skipped when its inputs have not changed, so both are safe to re-
 
 ### Add a resort yourself, step by step
 
-Without Claude, on Windows, US resorts (the gold tier needs USGS lidar):
+Without Claude, on Windows:
 
 1. **Set up once.**
    - Install Python 3.13 and run `pip install -r pipeline\requirements.txt`, then install Node.
@@ -44,10 +44,10 @@ Without Claude, on Windows, US resorts (the gold tier needs USGS lidar):
    - *Neighbours in its box or sold with it* (Park City lists Deer Valley, Solitude, Brighton, Alta): type the numbers of any to build into the same pack, commas between, or press Enter to leave their runs and lifts out. It prints the flags that give the same answer (`--with "<name>"`, `--alone`) for scripts.
 
    It then writes `resorts\<slug>\<slug>.json` and the data plan `resorts\<slug>\<slug>-plan.md`, and stops.
-4. **Read the plan.** It shows the box, the tier (gold needs 1 m terrain and lidar over the box), each layer's source, year and size, and the total download. If the tier or the box looks wrong, stop here and open an issue.
+4. **Read the plan.** It shows the box, the tier (gold, silver or bronze, below), each layer's source, year and size, and the total download. If the tier or the box looks wrong, stop here and open an issue.
 5. **Second run: everything else.** Run `add_resort.cmd` again with the same name. It does not ask again: the config remembers your answers (`--force resolve` asks again). Then:
    - It fetches (the long part; resumable).
-   - It asks the LANDFIRE email once.
+   - It asks the LANDFIRE email once (US resorts only).
    - It builds the pack into `packs\<slug>\` (about 10 minutes for Vail).
    - It writes the scorecard `packs\<slug>\report.md`, rides the pack headless in the game, and publishes the release.
 
@@ -55,6 +55,7 @@ Without Claude, on Windows, US resorts (the gold tier needs USGS lidar):
 6. **When a stage stops,** the message says which stage and what to do. Fix that and run the same command again: finished stages are skipped. `add_resort.cmd "<name>" --force <stage>` reruns one stage, and `python pipeline\resort.py add --help` lists the rest.
 7. **Ride it.** In the game: `cd game`, then `npm run get <slug>` once it is published, or `npm run get -- --from ..\..\MapPacker-SnowboardAnywhere\packs\<slug>` for the local build. Then `npm run dev` and open `/?pack=<slug>`.
 
+- **Any resort with terrain** (FEAT-225): the plan picks the best source per layer and records the tier, the weakest layer's. Gold is 1 m 3DEP, lidar crowns and NAIP (most US resorts); Silver has no lidar (the trees are stands from the ETH 10 m canopy height) or Mapterhorn terrain at z15 or finer; Bronze has no NAIP (masks from ESA WorldCover), as everywhere outside the US, where the terrain comes from Mapterhorn at the best zoom it has there. Same pack format; the report shows each layer's source, and the DATA-022 gate still decides playable or preview.
 - **Raw data** goes to `SBA_RAW_ROOT`, else `raw\` in the main checkout (worktrees share it). It is gitignored and never committed. On Drew's PC `SBA_RAW_ROOT` points at the raw data still in the game's clone, `C:\Users\Drew\git\SnowboardAnywhere\raw`, until it is moved here.
 - **Moving an area** (FEAT-249): a config's `relocate` list cuts an area out and pastes it next to the rest (Brandywine beside Boston Mills), and `pack_bbox` is the box the pack is built on while `utm_bbox` stays the box the raw data was fetched for, so moving an area needs no new download. `python pipeline\relocate.py <slug> [--write]` works out `pack_bbox` from the runs and lifts after the move (`--write` puts it in the config).
 - **Moving in another resort** (FEAT-268): a move with `"source": "<slug>"` cuts its area from that place's own raw data, a config marked `"source_only": true` (fetched with `build_resort.py <slug> --stop-after landfire`, never built or published), so a custom map can put hills from far apart side by side. `"raw_from": "<slug>"` builds a config on another resort's raw data and manifest, with its own state file. Ohio Hills (`resorts/ohio-hills/`) is Boston Mills' data with Mad River Mountain (`resorts/mad-river-mountain/`) moved in north of it.
@@ -115,7 +116,7 @@ Packs live in releases, never in git history: a pack is 50 to 250 MB per build, 
 The packs are built from these sources. OpenStreetMap-derived parts of a pack (`features.json`: runs, lifts, buildings, roads, water, names; the groomed-run and run-direction masks) are a derivative of OpenStreetMap and are available under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The rest is public domain or CC BY 4.0 as listed.
 
 - Elevation and lidar: U.S. Geological Survey 3D Elevation Program (public domain)
-- Terrain tiles: Mapterhorn, built from USGS 3DEP
+- Terrain tiles: Mapterhorn, built from USGS 3DEP in the US and from national elevation models elsewhere (credit per pack in meta.json attribution)
 - Imagery: USDA NAIP via Microsoft Planetary Computer (public domain)
 - Vegetation type, cover and height: LANDFIRE, USGS and U.S. Forest Service (public domain)
 - Geographic names: USGS GNIS (public domain); town names and sizes: US Census Bureau Gazetteer and population estimates (public domain)
