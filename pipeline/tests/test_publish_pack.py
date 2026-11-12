@@ -12,7 +12,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from packwriter import FORMAT_VERSION, write_meta  # noqa: E402
-from publish_pack import catalog_entry, next_version, pack_files, update_catalog, zip_pack  # noqa: E402
+from publish_pack import (catalog_entry, content_key, find_test_pack, next_version, pack_files,  # noqa: E402
+                          update_catalog, zip_pack)
 
 
 
@@ -59,6 +60,69 @@ def test_catalog_replaces_the_resort_and_sorts_by_name():
     out = update_catalog(cat, e)
     assert [r["slug"] for r in out["resorts"]] == ["bigsky", "vail"]
     assert out["resorts"][1]["pack"]["version"] == 2 and out["formatVersion"] == FORMAT_VERSION
+
+
+def test_content_key_ignores_the_build_stamps_but_not_the_content(tmp_path):
+    pack = make_pack(tmp_path / "a")
+    key = content_key(str(pack))
+    write_meta(str(pack), json.load(open(pack / "meta.json")))      # a fresh build and pipeline stamp
+    assert content_key(str(pack)) == key
+    (pack / "debug" / "species.png").write_bytes(b"other debug")    # not in the zip, not in the key
+    assert content_key(str(pack)) == key
+    (pack / "fine" / "0_0.png").write_bytes(b"\x89PNG changed")
+    assert content_key(str(pack)) != key
+
+
+def synth_entry(version, fmt, content="c1"):
+    meta = {"slug": "synth", "name": "Synthetic test mountain", "formatVersion": fmt, "build": "b", "lonlat": [0, 0]}
+    e = catalog_entry(meta, {}, version=version, size=1, sha256=f"s{version}", pipeline="p", tier=None,
+                      status="test", report=None)
+    e["pack"]["content"] = content
+    return e
+
+
+def test_test_packs_stay_out_of_the_picker_one_per_format():
+    resorts = {"formatVersion": FORMAT_VERSION,
+               "resorts": [{"slug": "vail", "name": "Vail", "pack": {"version": 1, "formatVersion": FORMAT_VERSION}}]}
+    cat = update_catalog(resorts, synth_entry(1, FORMAT_VERSION), test=True)
+    assert [r["slug"] for r in cat["resorts"]] == ["vail"] and [t["pack"]["version"] for t in cat["test"]] == [1]
+    # a newer pack format goes beside the old one (the game's main keeps its own); the same format replaces it
+    cat = update_catalog(cat, synth_entry(2, FORMAT_VERSION + 1), test=True)
+    cat = update_catalog(cat, synth_entry(3, FORMAT_VERSION, "c2"), test=True)
+    assert [(t["pack"]["formatVersion"], t["pack"]["version"]) for t in cat["test"]] == \
+        [(FORMAT_VERSION, 3), (FORMAT_VERSION + 1, 2)]
+    assert find_test_pack(cat, "synth", FORMAT_VERSION)["pack"]["content"] == "c2"
+    assert find_test_pack(cat, "synth", FORMAT_VERSION + 2) is None
+    # the catalog's formatVersion is the resorts', a test pack does not move it; a resort publish keeps the tests
+    assert cat["formatVersion"] == FORMAT_VERSION
+    vail = catalog_entry({"slug": "vail", "name": "Vail", "formatVersion": FORMAT_VERSION}, {}, version=2, size=1,
+                         sha256="v", pipeline="p", tier="gold", status="preview", report=None)
+    assert update_catalog(cat, vail)["test"] == cat["test"]
+    assert next_version("synth", ["synth-v1"], cat) == 4
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
+def test_get_pack_installs_the_test_pack_at_its_own_format(tmp_path, game_file):
+    tool = game_file("game", "tools", "get_pack.mjs")
+    if "catalog.test" not in open(tool, encoding="utf-8").read():
+        pytest.skip("the game's get_pack.mjs predates test packs (FEAT-241)")
+    pack = make_pack(tmp_path / "src", slug="synth")
+    zpath = tmp_path / "synth.zip"
+    size, sha = zip_pack(str(pack), str(zpath))
+    cat = {"resorts": []}
+    for version, fmt, s in [(1, FORMAT_VERSION, sha), (2, FORMAT_VERSION + 1, "0" * 64)]:
+        e = synth_entry(version, fmt)
+        e["pack"].update(sha256=s, bytes=size, url=str(zpath))
+        cat = update_catalog(cat, e, test=True)
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text(json.dumps(cat))
+    run = lambda *a: subprocess.run(["node", tool, "synth", "--catalog", str(catalog), *a], capture_output=True, text=True)
+    r = run("--sha256")
+    assert (r.returncode, r.stdout.strip()) == (0, sha), r.stderr
+    packs = tmp_path / "packs"
+    r = run("--packs", str(packs))
+    assert r.returncode == 0, r.stderr
+    assert json.load(open(packs / "synth" / ".catalog.json"))["version"] == 1
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="node not installed")

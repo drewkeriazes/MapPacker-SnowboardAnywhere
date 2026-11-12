@@ -33,6 +33,7 @@ Every stage is skipped when its inputs have not changed, so both are safe to re-
 - **The game** must be cloned next to this repo (`..\SnowboardAnywhere`) for the headless ride, the game-side lines of the build report and a few tests. `--game-repo <path>` or `SBA_GAME_REPO` points elsewhere; without it those parts say so and stop or skip.
 - **Publishing** (`pipeline\publish_pack.py`, the last stage of `add_resort.cmd`) runs in the main checkout on `main`: it makes the release `<slug>-v<N>` and commits `catalog.json` with the resort's config, node lists, plan, manifest and report straight to `main`.
 - **To ride a pack before publishing it**, copy `packs\<slug>` into the game's `packs\`.
+- **The synthetic pack** (`pipeline\synth_pack.py`, a made-up mountain the game's CI checks run on) is published the same way as a test pack, release `synth-v<N>`: `python pipeline\publish_pack.py --synth` on `main` builds it (about 2 minutes) and publishes it only if its content changed. Run it after merging a change to the pipeline or the pack format (FEAT-241).
 
 More in the `pack-build` skill (`.claude/skills/pack-build/SKILL.md`) and the notes in `CLAUDE.md`.
 
@@ -40,13 +41,13 @@ More in the `pack-build` skill (`.claude/skills/pack-build/SKILL.md`) and the no
 
 | Path | What |
 |---|---|
-| `catalog.json` | Every published pack: slug, name, region, tier, status, and the release zip's version, pack format, size, sha256, URL and the pipeline commit that built it |
+| `catalog.json` | Every published pack: slug, name, region, tier, status, and the release zip's version, pack format, size, sha256, URL and the pipeline commit that built it. Test packs (the synthetic pack) are in a separate `test` list the resort picker does not read, one entry per pack format, with a `content` hash |
 | `pipeline/` | The pipeline: `resort.py` (name to config and data plan, and `add`), `build_resort.py`, `build_pack.py` and its stages, `pack_report.py`, `publish_pack.py`, the fetch scripts, tests in `pipeline/tests/`. Moved from the game repo with its history (FEAT-238) |
 | `resorts/<slug>/` | A folder per resort: `<slug>.json`, the config the pipeline reads, the EPT node lists it names (`nodes_file`, beside it) and the data plan (`<slug>-plan.md`) |
 | `manifests/<slug>.json` | The download manifest the raw data was fetched with |
 | `reports/<slug>.md` | The build report of the published pack |
 | `*.cmd` | Launchers for Drew's PC (above) |
-| Releases `<slug>-v<N>` | `<slug>.zip` (the pack, stored), its `meta.json`, and the report |
+| Releases `<slug>-v<N>` | `<slug>.zip` (the pack, stored), its `meta.json`, and the report; `synth-v<N>` for the synthetic pack |
 
 Packs live in releases, never in git history: a pack is 50 to 250 MB per build, and releases can be deleted when a build is replaced. A catalog entry's `pipeline` is the commit of this repo that built the pack; entries published before the pipeline moved here (FEAT-238) name a SnowboardAnywhere commit instead.
 
