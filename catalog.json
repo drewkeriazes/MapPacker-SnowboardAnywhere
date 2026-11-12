@@ -25,6 +25,29 @@
    "report": null
   },
   {
+   "slug": "boston-mills",
+   "name": "Boston Mills / Brandywine",
+   "region": "Ohio",
+   "country": "US",
+   "lonlat": [
+    -81.55938846025708,
+    41.27422289088265
+   ],
+   "tier": "gold",
+   "status": "preview",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261112T013748Z-b77540",
+    "built": "2026-11-11",
+    "pipeline": "2a0b12f",
+    "bytes": 59668268,
+    "sha256": "ce5a5b2ca1b620c2d1113701002cc0c11c56669c005e39be9180e88fcb19b0aa",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/boston-mills-v1/boston-mills.zip"
+   },
+   "report": "reports/boston-mills.md"
+  },
+  {
    "slug": "breckenridge",
    "name": "Breckenridge",
    "region": "Colorado",
