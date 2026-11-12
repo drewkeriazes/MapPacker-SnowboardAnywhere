@@ -57,18 +57,18 @@
     39.47501338028009
    ],
    "tier": "gold",
-   "status": "preview",
+   "status": "playable",
    "pack": {
-    "version": 1,
+    "version": 2,
     "formatVersion": 1,
-    "build": "20261111T150040Z-6846ea",
-    "built": "2026-11-11",
-    "pipeline": "428c65d",
-    "bytes": 179380797,
-    "sha256": "51de3837f8a051f0179101774f980ac355b5c86b92fe03e3b96079701dfca0dd",
-    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/breckenridge-v1/breckenridge.zip"
+    "build": "20261112T222950Z-db9d1a",
+    "built": "2026-11-12",
+    "pipeline": "9596769",
+    "bytes": 223158871,
+    "sha256": "171118d48591e86a61f31c089788df8ca4d89035ccb6165c45a41fafe7b298d5",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/breckenridge/v2/breckenridge.zip"
    },
-   "report": null
+   "report": "reports/breckenridge.md"
   },
   {
    "slug": "ohio-hills",
