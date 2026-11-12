@@ -71,6 +71,29 @@
    "report": null
   },
   {
+   "slug": "ohio-hills",
+   "name": "Ohio Hills (custom mashup)",
+   "region": "Ohio",
+   "country": "US",
+   "lonlat": [
+    -81.55938846025708,
+    41.27422289088265
+   ],
+   "tier": "gold",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261112T164000Z-415c56",
+    "built": "2026-11-12",
+    "pipeline": "7923e19",
+    "bytes": 41095778,
+    "sha256": "6266a81bf7b80b8a311eac3b8b288b8b66b6b88a0f46620d8cc6a545693db794",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/ohio-hills-v1/ohio-hills.zip"
+   },
+   "report": "reports/ohio-hills.md"
+  },
+  {
    "slug": "vail",
    "name": "Vail",
    "region": "Colorado",
