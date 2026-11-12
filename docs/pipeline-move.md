@@ -53,7 +53,7 @@ Today one workflow (`SnowboardAnywhere/.github/workflows/checks.yml`) covers bot
 | Job today | Runs when | After the move |
 |---|---|---|
 | `pipeline-tests` (pytest) | `pipeline/` changed | MapPacker `checks.yml` |
-| `synth-pack` (Python, about 2 min, cached on `tools/ci/synth_key.sh`) | `game/` or `pipeline/` changed | Game downloads release `synth-v<N>` (FEAT-241) |
+| `synth-pack` (Python, about 2 min, cached on `tools/ci/synth_key.sh`) | `game/` or `pipeline/` changed | Game downloads release `synth/v<N>` (FEAT-241; `synth-v<N>` before FEAT-271) |
 | `browser-checks` on the synthetic pack | `game/` or `pipeline/` changed | Game, on the downloaded pack |
 | `render-budgets`, main vs PR, with main's synthetic pack when the PR changes the pipeline | PRs, `game/` or `pipeline/` changed | Game: same pack both sides, game changes only. MapPacker: synthetic pack from main vs PR, rendered by the game's `main` (FEAT-240) |
 | Repo rules, public guards | every PR | Both repos |
@@ -61,7 +61,7 @@ Today one workflow (`SnowboardAnywhere/.github/workflows/checks.yml`) covers bot
 
 The GPU pre-push hook (`.githooks/pre-push`) runs `render-budgets` on `game/` or `pipeline/` changes; its pipeline half moves with FEAT-240.
 
-FEAT-241 as built: `publish_pack.py --synth` builds the synthetic pack and publishes it as release `synth-v<N>` in the catalog's `test` list (one entry per pack format, with a `content` hash of the pack less its build stamps, so an unchanged rebuild publishes nothing). The game's `get_pack.mjs` reads `test` too and picks the entry for its own `PACK_FORMAT`; its CI caches the download on the release's sha256.
+FEAT-241 as built: `publish_pack.py --synth` builds the synthetic pack and publishes it as release `synth/v<N>` (`synth-v<N>` before FEAT-271) in the catalog's `test` list (one entry per pack format, with a `content` hash of the pack less its build stamps, so an unchanged rebuild publishes nothing). The game's `get_pack.mjs` reads `test` too and picks the entry for its own `PACK_FORMAT`; its CI caches the download on the release's sha256.
 
 ## 5. Game repo cleanup (FEAT-242)
 

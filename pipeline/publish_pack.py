@@ -5,7 +5,7 @@
     python pipeline/publish_pack.py --synth [--force] [--dry-run]
 
 `--synth` (FEAT-241) builds the synthetic pack (synth_pack.py, about 2 minutes) into packs/synth and publishes it
-as a test pack, release `synth-v<N>`, for the game's CI (`node game/tools/get_pack.mjs synth`). It publishes only
+as a test pack, release `synth/v<N>`, for the game's CI (`node game/tools/get_pack.mjs synth`). It publishes only
 when the pack's content differs from the catalog's synth for this format (`--force` publishes anyway). Run it from
 a clean checkout of main after merging a change to the pipeline or the pack format.
 
@@ -16,11 +16,12 @@ main (FEAT-272). Steps:
   2. refuse a pack pack_lint.py finds problems in (the publish-check job would reject its zip), dry run included;
      zip the pack, stored (PNG tiles do not compress), fixed timestamps so the same pack gives the same sha256;
      refuse a zip over 1.9 GiB (GitHub's limit per release asset is 2 GiB)
-  3. `gh release create <slug>-v<N> --draft` in this repo with the zip, meta.json and the report if there is one;
-     the version counts draft tags, so two publishes in flight never pick the same number. Players and the catalog
-     don't see a draft.
+  3. `gh release create <slug>/v<N> --draft` in this repo with the zip, meta.json and the report if there is one
+     (FEAT-271 tags; the old `<slug>-v<N>` ones still count); the version counts draft tags, so two publishes in
+     flight never pick the same number. Players and the catalog don't see a draft.
   4. open a publish PR (open_publish_pr): in a throwaway worktree off a fresh origin/main, branch
-     `publish/<slug>-v<N>` with catalog.json plus the new entry, the pack's report as reports/<slug>.md and the
+     `publish/<slug>-v<N>` with catalog.json plus the new entry, RELEASES.md rewritten with this release in it
+     (releases.py, FEAT-271), the pack's report as reports/<slug>.md and the
      resort's config, EPT node lists, data plan (resorts/<slug>/) and manifest (manifests/), copied from this
      checkout (which is left as it was; the worktree and the local branch are deleted afterwards); labels `publish`,
      `automerge` when the publisher is in .github/maintainers.txt, `accept-change` with --accept-change. The merge
@@ -36,12 +37,13 @@ A pack is `playable` only when every DATA-022 MVP line passes in its report (EPI
 from `<pack_dir>/report.json` (`pack_report.py`, FEAT-175) when it was made for this build, `preview` without one,
 and `--status playable` is refused unless the report passes.
 """
-import argparse, glob, hashlib, json, os, re, shutil, subprocess, sys, tempfile, time, zipfile
+import argparse, glob, hashlib, json, os, shutil, subprocess, sys, tempfile, time, zipfile
 from typing import Callable
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from packwriter import FORMAT_VERSION, pipeline_commit  # noqa: E402
 from pack_lint import lint  # noqa: E402
+from releases import INDEX, list_releases, own_release, parse_tag, release_tag, write_index  # noqa: E402
 import paths  # noqa: E402
 
 RESORTS_REPO = "drewkeriazes/MapPacker-SnowboardAnywhere"
@@ -112,9 +114,9 @@ def find_test_pack(catalog: dict, slug: str, fmt: int) -> dict | None:
 
 
 def next_version(slug: str, tags: list, catalog: dict) -> int:
-    """One past the highest <slug>-v<N> release or catalog version, so a deleted release's number is not reused."""
-    pat = re.compile(rf"^{re.escape(slug)}-v(\d+)$")
-    nums = [int(m.group(1)) for t in tags if (m := pat.match(t))]
+    """One past the highest <slug>/v<N> (or old <slug>-v<N>) release or catalog version, so a deleted release's
+    number is not reused."""
+    nums = [p[1] for t in tags if (p := parse_tag(t)) and p[0] == slug]
     nums += [r["pack"]["version"] for r in all_entries(catalog) if r.get("slug") == slug and r.get("pack")]
     return max(nums, default=0) + 1
 
@@ -137,7 +139,7 @@ def report_status(pack_dir: str, meta: dict, requested: str | None) -> tuple:
 
 
 def asset_url(slug: str, version: int, repo: str = RESORTS_REPO) -> str:
-    return f"https://github.com/{repo}/releases/download/{slug}-v{version}/{slug}.zip"
+    return f"https://github.com/{repo}/releases/download/{release_tag(slug, version)}/{slug}.zip"
 
 
 def catalog_entry(meta: dict, cfg: dict, *, version: int, size: int, sha256: str, pipeline: str, tier: str,
@@ -264,9 +266,10 @@ def warn_on_failure(cmd: list, cwd: str) -> None:
 
 
 def open_publish_pr(*, slug: str, version: int, entry: dict, test: bool, src_repo: str, labels: list[str],
-                    body: str, repo: str, report: str | None = None) -> str:
-    """Commit the catalog entry, the resort's own files (copied from `src_repo`) and `report` (as
-    reports/<slug>.md) on publish/<slug>-v<N>, in a throwaway worktree off a fresh origin/main (never the publisher's
+                    body: str, repo: str, report: str | None = None, releases: list | None = None) -> str:
+    """Commit the catalog entry, RELEASES.md from `releases` when given (list_releases records, this publish's
+    draft among them), the resort's own files (copied from `src_repo`) and `report` (as reports/<slug>.md) on
+    publish/<slug>-v<N>, in a throwaway worktree off a fresh origin/main (never the publisher's
     checkout), push that branch, open the PR against main. Returns the PR URL. The worktree and the local branch
     are deleted afterwards, so a rerun can make the branch again."""
     branch = publish_branch(slug, version)
@@ -279,9 +282,13 @@ def open_publish_pr(*, slug: str, version: int, entry: dict, test: bool, src_rep
         cat_path = os.path.join(wt, "catalog.json")
         with open(cat_path, encoding="utf-8") as f:
             catalog = json.load(f)
+        catalog = update_catalog(catalog, entry, test=test)
         with open(cat_path, "w", encoding="utf-8", newline="\n") as f:
-            json.dump(update_catalog(catalog, entry, test=test), f, indent=1)
+            json.dump(catalog, f, indent=1)
             f.write("\n")
+        index = [] if releases is None else [INDEX]
+        if releases is not None:
+            write_index(os.path.join(wt, INDEX), releases, catalog, repo, own=release_tag(slug, version))
         report_rel = f"reports/{slug}.md"   # this publish's report only, never an older one left in src_repo
         own = [] if test else [rel for rel in resort_files(slug, src_repo) if rel != report_rel]
         copies = [(os.path.join(src_repo, rel), rel) for rel in own] + ([(report, report_rel)] if report else [])
@@ -291,7 +298,7 @@ def open_publish_pr(*, slug: str, version: int, entry: dict, test: bool, src_rep
         p = entry["pack"]
         run(["git", "switch", "-c", branch], cwd=wt)
         created = True
-        run(["git", "add", "--", "catalog.json", *[rel for _, rel in copies]], cwd=wt)
+        run(["git", "add", "--", "catalog.json", *index, *[rel for _, rel in copies]], cwd=wt)
         run(["git", "commit", "-q", "-m",
              f"{slug} v{version}: {entry['status']}, {p['bytes'] / 1e6:.0f} MB, pipeline {p['pipeline']}"], cwd=wt)
         run(["git", "push", "-u", "origin", branch], cwd=wt)
@@ -408,7 +415,7 @@ def main(argv=None) -> None:
     tags = [] if a.dry_run else [r["tagName"] for r in json.loads(run(
         ["gh", "release", "list", "-R", a.repo, "--limit", "1000", "--json", "tagName"]) or "[]")]
     version = next_version(slug, tags, catalog)
-    tag = f"{slug}-v{version}"
+    tag = release_tag(slug, version)
 
     tmp = tempfile.mkdtemp(prefix=f"publish-{slug}-")
     try:
@@ -445,12 +452,15 @@ def main(argv=None) -> None:
         release_url = run(["gh", "release", "create", tag, *assets, "-R", a.repo, "--draft",
                            "--title", f"{meta['name']} v{version}", "--notes", notes])
 
-        # the recipe that built it goes in the PR beside the catalog: config, node lists, plan, manifest, report
+        # the recipe that built it goes in the PR beside the catalog: config, node lists, plan, manifest, report;
+        # RELEASES.md lists this publish's draft as out (the merge workflow publishes it before it merges)
         body = pr_body(entry, why=why, release_url=release_url, started_by=login, run_url=a.run_url,
                        requested_by=a.requested_by)
         try:
+            releases = [r for r in list_releases(a.repo, run) if r.get("tag_name") != tag]
+            releases.append(own_release(slug, version, f"{meta['name']} v{version}", size))
             pr = open_publish_pr(slug=slug, version=version, entry=entry, test=test, src_repo=REPO, labels=labels,
-                                 body=body, repo=a.repo, report=report)
+                                 body=body, repo=a.repo, report=report, releases=releases)
         except SystemExit as e:
             raise SystemExit(f"{e}\nThe draft release {tag} exists with nothing pointing at it: open the PR by hand, "
                              f"or delete the draft (gh release delete {tag} -R {a.repo} --yes)")
