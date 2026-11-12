@@ -286,6 +286,10 @@ def test_keep_hand_fields():
     got = R.keep_hand_fields(new, old)
     assert got["start_run"] == "Born Free" and got["grooming_aliases"] == {"a": "b"}
     assert [e["name"] for e in got["exclude"]] == ["Club", "Drawn"]
+    # FEAT-249: a moved area and the pack box from it survive a re-plan
+    old = {"relocate": [{"name": "Brandywine", "from": [0, 0, 1, 1], "to": [5, 5]}], "pack_bbox": [0, 0, 100, 100]}
+    got = R.keep_hand_fields({"slug": "boston-mills"}, old)
+    assert got["relocate"] == old["relocate"] and got["pack_bbox"] == [0, 0, 100, 100]
 
 
 # ------------------------------------------------------------------------------------------------ plan, fake hosts
