@@ -4,7 +4,8 @@ Every published pack, grouped by resort, newest version first. The game download
 
 ## Big Sky
 
-- [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/bigsky/v1) (latest) 224 MB, 2026-11-11
+- [v2](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/bigsky/v2) (latest) 252 MB, 2026-11-12
+- [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/bigsky/v1) 224 MB, 2026-11-11
 
 ## Boston Mills / Brandywine
 

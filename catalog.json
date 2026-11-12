@@ -11,18 +11,18 @@
     45.28371220009889
    ],
    "tier": "gold",
-   "status": "preview",
+   "status": "playable",
    "pack": {
-    "version": 1,
+    "version": 2,
     "formatVersion": 1,
-    "build": "20261111T150705Z-8cc64e",
-    "built": "2026-11-11",
-    "pipeline": "428c65d",
-    "bytes": 224423225,
-    "sha256": "2e2689a79b3fee13926467bd86dc973da7de521600154ec714c8eb8517d0a064",
-    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/bigsky-v1/bigsky.zip"
+    "build": "20261112T223031Z-5ce36a",
+    "built": "2026-11-12",
+    "pipeline": "9596769",
+    "bytes": 252378581,
+    "sha256": "18c0d5344c4da4cafff7401137a7bcb79a26d6fcfa15d2e70adb511125defd0d",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/bigsky/v2/bigsky.zip"
    },
-   "report": null
+   "report": "reports/bigsky.md"
   },
   {
    "slug": "boston-mills",
