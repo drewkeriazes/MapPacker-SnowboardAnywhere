@@ -66,8 +66,8 @@ class Fake:
 @pytest.fixture
 def resort(tmp_path, monkeypatch):
     res, man = tmp_path / "resorts", tmp_path / "manifests"
-    res.mkdir(); man.mkdir()
-    json.dump(CFG, open(res / "demo.json", "w"))
+    (res / "demo").mkdir(parents=True); man.mkdir()
+    json.dump(CFG, open(res / "demo" / "demo.json", "w"))   # FEAT-244: a folder per resort
     monkeypatch.setattr(B, "pipeline_code", lambda repo=B.REPO: "code1")
     monkeypatch.setattr(B, "same_code", lambda commit, repo=B.REPO: commit == "abc1234")
     r = B.Resort("demo", str(tmp_path / "raw" / "demo"), str(tmp_path / "packs" / "demo"), str(res), str(man))

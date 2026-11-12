@@ -8,7 +8,7 @@ IsOpen and IsGroomed, as published by the resort that night. This script saves t
 build_pack.py then marks a run groomed when the resort groomed it on any saved night.
 
 Usage:  python pipeline/fetch_grooming.py <slug> <raw_dir>
-        (the URL comes from resorts/<slug>.json "terrain_status_url")
+        (the URL comes from resorts/<slug>/<slug>.json "terrain_status_url")
 Stdlib only. Resumable: snapshots already saved are skipped. Runs on Drew's PC (needs web access).
 """
 import json, os, re, subprocess, sys, time
@@ -47,10 +47,10 @@ def parse_feed(html):
 
 def main():
     slug, raw_dir = sys.argv[1], sys.argv[2]
-    cfg = json.load(open(os.path.join(paths.RESORTS, f"{slug}.json"), encoding="utf-8"))
+    cfg = json.load(open(paths.config_path(slug), encoding="utf-8"))
     url = cfg.get("terrain_status_url")
     if not url:
-        sys.exit(f"no terrain_status_url in resorts/{slug}.json")
+        sys.exit(f"no terrain_status_url in resorts/{slug}/{slug}.json")
     out = os.path.join(raw_dir, "grooming")
     os.makedirs(out, exist_ok=True)
 

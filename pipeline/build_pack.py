@@ -34,7 +34,7 @@ from species import evt_luts
 slug = sys.argv[1]
 raw = sys.argv[2]
 out = sys.argv[3]
-cfg = json.load(open(os.path.join(paths.RESORTS, f"{slug}.json"), encoding="utf-8"))
+cfg = json.load(open(paths.config_path(slug), encoding="utf-8"))
 manifest = json.load(open(os.path.join(paths.MANIFESTS, f"{slug}.json"), encoding="utf-8"))
 os.makedirs(out, exist_ok=True)
 T0 = time.time()

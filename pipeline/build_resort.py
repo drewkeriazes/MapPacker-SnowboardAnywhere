@@ -6,7 +6,7 @@
 
 `raw_dir` is the resort's raw folder (default <raw root>/<slug>, the raw root being SBA_RAW_ROOT or raw/ in the main
 checkout; its last folder must be the slug, as fetch.ps1 writes <RawDir>/<slug>), `out_dir` the pack (default
-packs/<slug>). The config is resorts/<slug>.json, the manifest manifests/<slug>.json (pipeline/paths.py). Stages:
+packs/<slug>). The config is resorts/<slug>/<slug>.json, the manifest manifests/<slug>.json (pipeline/paths.py). Stages:
 
   nodes     ept_select.py: the EPT node lists (resort.py plan writes them too)
   manifest  gen_manifest.py: the download list
@@ -123,7 +123,7 @@ class Resort:
         self.slug, self.raw, self.out = slug, os.path.abspath(raw_dir), os.path.abspath(out_dir)
         self.resorts = resorts_dir or paths.RESORTS
         self.manifests = manifests_dir or paths.MANIFESTS
-        self.cfg_path = os.path.join(self.resorts, f"{slug}.json")
+        self.cfg_path = paths.config_path(slug, self.resorts)
         self.man_path = os.path.join(self.manifests, f"{slug}.json")
         with open(self.cfg_path, encoding="utf-8") as f:
             self.cfg = json.load(f)
@@ -145,7 +145,7 @@ class Resort:
         files = [s["nodes_file"] for s in [L] + list(L.get("extra", [])) if s.get("nodes_file")]
         if L.get("far"):
             files.append(L["far"]["nodes_file"])
-        return [os.path.join(self.resorts, f) for f in files]
+        return [os.path.join(paths.resort_dir(self.slug, self.resorts), f) for f in files]
 
 
 # ------------------------------------------------------------------------------------------------ stages
@@ -465,8 +465,8 @@ def main(argv=None):
     ap.add_argument("--gate", action="store_true", help="fail unless every DATA-022 MVP line passes")
     ap.add_argument("--dry-run", action="store_true", help="print what would run and why")
     a = ap.parse_args(argv)
-    if not os.path.isfile(os.path.join(paths.RESORTS, f"{a.slug}.json")):
-        print(f"no resorts/{a.slug}.json: `python pipeline/resort.py resolve \"<name>\"` and `plan` make one")
+    if not os.path.isfile(paths.config_path(a.slug)):
+        print(f"no resorts/{a.slug}/{a.slug}.json: `python pipeline/resort.py resolve \"<name>\"` and `plan` make one")
         return 2
     if a.first and a.last and STAGES.index(a.first) > STAGES.index(a.last):
         print("--from comes after --stop-after")

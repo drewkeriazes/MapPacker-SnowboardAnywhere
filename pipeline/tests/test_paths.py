@@ -12,7 +12,8 @@ from publish_pack import ready_to_commit, resort_files  # noqa: E402
 
 
 def test_layout_is_at_the_repo_root():
-    assert paths.RESORTS == os.path.join(paths.REPO, "resorts") and os.path.isfile(os.path.join(paths.RESORTS, "vail.json"))
+    assert paths.RESORTS == os.path.join(paths.REPO, "resorts") and os.path.isfile(paths.config_path("vail"))
+    assert paths.config_path("vail") == os.path.join(paths.REPO, "resorts", "vail", "vail.json")
     assert paths.MANIFESTS == os.path.join(paths.REPO, "manifests")
     assert paths.PACKS == os.path.join(paths.REPO, "packs")
     assert os.path.isfile(os.path.join(paths.REPO, "catalog.json"))
@@ -43,13 +44,15 @@ def test_require_game_says_where_it_looked(tmp_path):
 
 
 def test_publish_commits_the_resorts_own_files(tmp_path):
-    for f in ("resorts/demo.json", "resorts/demo-plan.md", "resorts/demo_ept_nodes.txt", "resorts/demo_ept_far_nodes.txt",
-              "manifests/demo.json", "reports/demo.md", "resorts/demox.json", "resorts/other_ept_nodes.txt"):
+    for f in ("resorts/demo/demo.json", "resorts/demo/demo-plan.md", "resorts/demo/demo_ept_nodes.txt",
+              "resorts/demo/demo_ept_far_nodes.txt", "manifests/demo.json", "reports/demo.md",
+              "resorts/demox/demox.json", "resorts/other/other_ept_nodes.txt", "resorts/demo.json"):
         os.makedirs(tmp_path / os.path.dirname(f), exist_ok=True)
         (tmp_path / f).write_text("x")
-    assert resort_files("demo", str(tmp_path)) == ["resorts/demo.json", "resorts/demo-plan.md", "manifests/demo.json",
-                                                   "reports/demo.md", "resorts/demo_ept_far_nodes.txt",
-                                                   "resorts/demo_ept_nodes.txt"]
+    assert resort_files("demo", str(tmp_path)) == ["resorts/demo/demo.json", "resorts/demo/demo-plan.md",
+                                                   "manifests/demo.json", "reports/demo.md",
+                                                   "resorts/demo/demo_ept_far_nodes.txt",
+                                                   "resorts/demo/demo_ept_nodes.txt"]   # not a stray flat resorts/demo.json
 
 
 def git(repo, *a):
@@ -63,3 +66,18 @@ def test_publish_refuses_a_checkout_not_on_main(tmp_path):
     git(tmp_path, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "x")
     with pytest.raises(SystemExit, match="is on card: publish from the main checkout on main"):
         ready_to_commit(str(tmp_path))
+
+
+def test_every_resort_has_its_own_folder_with_the_node_lists_it_names():
+    """FEAT-244: resorts/<slug>/ holds the config and every nodes_file it names; nothing is left flat in resorts/"""
+    flat = [f for f in os.listdir(paths.RESORTS) if os.path.isfile(os.path.join(paths.RESORTS, f))]
+    assert flat == []
+    slugs = sorted(d for d in os.listdir(paths.RESORTS) if os.path.isdir(paths.resort_dir(d)))
+    assert "vail" in slugs
+    for slug in slugs:
+        cfg = json.load(open(paths.config_path(slug), encoding="utf-8"))
+        assert cfg["slug"] == slug
+        L = cfg.get("lidar") or {}
+        for src in [L] + list(L.get("extra", [])) + [L.get("far") or {}]:
+            if src.get("nodes_file"):
+                assert os.path.isfile(os.path.join(paths.resort_dir(slug), src["nodes_file"])), (slug, src["nodes_file"])
