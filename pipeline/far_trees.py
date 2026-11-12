@@ -22,6 +22,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import species as spc                       # noqa: E402
 from ept_select import node_box, far_box    # noqa: E402
+import paths                                # noqa: E402
 
 R2 = 2.0            # canopy height model cell (m), as the pack
 RG = 4.0            # ground cell (m)
@@ -108,7 +109,7 @@ def main(argv):
     if len(argv) < 3:
         print(__doc__); return 2
     slug, raw, pack = argv[0], argv[1], argv[2]
-    cfg = json.load(open(os.path.join(HERE, "resorts", f"{slug}.json"), encoding="utf-8"))
+    cfg = json.load(open(os.path.join(paths.RESORTS, f"{slug}.json"), encoding="utf-8"))
     if not cfg["lidar"].get("far"):
         log("no lidar.far in the resort config: no far tree ring"); return 1
     meta_p = os.path.join(pack, "meta.json")

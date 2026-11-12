@@ -1,10 +1,10 @@
-# Snowboard sim data fetcher. Downloads everything listed in pipeline/manifests/<slug>.json
-# into raw/<slug>/. Safe to re-run: finished files are skipped, partial files are retried.
+# Snowboard sim data fetcher. Downloads everything listed in manifests/<slug>.json
+# into <raw root>/<slug>/ (-RawDir, else SBA_RAW_ROOT, else raw\ in this checkout). Safe to re-run: finished files are skipped, partial files are retried.
 # Works on Windows PowerShell 5.1 and PowerShell 7. No installs needed.
 param(
     [string]$Slug = "vail",
     [int]$Concurrency = 6,
-    # parent folder for raw data; downloads go to <RawDir>\<Slug>. Default: raw\ inside the repo.
+    # parent folder for raw data; downloads go to <RawDir>\<Slug>. Default: SBA_RAW_ROOT, else raw\ inside the repo.
     [string]$RawDir = ""
 )
 $ErrorActionPreference = "Stop"
@@ -12,8 +12,9 @@ $ProgressPreference = "SilentlyContinue"
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13 } catch { try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {} }
 
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)   # repo root
-$manifestPath = Join-Path $root "pipeline\manifests\$Slug.json"
-$rawDir = if ($RawDir) { Join-Path $RawDir $Slug } else { Join-Path $root "raw\$Slug" }
+$manifestPath = Join-Path $root "manifests\$Slug.json"
+if (-not $RawDir) { $RawDir = if ($env:SBA_RAW_ROOT) { $env:SBA_RAW_ROOT } else { Join-Path $root "raw" } }
+$rawDir = Join-Path $RawDir $Slug
 if (-not (Test-Path $manifestPath)) { Write-Host "Manifest not found: $manifestPath" -ForegroundColor Red; exit 1 }
 New-Item -ItemType Directory -Force -Path $rawDir | Out-Null
 $log = Join-Path $rawDir "fetch_log.txt"

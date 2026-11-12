@@ -1,18 +1,20 @@
-"""FEAT-222: publish a built pack as a release of the resorts repo, so `npm run get <slug>` can download it.
+"""FEAT-222: publish a built pack as a release of this repo, so the game's `npm run get <slug>` can download it.
 
     python pipeline/publish_pack.py packs/vail [--status preview|playable] [--tier gold] [--report report.md]
-                                               [--repo-dir <clone>] [--dry-run]
+                                               [--dry-run]
 
-Runs on Drew's PC (needs `gh` signed in with push access to the resorts repo). Steps:
+Runs on Drew's PC, in the main checkout on `main` (needs `gh` signed in with push access to this repo). Steps:
   1. refuse a pack whose meta.json `formatVersion` is not this pipeline's FORMAT_VERSION (rebuild it on main)
   2. zip the pack, stored (PNG tiles do not compress), fixed timestamps so the same pack gives the same sha256;
      refuse a zip over 1.9 GiB (GitHub's limit per release asset is 2 GiB)
-  3. `gh release create <slug>-v<N>` in the resorts repo with the zip, meta.json and the report if there is one
-  4. update catalog.json, copy the resort's config, EPT node lists, manifest and data plan (`resort.py plan`,
-     to reports/<slug>-plan.md) into the clone, commit and push
+  3. `gh release create <slug>-v<N>` in this repo with the zip, meta.json and the report if there is one
+  4. update catalog.json, copy the report to reports/<slug>.md, and commit them in place with the resort's
+     config, EPT node lists, data plan (resorts/) and manifest (manifests/), then push. Only those files go in
+     the commit; anything else uncommitted in the checkout is left alone.
 
-The resorts repo is cloned next to this checkout (../MapPacker-SnowboardAnywhere) the first time. Layout and
-catalog schema: docs/research/resort-auto-pipeline.md section 2; download side: game/tools/get_pack.mjs.
+The catalog's `pipeline` is this repo's commit (FEAT-238; packs published before the move name a SnowboardAnywhere
+commit). Catalog schema: SnowboardAnywhere docs/research/resort-auto-pipeline.md section 2; download side: the
+game's game/tools/get_pack.mjs.
 A pack is `playable` only when every DATA-022 MVP line passes in its report (EPIC-15 rule 2): the status comes
 from `<pack_dir>/report.json` (`pack_report.py`, FEAT-175) when it was made for this build, `preview` without one,
 and `--status playable` is refused unless the report passes.
@@ -21,9 +23,10 @@ import argparse, glob, hashlib, json, os, re, shutil, subprocess, sys, tempfile,
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from packwriter import FORMAT_VERSION  # noqa: E402
+import paths  # noqa: E402
 
 RESORTS_REPO = "drewkeriazes/MapPacker-SnowboardAnywhere"
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = paths.REPO
 MAX_ZIP = int(1.9 * 1024 ** 3)
 ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 SKIP_DIRS = {"debug"}        # pipeline diagnostics (debug/species.png), not read by the game
@@ -119,12 +122,22 @@ def run(cmd: list, cwd: str | None = None, capture: bool = True) -> str:
     return (r.stdout or "").strip()
 
 
-def resorts_clone(repo_dir: str, repo: str) -> str:
-    if not os.path.isdir(os.path.join(repo_dir, ".git")):
-        print(f"cloning {repo} into {repo_dir}")
-        run(["gh", "repo", "clone", repo, repo_dir], capture=False)
-    if run(["git", "status", "--porcelain"], cwd=repo_dir):
-        raise SystemExit(f"{repo_dir} has uncommitted changes; commit or discard them first")
+def resort_files(slug: str, repo_dir: str = REPO) -> list:
+    """the resort's own files, relative to the repo: config, EPT node lists, data plan, manifest, report"""
+    rel = [os.path.join("resorts", f"{slug}.json"), os.path.join("resorts", f"{slug}-plan.md"),
+           os.path.join("manifests", f"{slug}.json"), os.path.join("reports", f"{slug}.md")]
+    rel += [os.path.relpath(p, repo_dir) for p in sorted(glob.glob(os.path.join(repo_dir, "resorts", f"{slug}_*nodes*.txt")))]
+    return [p.replace(os.sep, "/") for p in rel if os.path.isfile(os.path.join(repo_dir, p))]
+
+
+def ready_to_commit(repo_dir: str = REPO) -> str:
+    """the checkout publish commits in: on main, catalog.json unchanged, up to date with origin"""
+    branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_dir)
+    if branch != "main":
+        raise SystemExit(f"{repo_dir} is on {branch}: publish from the main checkout on main (the catalog commit "
+                         "goes straight to main)")
+    if run(["git", "status", "--porcelain", "--", "catalog.json"], cwd=repo_dir):
+        raise SystemExit(f"{os.path.join(repo_dir, 'catalog.json')} has uncommitted changes; commit or discard them first")
     run(["git", "pull", "--ff-only", "--quiet"], cwd=repo_dir)
     return repo_dir
 
@@ -137,7 +150,6 @@ def main(argv=None) -> None:
     ap.add_argument("--tier", choices=["gold", "silver", "bronze"], default="gold")
     ap.add_argument("--report", help="report markdown to attach and commit (default <pack_dir>/report.md if present)")
     ap.add_argument("--repo", default=RESORTS_REPO)
-    ap.add_argument("--repo-dir", default=os.path.join(os.path.dirname(REPO), "MapPacker-SnowboardAnywhere"))
     ap.add_argument("--dry-run", action="store_true", help="zip and print the catalog entry; no release, no commit")
     a = ap.parse_args(argv)
 
@@ -151,14 +163,14 @@ def main(argv=None) -> None:
                          f"(python pipeline/build_pack.py {slug} <raw_dir> <out_dir>) before publishing")
     a.status, why = report_status(pack_dir, meta, a.status)
     print(f"status {a.status} ({why})")
-    cfg_path = os.path.join(REPO, "pipeline", "resorts", f"{slug}.json")
+    cfg_path = os.path.join(paths.RESORTS, f"{slug}.json")
     cfg = json.load(open(cfg_path, encoding="utf-8")) if os.path.isfile(cfg_path) else {}
     report = a.report or (os.path.join(pack_dir, "report.md") if os.path.isfile(os.path.join(pack_dir, "report.md")) else None)
     pipeline = run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO)
     if run(["git", "status", "--porcelain", "--", "pipeline"], cwd=REPO):
         print("warning: pipeline/ has uncommitted changes; the catalog records the commit, not them")
 
-    repo_dir = None if a.dry_run else resorts_clone(os.path.abspath(a.repo_dir), a.repo)
+    repo_dir = None if a.dry_run else ready_to_commit()
     cat_path = os.path.join(repo_dir, "catalog.json") if repo_dir else None
     catalog = json.load(open(cat_path, encoding="utf-8")) if cat_path and os.path.isfile(cat_path) else {"resorts": []}
     tags = [] if a.dry_run else [r["tagName"] for r in json.loads(run(
@@ -192,23 +204,14 @@ def main(argv=None) -> None:
         with open(cat_path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(update_catalog(catalog, entry), f, indent=1)
             f.write("\n")
-        # the recipe that built it, versioned beside the catalog (copies for now: the pipeline still reads its own)
-        os.makedirs(os.path.join(repo_dir, "resorts"), exist_ok=True)
-        os.makedirs(os.path.join(repo_dir, "manifests"), exist_ok=True)
-        for src in [cfg_path] + glob.glob(os.path.join(REPO, "pipeline", "resorts", f"{slug}_ept_nodes*.txt")):
-            if os.path.isfile(src):
-                shutil.copy2(src, os.path.join(repo_dir, "resorts", os.path.basename(src)))
-        man = os.path.join(REPO, "pipeline", "manifests", f"{slug}.json")
-        if os.path.isfile(man):
-            shutil.copy2(man, os.path.join(repo_dir, "manifests", f"{slug}.json"))
+        # the recipe that built it is committed beside the catalog: config, node lists, plan, manifest, report
         os.makedirs(os.path.join(repo_dir, "reports"), exist_ok=True)
-        if report:
+        if report and os.path.abspath(report) != os.path.abspath(os.path.join(repo_dir, report_rel)):
             shutil.copy2(report, os.path.join(repo_dir, report_rel))
-        plan = os.path.join(REPO, "pipeline", "resorts", f"{slug}-plan.md")   # FEAT-223 resort.py plan
-        if os.path.isfile(plan):
-            shutil.copy2(plan, os.path.join(repo_dir, "reports", f"{slug}-plan.md"))
-        run(["git", "add", "-A"], cwd=repo_dir)
-        run(["git", "commit", "-q", "-m", f"{slug} v{version}: {a.status}, {size / 1e6:.0f} MB, pipeline {pipeline}"], cwd=repo_dir)
+        files = ["catalog.json"] + resort_files(slug, repo_dir)
+        run(["git", "add", "--", *files], cwd=repo_dir)
+        run(["git", "commit", "-q", "-m", f"{slug} v{version}: {a.status}, {size / 1e6:.0f} MB, pipeline {pipeline}",
+             "--", *files], cwd=repo_dir)
         try:
             run(["git", "push", "-q"], cwd=repo_dir)
         except SystemExit as e:

@@ -9,18 +9,18 @@ resolve  Finds the ski area in OpenSkiData (`ski_areas.geojson`) by name, case a
          matches: prints them and stops (`--id` picks one). A named neighbour within 3 km (Boston Mills and
          Brandywine): stops and asks for `--with <name>` (one pack over both) or `--alone` (the neighbour's runs
          and lifts are left out by OSM id, as Big Sky leaves out the Yellowstone Club). No match: prints the
-         closest names. Writes `pipeline/resorts/<slug>.json` with the identity fields and `lonlat_bbox`, the
+         closest names. Writes `resorts/<slug>.json` with the identity fields and `lonlat_bbox`, the
          extent of the area's polygon, lifts and runs.
 plan     Derives every other field the hand-written configs have (docs/research/resort-auto-pipeline.md section 1)
          from the hosts below, walks the EPT hierarchy for the node lists (`--no-nodes` skips it), writes the config
-         and `pipeline/resorts/<slug>-plan.md` (the data plan: layer, source, year, resolution, size, tier).
-         `publish_pack.py` copies the plan into the resorts repo's `reports/` with the config.
+         and `resorts/<slug>-plan.md` (the data plan: layer, source, year, resolution, size, tier).
+         `publish_pack.py` commits the plan with the config when the pack is published.
 compare  Resolves a hand-written config's resort by name, plans it in memory and lists how it differs from the
          hand values (FEAT-223 check: Vail, Breckenridge, Big Sky). Writes nothing.
 
 Hosts (Drew's PC; not reachable from the cloud sandbox, which can use cached index files): OpenSkiData, Mapterhorn,
 TNM Access, the 3DEP elevation index (lidar work units), usgs.entwine.io, the EPT bucket, Planetary Computer STAC,
-Geofabrik and the Internet Archive. The big index files are cached in `raw/_index/` (`--cache`, `SBA_INDEX_DIR`)
+Geofabrik and the Internet Archive. The big index files are cached in `<raw root>/_index/` (`--cache`, `SBA_INDEX_DIR`)
 and re-downloaded after 30 days or with `--refresh`. Pure helpers, tested offline in tests/test_resort_plan.py.
 """
 import argparse, copy, datetime, difflib, io, json, math, os, re, subprocess, sys, tempfile, unicodedata
@@ -29,8 +29,9 @@ import urllib.parse, urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
+import paths  # noqa: E402
 
-RESORTS_DIR = os.path.join(HERE, "resorts")
+RESORTS_DIR = paths.RESORTS
 UA = "SnowboardAnywhere-pipeline/1.0"
 OSD = "https://tiles.openskimap.org/geojson/"
 INDEXES = {  # cached name: url
@@ -1184,7 +1185,6 @@ def cmd_compare(a, hosts):
 ADD_STAGES = ["resolve", "plan", "fetch", "build", "report", "ride", "publish"]
 # resort.py add's fetch, build and report stages are these ranges of build_resort.py's stages
 BUILD_RANGES = {"fetch": ("nodes", "grooming"), "build": ("build", "index"), "report": ("report", "report")}
-MAPPACKER = os.path.join(os.path.dirname(REPO), "MapPacker-SnowboardAnywhere")
 RESORTS_REPO = "drewkeriazes/MapPacker-SnowboardAnywhere"
 
 
@@ -1200,10 +1200,11 @@ def default_runner(cmd, cwd, env=None):
     return subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
-def ride(slug, raw_dir, out_dir, runner=default_runner, log=print):
+def ride(slug, raw_dir, out_dir, runner=default_runner, log=print, game_repo=None):
     """the headless ride from the pack's start (game/tools/shoot.mjs, on the real GPU on Drew's PC): the game must
     load the pack, ride and fly without a page error. Recorded per pack build in <raw_dir>/shots/ride.json, so a
-    re-run of the same build skips it."""
+    re-run of the same build skips it. The game is the SnowboardAnywhere checkout next to this repo (paths.game_repo:
+    `game_repo`, --game-repo or SBA_GAME_REPO)."""
     import shutil
     # absolute: shoot.mjs runs in game/, where a relative SHOT_PACKS finds no pack and the game never starts
     raw_dir, out_dir = os.path.abspath(raw_dir), os.path.abspath(out_dir)
@@ -1213,7 +1214,7 @@ def ride(slug, raw_dir, out_dir, runner=default_runner, log=print):
     if os.path.isfile(rec) and load_json(rec).get("build") == meta.get("build"):
         log(f"  ride already passed for build {meta.get('build')}")
         return False
-    game = os.path.join(REPO, "game")
+    game = os.path.join(paths.require_game("the ride stage", game_repo), "game")
     r = runner([shutil.which("npx") or "npx", "vite", "build"], game)
     if r.returncode:
         log((r.stdout or "")[-2000:] + (r.stderr or "")[-2000:])
@@ -1231,8 +1232,10 @@ def ride(slug, raw_dir, out_dir, runner=default_runner, log=print):
     return True
 
 
-def published(slug, pack_dir, repo_dir=MAPPACKER):
-    """True when the resorts repo's catalog already has this pack's build"""
+def published(slug, pack_dir, repo_dir=None):
+    """True when the catalog (catalog.json in the main checkout, where publish_pack.py commits it) already has this
+    pack's build"""
+    repo_dir = repo_dir or paths.main_checkout()
     try:
         cat = load_json(os.path.join(repo_dir, "catalog.json"))
         build = load_json(os.path.join(pack_dir, "meta.json")).get("build")
@@ -1288,7 +1291,7 @@ def cmd_add(a, hosts, publish=None, br=None):
         print(f"{path} is not planned yet: start from plan")
         return 1
     raw = os.path.abspath(os.path.join(a.raw_root or br.default_raw_root(), slug))
-    out = os.path.abspath(a.out or os.path.join(REPO, "packs", slug))
+    out = os.path.abspath(a.out or os.path.join(paths.PACKS, slug))
     ctx = br.Context([s for s in br.STAGES if s in forced] + (["all"] if "all" in forced else []), a.email,
                      sys.stdin.isatty())
     for stage in ("fetch", "build", "report"):
@@ -1313,7 +1316,7 @@ def cmd_add(a, hosts, publish=None, br=None):
     if "ride" in todo:
         head("ride", "game/tools/shoot.mjs from the start")
         try:
-            ride(slug, raw, out)
+            ride(slug, raw, out, game_repo=getattr(a, "game_repo", None))
         except SystemExit as e:
             print(f"\nstopped at ride: {e}")
             return 1
@@ -1339,12 +1342,12 @@ def cmd_add(a, hosts, publish=None, br=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--cache", default=os.environ.get("SBA_INDEX_DIR", os.path.join(REPO, "raw", "_index")),
-                    help="folder for the cached index files (default raw/_index, or SBA_INDEX_DIR)")
+    ap.add_argument("--cache", default=os.environ.get("SBA_INDEX_DIR", os.path.join(paths.raw_root(), "_index")),
+                    help="folder for the cached index files (default _index/ in the raw root, or SBA_INDEX_DIR)")
     ap.add_argument("--refresh", action="store_true", help="download the index files again")
     ap.add_argument("--resorts-dir", default=RESORTS_DIR, help=argparse.SUPPRESS)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    r = sub.add_parser("resolve", help="name to OpenSkiData ski area(s) and pipeline/resorts/<slug>.json")
+    r = sub.add_parser("resolve", help="name to OpenSkiData ski area(s) and resorts/<slug>.json")
     r.add_argument("name")
     r.add_argument("--id", help="OpenSkiData ski area id, when several match")
     r.add_argument("--with", dest="with_", action="append", help="a neighbour to build into the same pack")
@@ -1373,6 +1376,8 @@ def main(argv=None):
     d.add_argument("--raw-root", help="folder that holds <slug>/ raw data (default raw/ in the main checkout, or "
                    "SBA_RAW_ROOT)")
     d.add_argument("--out", help="pack folder (default packs/<slug>)")
+    d.add_argument("--game-repo", help="the SnowboardAnywhere checkout for the ride stage (default "
+                   "../SnowboardAnywhere, or SBA_GAME_REPO)")
     d.add_argument("--email", help="email for the LANDFIRE service (or LANDFIRE_EMAIL)")
     d.add_argument("--no-publish", action="store_true", help="everything but the release")
     d.add_argument("--review-plan", action="store_true", help="stop after a plan that was just written, to read it "

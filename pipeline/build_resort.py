@@ -4,8 +4,9 @@
     python pipeline/build_resort.py <slug> [<raw_dir>] [<out_dir>] [--from <stage>] [--stop-after <stage>]
                                     [--force <stage>]... [--email <address>] [--dry-run]
 
-`raw_dir` is the resort's raw folder (default raw/<slug>; its last folder must be the slug, as fetch.ps1 writes
-<RawDir>/<slug>), `out_dir` the pack (default packs/<slug>). Stages, in order:
+`raw_dir` is the resort's raw folder (default <raw root>/<slug>, the raw root being SBA_RAW_ROOT or raw/ in the main
+checkout; its last folder must be the slug, as fetch.ps1 writes <RawDir>/<slug>), `out_dir` the pack (default
+packs/<slug>). The config is resorts/<slug>.json, the manifest manifests/<slug>.json (pipeline/paths.py). Stages:
 
   nodes     ept_select.py: the EPT node lists (resort.py plan writes them too)
   manifest  gen_manifest.py: the download list
@@ -33,6 +34,7 @@ import argparse, glob, hashlib, json, os, subprocess, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
+import paths  # noqa: E402
 
 STAGES = ["nodes", "manifest", "fetch", "landfire", "grooming", "build", "index", "report"]
 STATE = "build_resort.json"
@@ -61,7 +63,8 @@ def file_sha(path) -> str | None:
         return sha(f.read())
 
 
-# pipeline/ paths that do not shape the pack: inputs of their own, or tools around the build
+# pipeline/ paths that do not shape the pack: inputs of their own, or tools around the build (pipeline/resorts and
+# pipeline/manifests are where the configs lived in SnowboardAnywhere: MOVED below fingerprints that tree)
 NOT_BUILD = ("pipeline/tests", "pipeline/resorts", "pipeline/manifests", "pipeline/build_resort.py",
              "pipeline/resort.py", "pipeline/publish_pack.py", "pipeline/pack_report.py")
 NOT_BUILD_SPEC = [f":!{p}" for p in NOT_BUILD]
@@ -93,16 +96,18 @@ def same_code(commit, repo=REPO) -> bool:
 
 
 def default_raw_root(repo=REPO) -> str:
-    """where raw data lives: SBA_RAW_ROOT, else raw/ in the main checkout. Every worktree of the repo shares the
-    main checkout's raw/ (a worktree's own raw/ is empty: a run there would fetch the resort again from scratch)"""
-    if os.environ.get("SBA_RAW_ROOT"):
-        return os.path.abspath(os.environ["SBA_RAW_ROOT"])
-    try:
-        common = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=repo,
-                                capture_output=True, text=True, check=True).stdout.strip()
-        return os.path.join(os.path.dirname(os.path.normpath(common)), "raw")
-    except (OSError, subprocess.CalledProcessError):
-        return os.path.join(repo, "raw")
+    """where raw data lives: SBA_RAW_ROOT, else raw/ in the main checkout (paths.raw_root)"""
+    return paths.raw_root(repo)
+
+
+# FEAT-238: the pipeline moved here from SnowboardAnywhere at its commit 2a0b12f. A build recorded there (its
+# fingerprint has the game's pipeline code and the game checkout's packs/<slug>) still counts here, so the packs
+# built before the move are not built again: only while this checkout's build code is still the moved code
+# (`code`, pipeline_code() right after the move; any later change to the build code builds again, as it should).
+MOVED = {"from": "SnowboardAnywhere 2a0b12f",
+         "game_code": "80d9391a499fed00",
+         "code": "MOVED_CODE"}
+MOVED_WHY = "built before the move to MapPacker (FEAT-238), inputs unchanged"
 
 
 def run(cmd, cwd=REPO):
@@ -116,8 +121,8 @@ class Resort:
 
     def __init__(self, slug, raw_dir, out_dir, resorts_dir=None, manifests_dir=None):
         self.slug, self.raw, self.out = slug, os.path.abspath(raw_dir), os.path.abspath(out_dir)
-        self.resorts = resorts_dir or os.path.join(HERE, "resorts")
-        self.manifests = manifests_dir or os.path.join(HERE, "manifests")
+        self.resorts = resorts_dir or paths.RESORTS
+        self.manifests = manifests_dir or paths.MANIFESTS
         self.cfg_path = os.path.join(self.resorts, f"{slug}.json")
         self.man_path = os.path.join(self.manifests, f"{slug}.json")
         with open(self.cfg_path, encoding="utf-8") as f:
@@ -294,10 +299,27 @@ def grooming_run(r, ctx):
         raise Failed("fetch_grooming.py failed (the Internet Archive is slow at times; run again, it resumes)")
 
 
-def build_inputs(r):
+def build_inputs(r, code=None, out=None):
     groom = sorted(os.path.basename(p) for p in glob.glob(os.path.join(r.raw, "grooming", "*.json")))
     return sha(file_sha(r.cfg_path), manifest_items_sha(r), r.state.get("fetch"), r.state.get("landfire"), groom,
-               pipeline_code(), r.out)
+               code or pipeline_code(), out or r.out)
+
+
+def built_before_move(r, seen):
+    """FEAT-238: True when the recorded build fingerprint `seen` is this build's inputs as SnowboardAnywhere saw
+    them (the game's pipeline code at the move, the pack in the game checkout's packs/), this checkout's build code
+    is still the moved code, and the pack here is that build (the same build id as the game checkout's copy)"""
+    if pipeline_code() != MOVED["code"]:
+        return False
+    old_out = os.path.join(paths.game_repo(), "packs", r.slug)
+    if seen != build_inputs(r, MOVED["game_code"], old_out):
+        return False
+    try:
+        with open(os.path.join(old_out, "meta.json"), encoding="utf-8") as f:
+            old_build = json.load(f).get("build")
+    except (OSError, ValueError):
+        old_build = None
+    return old_build is None or old_build == (meta(r) or {}).get("build")
 
 
 def meta(r):
@@ -396,6 +418,8 @@ def decide(r, stage, ctx):
     seen = r.state.get(stage)
     if seen == fp and present(r):
         return False, "inputs unchanged"
+    if stage == "build" and seen is not None and present(r) and built_before_move(r, seen):
+        return False, MOVED_WHY
     if seen is None and ADOPT.get(stage, present)(r):
         return False, "already on disk (adopted)"
     if seen is None:
@@ -422,7 +446,7 @@ def build(r, ctx, first=None, last=None, dry=False, out=print):
         if stage in ("nodes", "manifest", "fetch", "build"):
             r.cfg = json.load(open(r.cfg_path, encoding="utf-8"))
         fp = inputs(r)
-        if fp is not None and (go or r.state.get(stage) is None):
+        if fp is not None and (go or r.state.get(stage) is None or why == MOVED_WHY):
             r.state[stage] = fp
             r.save()
     return 0
@@ -441,14 +465,14 @@ def main(argv=None):
     ap.add_argument("--gate", action="store_true", help="fail unless every DATA-022 MVP line passes")
     ap.add_argument("--dry-run", action="store_true", help="print what would run and why")
     a = ap.parse_args(argv)
-    if not os.path.isfile(os.path.join(HERE, "resorts", f"{a.slug}.json")):
-        print(f"no pipeline/resorts/{a.slug}.json: `python pipeline/resort.py resolve \"<name>\"` and `plan` make one")
+    if not os.path.isfile(os.path.join(paths.RESORTS, f"{a.slug}.json")):
+        print(f"no resorts/{a.slug}.json: `python pipeline/resort.py resolve \"<name>\"` and `plan` make one")
         return 2
     if a.first and a.last and STAGES.index(a.first) > STAGES.index(a.last):
         print("--from comes after --stop-after")
         return 2
     raw = a.raw_dir or os.path.join(default_raw_root(), a.slug)
-    out = a.out_dir or os.path.join(REPO, "packs", a.slug)
+    out = a.out_dir or os.path.join(paths.PACKS, a.slug)
     r = Resort(a.slug, raw, out)
     print(f"{r.cfg.get('name', a.slug)}: raw {r.raw}, pack {r.out}")
     ctx = Context(a.force, a.email, sys.stdin.isatty(), a.gate)

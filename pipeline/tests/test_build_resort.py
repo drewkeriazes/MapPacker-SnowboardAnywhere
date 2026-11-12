@@ -250,6 +250,46 @@ def test_raw_lives_in_the_main_checkout(monkeypatch, tmp_path):
     assert B.default_raw_root() == str(tmp_path)
 
 
+def moved_state(resort, tmp_path, monkeypatch, old_build="b1"):
+    """FEAT-238: the resort as SnowboardAnywhere left it: built there (its packs/demo, the game's pipeline code),
+    with the same pack copied here"""
+    go(resort, Fake(resort))
+    game = tmp_path / "SnowboardAnywhere"
+    (game / "packs" / "demo").mkdir(parents=True)
+    json.dump({"build": old_build}, open(game / "packs" / "demo" / "meta.json", "w"))
+    monkeypatch.setenv("SBA_GAME_REPO", str(game))
+    monkeypatch.setattr(B, "MOVED", {"from": "test", "game_code": "gamecode", "code": "code1"})
+    r = B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests)
+    r.state["build"] = B.build_inputs(r, "gamecode", str(game / "packs" / "demo"))
+    r.save()
+    return B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests)
+
+
+def test_a_build_recorded_before_the_move_is_not_built_again(resort, tmp_path, monkeypatch):
+    r = moved_state(resort, tmp_path, monkeypatch)
+    f = Fake(r)
+    lines = go(r, f)
+    assert f.calls == ["pack_report.py"] and f"[build] skip: {B.MOVED_WHY}" in lines
+    assert B.Resort("demo", r.raw, r.out, r.resorts, r.manifests).state["build"] == B.build_inputs(r)   # recorded
+    lines = go(B.Resort("demo", r.raw, r.out, r.resorts, r.manifests), Fake(r))
+    assert "[build] skip: inputs unchanged" in lines
+
+
+def test_a_build_from_before_the_move_builds_again_once_the_code_changes(resort, tmp_path, monkeypatch):
+    r = moved_state(resort, tmp_path, monkeypatch)
+    monkeypatch.setattr(B, "pipeline_code", lambda repo=B.REPO: "code2")
+    f = Fake(r)
+    go(r, f)
+    assert "build_pack.py" in f.calls
+
+
+def test_a_different_pack_here_than_the_game_had_builds_again(resort, tmp_path, monkeypatch):
+    r = moved_state(resort, tmp_path, monkeypatch, old_build="b0")
+    f = Fake(r)
+    go(r, f)
+    assert "build_pack.py" in f.calls
+
+
 def test_no_console_for_the_landfire_prompt_stops_cleanly(resort, monkeypatch):
     def eof(prompt=""):
         raise EOFError

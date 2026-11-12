@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from packwriter import FORMAT_VERSION, write_meta  # noqa: E402
 from publish_pack import catalog_entry, next_version, pack_files, update_catalog, zip_pack  # noqa: E402
 
-REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
 def make_pack(root, slug="demo", fmt=FORMAT_VERSION):
@@ -28,8 +27,8 @@ def make_pack(root, slug="demo", fmt=FORMAT_VERSION):
     return d
 
 
-def test_client_reads_the_format_the_pipeline_writes():
-    ts = open(os.path.join(REPO, "game", "src", "pack", "format.ts"), encoding="utf-8").read()
+def test_client_reads_the_format_the_pipeline_writes(game_file):
+    ts = open(game_file("game", "src", "pack", "format.ts"), encoding="utf-8").read()
     assert int(re.search(r"PACK_FORMAT\s*=\s*(\d+)", ts).group(1)) == FORMAT_VERSION
 
 
@@ -63,7 +62,7 @@ def test_catalog_replaces_the_resort_and_sorts_by_name():
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
-def test_get_pack_installs_a_published_zip(tmp_path):
+def test_get_pack_installs_a_published_zip(tmp_path, game_file):
     pack = make_pack(tmp_path / "src")
     zpath = tmp_path / "demo.zip"
     size, sha = zip_pack(str(pack), str(zpath))
@@ -73,7 +72,7 @@ def test_get_pack_installs_a_published_zip(tmp_path):
     catalog = tmp_path / "catalog.json"
     catalog.write_text(json.dumps(update_catalog({}, entry)))
     packs = tmp_path / "packs"
-    tool = os.path.join(REPO, "game", "tools", "get_pack.mjs")
+    tool = game_file("game", "tools", "get_pack.mjs")
     run = lambda *a: subprocess.run(["node", tool, "demo", "--catalog", str(catalog), "--packs", str(packs), *a],
                                     capture_output=True, text=True)
     r = run()

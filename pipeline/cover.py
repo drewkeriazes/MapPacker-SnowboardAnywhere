@@ -27,6 +27,9 @@ import glob, json, math, os, sys
 import numpy as np
 from PIL import Image, ImageDraw
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402
+
 Image.MAX_IMAGE_PIXELS = None   # the burn rasters are up to 10,240 px square
 
 PACK_RES = 4.0
@@ -610,8 +613,7 @@ def build_cover(pack_dir, raw_dir, cfg=None, log=print):
 
 if __name__ == "__main__":
     slug, raw, pack = sys.argv[1], sys.argv[2], sys.argv[3]
-    HERE = os.path.dirname(os.path.abspath(__file__))
-    cfg = json.load(open(os.path.join(HERE, "resorts", f"{slug}.json"), encoding="utf-8"))
+    cfg = json.load(open(os.path.join(paths.RESORTS, f"{slug}.json"), encoding="utf-8"))
     entry = build_cover(pack, raw, cfg)
     mp = os.path.join(pack, "meta.json")
     meta = json.load(open(mp, encoding="utf-8"))

@@ -1,13 +1,15 @@
 # Downloads the two static source files that replace the Overpass queries:
-#   1. Geofabrik Colorado OSM extract (.osm.pbf, ~300 MB)  -> raw\static\colorado-latest.osm.pbf
-#   2. USGS GNIS Colorado domestic names (.zip, ~10 MB)    -> raw\static\DomesticNames_CO_Text.zip
+#   1. Geofabrik Colorado OSM extract (.osm.pbf, ~300 MB)  -> <raw root>\static\colorado-latest.osm.pbf
+#   2. USGS GNIS Colorado domestic names (.zip, ~10 MB)    -> <raw root>\static\DomesticNames_CO_Text.zip
+# The raw root is SBA_RAW_ROOT, else raw\ in this checkout.
 # Plain file downloads, no query servers. Safe to re-run: finished files are skipped.
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$out = Join-Path $root "raw\static"
+$rawRoot = if ($env:SBA_RAW_ROOT) { $env:SBA_RAW_ROOT } else { Join-Path $root "raw" }
+$out = Join-Path $rawRoot "static"
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 
 $files = @(

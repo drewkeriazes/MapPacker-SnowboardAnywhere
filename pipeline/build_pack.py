@@ -27,15 +27,15 @@ from terrain_ao import sky_visibility
 from moguls import run_mogul_score, slope_window, paint_field, paint_polygon
 from canopy_spots import run_half_width   # run corridor half widths, shared with the BUG-028 canopy measure
 import species as spc
+import paths
 import stands
 from species import evt_luts
 
-HERE = os.path.dirname(os.path.abspath(__file__))
 slug = sys.argv[1]
 raw = sys.argv[2]
 out = sys.argv[3]
-cfg = json.load(open(os.path.join(HERE, "resorts", f"{slug}.json"), encoding="utf-8"))
-manifest = json.load(open(os.path.join(HERE, "manifests", f"{slug}.json"), encoding="utf-8"))
+cfg = json.load(open(os.path.join(paths.RESORTS, f"{slug}.json"), encoding="utf-8"))
+manifest = json.load(open(os.path.join(paths.MANIFESTS, f"{slug}.json"), encoding="utf-8"))
 os.makedirs(out, exist_ok=True)
 T0 = time.time()
 def log(*a):

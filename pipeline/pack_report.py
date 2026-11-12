@@ -7,9 +7,10 @@ pass, warn (works, but worth a look), fail, or skip (cannot tell from what it wa
 raw-data lines). The pack is **playable** when no MVP line (F and 1 to 14) is fail or skip (EPIC-15 rule 2);
 `publish_pack.py` reads that. `--gate` exits 1 when it is not.
 
-Reads only the pack, the resort config, the raw folder when given (file presence, no decoding), and the hand
-content in this repo (`docs/compare/<slug>/`, `game/public/attract/<slug>/`, `game/src/world/Landmarks.ts`,
-`game/src/resorts.ts`). About a minute on Vail. The numbers it measures, besides the checklist:
+Reads only the pack, the resort config, the raw folder when given (file presence, no decoding), the catalog, and
+the hand content in the game checkout (`docs/compare/<slug>/`, `game/public/attract/<slug>/`,
+`game/src/world/Landmarks.ts`, `game/src/resorts.ts`; ../SnowboardAnywhere, or --game-repo / SBA_GAME_REPO, until
+FEAT-243 moves that content into the pack). Without the game those lines say so and skip. About a minute on Vail. The numbers it measures, besides the checklist:
 - surface: rock share (mask R at least half), canopy share, canopy left on run centre lines (trail cuts should
   be near 0), groomed share;
 - trees: crowns + stems per km2 over the bounds and per 100 m elevation band, crowns and stems on lift lines,
@@ -32,8 +33,9 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from canopy_spots import run_half_width  # noqa: E402
 from packwriter import FORMAT_VERSION, decode_terrarium  # noqa: E402
+import paths  # noqa: E402
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = paths.REPO
 REPORT_VERSION = 1
 PASS, WARN, FAIL, SKIP = "pass", "warn", "fail", "skip"
 ICON = {PASS: "✅", WARN: "⚠️", FAIL: "❌", SKIP: "➖"}
@@ -301,12 +303,14 @@ def gate(lines):
 # ------------------------------------------------------------------ the report
 
 class Report:
-    def __init__(self, pack_dir, cfg, raw=None, repo=REPO, reference=None):
+    def __init__(self, pack_dir, cfg, raw=None, repo=REPO, reference=None, game=None):
         self.pack = pack_dir
         self.meta = load_json(os.path.join(pack_dir, "meta.json"))
         fpath = os.path.join(pack_dir, "features.json")
         self.features = load_json(fpath) if os.path.isfile(fpath) else {}
         self.cfg, self.raw, self.repo = cfg, raw, repo
+        self.game = game or paths.game_repo(repo=repo)      # the SnowboardAnywhere checkout, for the hand content
+        self.has_game = paths.has_game(self.game)
         self.ref = reference or REFERENCE
         self.slug = self.meta["slug"]
         self.lines, self.numbers = [], {}
@@ -427,7 +431,7 @@ class Report:
             self.numbers["mogulScoreByDifficulty"] = {k: round(float(np.mean(v)), 2) for k, v in sorted(mog.items())}
 
         # compare spots
-        for p in sorted(glob.glob(os.path.join(self.repo, "docs", "compare", self.slug, "*", "spot.json"))):
+        for p in sorted(glob.glob(os.path.join(self.game, "docs", "compare", self.slug, "*", "spot.json"))):
             g = load_json(p).get("game", {})
             if "x" in g:
                 self.spots.append({"spot": os.path.basename(os.path.dirname(p)),
@@ -602,9 +606,9 @@ class Report:
         # pack (a pack outside packs/), the game's own list or the catalog
         idx = os.path.join(os.path.dirname(os.path.normpath(self.pack)), "index.json")
         listed = self.slug in load_json(idx).get("packs", []) if os.path.isfile(idx) else None
-        resorts_ts = os.path.join(self.repo, "game", "src", "resorts.ts")
+        resorts_ts = os.path.join(self.game, "game", "src", "resorts.ts")
         in_ts = os.path.isfile(resorts_ts) and bool(re.search(rf"slug:\s*'{re.escape(self.slug)}'", open(resorts_ts, encoding="utf-8").read()))
-        catalog = os.path.join(os.path.dirname(self.repo), "MapPacker-SnowboardAnywhere", "catalog.json")
+        catalog = os.path.join(self.repo, "catalog.json")
         in_cat = os.path.isfile(catalog) and any(r.get("slug") == self.slug for r in load_json(catalog).get("resorts", []))
         where = [w for w, on in (("in packs/index.json", listed), ("in game/src/resorts.ts", in_ts), ("in the catalog", in_cat)) if on]
         if listed is False:
@@ -663,14 +667,19 @@ class Report:
                       "raw/names present" if self.raw_has("names") else "no raw/names", mvp=False)
         else:
             self.line("16", "Place names", SKIP, "pass --raw", mvp=False)
-        shots = os.path.join(self.repo, "game", "public", "attract", self.slug, "shots.json")
-        self.line("17", "Main menu shot and ghosts", PASS if os.path.isfile(shots) else FAIL,
-                  f"game/public/attract/{self.slug}/shots.json" + ("" if os.path.isfile(shots) else " missing"), mvp=False)
-        lm = os.path.join(self.repo, "game", "src", "world", "Landmarks.ts")
-        has_lm = os.path.isfile(lm) and bool(re.search(rf"^\s*'?{re.escape(self.slug)}'?\s*:\s*\[", open(lm, encoding="utf-8").read(), re.M))
-        self.line("18", "Landmark", PASS if has_lm else FAIL, "in Landmarks.ts" if has_lm else "none (optional)", mvp=False)
-        self.line("19", "Compare spots against photos", PASS if self.spots else FAIL,
-                  f"{len(self.spots)} spots in docs/compare/{self.slug}", mvp=False)
+        if self.has_game:
+            shots = os.path.join(self.game, "game", "public", "attract", self.slug, "shots.json")
+            self.line("17", "Main menu shot and ghosts", PASS if os.path.isfile(shots) else FAIL,
+                      f"game/public/attract/{self.slug}/shots.json" + ("" if os.path.isfile(shots) else " missing"), mvp=False)
+            lm = os.path.join(self.game, "game", "src", "world", "Landmarks.ts")
+            has_lm = os.path.isfile(lm) and bool(re.search(rf"^\s*'?{re.escape(self.slug)}'?\s*:\s*\[", open(lm, encoding="utf-8").read(), re.M))
+            self.line("18", "Landmark", PASS if has_lm else FAIL, "in Landmarks.ts" if has_lm else "none (optional)", mvp=False)
+            self.line("19", "Compare spots against photos", PASS if self.spots else FAIL,
+                      f"{len(self.spots)} spots in docs/compare/{self.slug}", mvp=False)
+        else:
+            why = f"no SnowboardAnywhere checkout at {self.game} (--game-repo or SBA_GAME_REPO)"
+            for i, item in (("17", "Main menu shot and ghosts"), ("18", "Landmark"), ("19", "Compare spots against photos")):
+                self.line(i, item, SKIP, why, mvp=False)
         derived = meta.get("derived") or {}
         tl = meta.get("treeline")
         parts = [f"treeline {tl:.0f} m measured" if tl else "no measured treeline (client uses Colorado's 3,480 m)"]
@@ -776,14 +785,11 @@ class Report:
 
 
 def find_config(slug, repo=REPO):
-    for p in (os.path.join(repo, "pipeline", "resorts", f"{slug}.json"),
-              os.path.join(os.path.dirname(repo), "MapPacker-SnowboardAnywhere", "resorts", f"{slug}.json")):
-        if os.path.isfile(p):
-            return p
-    return None
+    p = os.path.join(repo, "resorts", f"{slug}.json")
+    return p if os.path.isfile(p) else None
 
 
-def build_report(pack_dir, raw=None, config=None, against=None, repo=REPO):
+def build_report(pack_dir, raw=None, config=None, against=None, repo=REPO, game=None):
     meta = load_json(os.path.join(pack_dir, "meta.json"))
     cfg_path = config or find_config(meta["slug"], repo)
     cfg = load_json(cfg_path) if cfg_path else None
@@ -791,7 +797,7 @@ def build_report(pack_dir, raw=None, config=None, against=None, repo=REPO):
     if against:
         a = load_json(against)
         ref = {"slug": a["slug"], "build": a.get("build"), **{k: a["numbers"].get(k) for k in ("treesPerKm2", "rockShare", "canopyShare", "runCanopy")}}
-    r = Report(pack_dir, cfg, raw=raw, repo=repo, reference=ref)
+    r = Report(pack_dir, cfg, raw=raw, repo=repo, reference=ref, game=game)
     r.measure()
     r.check()
     return r
@@ -801,12 +807,14 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("pack_dir")
     ap.add_argument("--raw", help="the resort's raw folder (the one holding dem1m/, ept/, osm/), for lines 2 to 4 and 16")
-    ap.add_argument("--config", help="resort config (default pipeline/resorts/<slug>.json, then the resorts repo's)")
+    ap.add_argument("--config", help="resort config (default resorts/<slug>.json)")
+    ap.add_argument("--game-repo", help="the SnowboardAnywhere checkout for the game-side lines (default "
+                    "../SnowboardAnywhere, or SBA_GAME_REPO)")
     ap.add_argument("--against", help="another pack's report.json to compare with, instead of the built-in Vail numbers")
     ap.add_argument("--out", help="folder for report.json and report.md (default the pack)")
     ap.add_argument("--gate", action="store_true", help="exit 1 unless every MVP line passes")
     a = ap.parse_args(argv)
-    r = build_report(a.pack_dir, raw=a.raw, config=a.config, against=a.against)
+    r = build_report(a.pack_dir, raw=a.raw, config=a.config, against=a.against, game=a.game_repo)
     out = a.out or a.pack_dir
     os.makedirs(out, exist_ok=True)
     j = r.to_json()

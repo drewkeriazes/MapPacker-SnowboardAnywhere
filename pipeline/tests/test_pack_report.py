@@ -146,7 +146,6 @@ def test_publish_status_follows_the_report(tmp_path):
 
 
 # ------------------------------------------------------------------ FEAT-232: courses scale with the resort
-REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
 def test_course_thresholds_scale_with_the_hill():
@@ -157,9 +156,9 @@ def test_course_thresholds_scale_with_the_hill():
     assert pr.course_thresholds(0.0) == (100.0, 20.0)
 
 
-def test_course_rule_matches_the_game():
+def test_course_rule_matches_the_game(game_file):
     import re
-    ts = open(os.path.join(REPO, "game", "src", "sim", "Courses.ts"), encoding="utf-8").read()
+    ts = open(game_file("game", "src", "sim", "Courses.ts"), encoding="utf-8").read()
     val = lambda k: float(re.search(rf"const {k} = (\d+(?:\.\d+)?)", ts).group(1))
     assert (val("MIN_LENGTH"), val("MIN_DROP"), val("MIN_DROP_FLOOR")) == \
         (pr.COURSE_MIN_LENGTH, pr.COURSE_MIN_DROP, pr.COURSE_MIN_DROP_FLOOR)
@@ -183,8 +182,8 @@ def test_course_candidates_on_a_small_hill_and_a_mountain():
 @pytest.mark.parametrize("slug,expect", [("vail", (300.0, 60.0)), ("breckenridge", (300.0, 60.0)),
                                          ("bigsky", (300.0, 60.0)), ("boston-mills", (150.0, 30.0))])
 def test_real_packs_keep_or_gain_courses(slug, expect):
-    for root in (os.path.join(REPO, "packs"), os.path.join(os.path.dirname(REPO), "SnowboardAnywhere", "packs"),
-                 os.path.join(os.path.dirname(REPO), "wt-mp4", "packs")):
+    import paths
+    for root in (paths.PACKS, os.path.join(paths.main_checkout(), "packs"), os.path.join(paths.game_repo(), "packs")):
         f = os.path.join(root, slug, "features.json")
         if os.path.isfile(f):
             break

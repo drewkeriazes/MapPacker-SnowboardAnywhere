@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import resort as R  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-RESORTS = os.path.join(HERE, "..", "resorts")
+RESORTS = os.path.join(HERE, "..", "..", "resorts")      # FEAT-238: resorts/ at the repo root
 NETWORK = os.environ.get("SBA_NETWORK") == "1"
 
 
@@ -401,7 +401,8 @@ def test_plan_without_lidar_is_silver(tmp_path):
 
 @pytest.fixture(scope="module")
 def hosts():
-    cache = os.environ.get("SBA_INDEX_DIR", os.path.join(HERE, "..", "..", "raw", "_index"))
+    import paths
+    cache = os.environ.get("SBA_INDEX_DIR", os.path.join(paths.raw_root(), "_index"))
     return R.Hosts(cache)
 
 

@@ -11,7 +11,7 @@
 //
 // Usage: node pipeline/fetch_landfire.mjs <slug> <email> [EVT|EVC|EVH|<layer>] [--raw <raw_root>] [--force]
 // A product (EVT, the default, EVC or EVH) tries the newest year first and falls back; a full layer name
-// ("LF2024_EVC") asks for that one. --raw is the folder holding <slug>/ (default: raw/ in the repo).
+// ("LF2024_EVC") asks for that one. --raw is the folder holding <slug>/ (default: SBA_RAW_ROOT, else raw/ in the repo).
 // Output: EVT into <raw_root>/<slug>/landfire/, EVC and EVH into landfire/evc/ and landfire/evh/ (build_pack.py
 // reads the EVT GeoTIFF from landfire/*.tif, so the other products keep out of that folder). A product whose
 // folder already holds a .tif is skipped unless --force is given.
@@ -33,7 +33,7 @@ if (!slug || !email || (ri >= 0 && !rawArg)) {
   process.exit(1);
 }
 const root = path.resolve(import.meta.dirname, '..');
-const cfg = JSON.parse(await readFile(path.join(root, 'pipeline', 'resorts', `${slug}.json`), 'utf8'));
+const cfg = JSON.parse(await readFile(path.join(root, 'resorts', `${slug}.json`), 'utf8'));
 const [w, s, e, n] = cfg.lonlat_bbox; // lon0, lat0, lon1, lat1
 const pad = 0.02;
 const aoi = `${(w - pad).toFixed(5)} ${(s - pad).toFixed(5)} ${(e + pad).toFixed(5)} ${(n + pad).toFixed(5)}`; // W S E N, WGS84
@@ -42,7 +42,7 @@ const API = 'https://lfps.usgs.gov/api/job';
 const isProduct = /^(EVT|EVC|EVH)$/i.test(layerArg);
 const product = (isProduct ? layerArg : layerArg.split('_').pop()).toUpperCase();
 const layers = isProduct ? ['LF2024', 'LF2023', 'LF2022'].map((y) => `${y}_${product}`) : [layerArg];
-const out = path.join(rawRoot ?? path.join(root, 'raw'), slug, 'landfire', ...(product === 'EVT' ? [] : [product.toLowerCase()]));
+const out = path.join(rawRoot ?? (process.env.SBA_RAW_ROOT ? path.resolve(process.env.SBA_RAW_ROOT) : path.join(root, 'raw')), slug, 'landfire', ...(product === 'EVT' ? [] : [product.toLowerCase()]));
 await mkdir(out, { recursive: true });
 const have = (await readdir(out)).filter((f) => f.toLowerCase().endsWith('.tif'));
 if (have.length && !force) {

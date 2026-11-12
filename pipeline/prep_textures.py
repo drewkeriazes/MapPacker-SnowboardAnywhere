@@ -2,7 +2,8 @@
 
     python pipeline/prep_textures.py [work_dir]
 
-Outputs in game/public/textures/ (1024 px, tileable):
+Outputs in the game checkout's game/public/textures/ (../SnowboardAnywhere, or SBA_GAME_REPO; 1024 px, tileable).
+These are the game's own textures, not a pack's (FEAT-242 decides whether this script moves back to the game):
   <name>_albedo.jpg   sRGB colour, desaturated toward cool grey and normalised to a mean linear
                       luminance of ALBEDO_MEAN, so the shader sets the final tone with one tint
   <name>_nrm.jpg      R, G = OpenGL tangent-space normal x, y (z is rebuilt in the shader);
@@ -20,6 +21,9 @@ import zipfile
 import numpy as np
 from PIL import Image
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402
+
 SETS = {
     # name in the game -> (ambientCG asset, saturation kept)
     "rock": ("Rock030", 0.30),   # grey cliff face, granite-like, little moss
@@ -29,8 +33,6 @@ ALBEDO_MEAN = 0.35  # linear luminance after normalisation
 SIZE = 1024
 UA = "SnowboardAnywhere-texture-prep/1.0"
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(REPO, "game", "public", "textures")
 
 
 def srgb_to_linear(c):
@@ -59,9 +61,10 @@ def fetch(asset, work):
 
 
 def main():
-    work = sys.argv[1] if len(sys.argv) > 1 else os.path.join(REPO, "raw", "textures")
+    work = sys.argv[1] if len(sys.argv) > 1 else os.path.join(paths.raw_root(), "textures")
+    out = os.path.join(paths.require_game("prep_textures.py"), "game", "public", "textures")
     os.makedirs(work, exist_ok=True)
-    os.makedirs(OUT, exist_ok=True)
+    os.makedirs(out, exist_ok=True)
     for name, (asset, keep_sat) in SETS.items():
         load = fetch(asset, work)
         col = np.asarray(load("_Color.jpg").convert("RGB").resize((SIZE, SIZE), Image.LANCZOS), np.float32) / 255
@@ -72,11 +75,11 @@ def main():
         lin *= np.array([0.97, 1.0, 1.04], np.float32)
         lin *= ALBEDO_MEAN / float(lum.mean())
         Image.fromarray((linear_to_srgb(lin) * 255 + 0.5).astype(np.uint8)).save(
-            os.path.join(OUT, f"{name}_albedo.jpg"), quality=88)
+            os.path.join(out, f"{name}_albedo.jpg"), quality=88)
         nrm = np.asarray(load("_NormalGL.jpg").convert("RGB").resize((SIZE, SIZE), Image.LANCZOS), np.uint8)
         rough = np.asarray(load("_Roughness.jpg").convert("L").resize((SIZE, SIZE), Image.LANCZOS), np.uint8)
         packed = np.dstack([nrm[..., 0], nrm[..., 1], rough])
-        Image.fromarray(packed).save(os.path.join(OUT, f"{name}_nrm.jpg"), quality=92)
+        Image.fromarray(packed).save(os.path.join(out, f"{name}_nrm.jpg"), quality=92)
         print(f"{name}: {asset}  mean lum {lum.mean():.3f} -> {ALBEDO_MEAN}  roughness mean {rough.mean() / 255:.2f}")
 
 

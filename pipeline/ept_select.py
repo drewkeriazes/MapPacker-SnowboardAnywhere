@@ -2,7 +2,7 @@
 
 Usage: python pipeline/ept_select.py <slug> [--dry]
 
-Reads pipeline/resorts/<slug>.json and, for the `lidar` source and each entry of `lidar.extra`, walks
+Reads resorts/<slug>.json and, for the `lidar` source and each entry of `lidar.extra`, walks
 ept-hierarchy on the public bucket and keeps every node with points that intersects the box: down to
 `max_depth_resort` where the node touches the ski area (`lonlat_bbox`), `max_depth_outside` in the rest of the
 buffered box (`utm_bbox`, in the config's `crs`). An extra source may carry its own `utm_bbox` to clip it to the
@@ -14,7 +14,9 @@ BUG-081: `lidar.far` ({"pad_m", "max_depth", "nodes_file"}) adds the far tree ri
 import copy, json, os, sys, urllib.request
 from pyproj import Transformer
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402
+
 
 
 def node_box(bounds, key):
@@ -109,21 +111,21 @@ def main(argv):
     if not argv or argv[0].startswith("-"):
         print(__doc__); return 2
     slug, dry = argv[0], "--dry" in argv
-    cfg = json.load(open(os.path.join(HERE, "resorts", f"{slug}.json"), encoding="utf-8"))
+    cfg = json.load(open(os.path.join(paths.RESORTS, f"{slug}.json"), encoding="utf-8"))
     for src in sources(cfg):
         sel, pts_in = select(cfg, src)
         print(src["dataset"], "nodes", len(sel), "points in ski box", pts_in,
               "max depth", max((int(k.split("-")[0]) for k in sel), default=-1))
         if not dry:
-            with open(os.path.join(HERE, "resorts", src["nodes_file"]), "w") as f:
+            with open(os.path.join(paths.RESORTS, src["nodes_file"]), "w") as f:
                 f.write(" ".join(sel))
     far = cfg["lidar"].get("far")
     if far:
-        have = open(os.path.join(HERE, "resorts", cfg["lidar"]["nodes_file"])).read().split()
+        have = open(os.path.join(paths.RESORTS, cfg["lidar"]["nodes_file"])).read().split()
         sel = select_far(cfg, have=have)
         print("far ring", far["pad_m"], "m: nodes", len(sel))
         if not dry:
-            with open(os.path.join(HERE, "resorts", far["nodes_file"]), "w") as f:
+            with open(os.path.join(paths.RESORTS, far["nodes_file"]), "w") as f:
                 f.write(" ".join(sel))
     return 0
 

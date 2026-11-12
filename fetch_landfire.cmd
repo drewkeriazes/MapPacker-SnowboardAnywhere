@@ -2,7 +2,8 @@
 REM Double-click to download the LANDFIRE clips for a resort: vegetation type (EVT) into raw\<slug>\landfire\,
 REM vegetation cover (EVC) and height (EVH) into landfire\evc\ and landfire\evh\ (DATA-010).
 REM LFPS asks for an email address for its usage statistics.
-REM Optional: fetch_landfire.cmd <slug> [raw folder that holds <slug>\] (default: asks for the slug, raw\ in the repo).
+REM Optional: fetch_landfire.cmd <slug> [raw folder that holds <slug>\] (default: asks for the slug; SBA_RAW_ROOT,
+REM else raw\ in this checkout).
 cd /d "%~dp0"
 set SLUG=%~1
 if "%SLUG%"=="" set /p SLUG=Resort (vail, breckenridge, bigsky):

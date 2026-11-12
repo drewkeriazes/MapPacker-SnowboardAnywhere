@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the download manifest for a resort.
 
-Reads pipeline/resorts/<slug>.json and writes pipeline/manifests/<slug>.json, a flat
+Reads resorts/<slug>.json and writes manifests/<slug>.json, a flat
 list of {url, path, method?, body?} items that fetch.ps1 downloads on the PC.
 
 Sources:
@@ -15,13 +15,15 @@ import json, math, sys, os
 from urllib.parse import urlencode, quote
 from pyproj import Transformer
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402
+
 # Bump when the manifest gains or changes a layer, so raw data fetched from an older manifest is known to lack it
 # (DATA-022 item 3: Breckenridge was fetched before land cover existed). Written into every manifest.
 MANIFEST_VERSION = 1
 
 
-def manifest_items(cfg, resorts_dir=os.path.join(HERE, "resorts")):
+def manifest_items(cfg, resorts_dir=paths.RESORTS):
     """The download list for one resort config: [{url, path, method?, body?, meta?}]. EPT node lists are read
     from `resorts_dir` (the config's `nodes_file` names)."""
     crs = cfg["crs"]
@@ -167,12 +169,12 @@ def manifest_items(cfg, resorts_dir=os.path.join(HERE, "resorts")):
 
 def main(argv):
     if not argv:
-        sys.exit("usage: python pipeline/gen_manifest.py <slug>  (reads pipeline/resorts/<slug>.json)")
+        sys.exit("usage: python pipeline/gen_manifest.py <slug>  (reads resorts/<slug>.json)")
     slug = argv[0]
-    cfg = json.load(open(os.path.join(HERE, "resorts", f"{slug}.json"), encoding="utf-8"))
+    cfg = json.load(open(os.path.join(paths.RESORTS, f"{slug}.json"), encoding="utf-8"))
     items = manifest_items(cfg)
-    os.makedirs(os.path.join(HERE, "manifests"), exist_ok=True)
-    out = os.path.join(HERE, "manifests", f"{slug}.json")
+    os.makedirs(paths.MANIFESTS, exist_ok=True)
+    out = os.path.join(paths.MANIFESTS, f"{slug}.json")
     json.dump({"slug": slug, "manifestVersion": MANIFEST_VERSION, "items": items}, open(out, "w"))
     from collections import Counter
     c = Counter(i["path"].split("/")[0] for i in items)

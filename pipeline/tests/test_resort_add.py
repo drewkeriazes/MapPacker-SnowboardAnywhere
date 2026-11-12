@@ -47,7 +47,7 @@ class World:
             (world.resorts / "demo-plan.md").write_text("# plan")
             return 0
 
-        def ride(slug, raw, out, runner=None, log=print):
+        def ride(slug, raw, out, runner=None, log=print, game_repo=None):
             world.calls.append(("ride", slug))
             return True
 
@@ -156,7 +156,15 @@ def test_a_hand_written_config_is_kept_unless_forced(tmp_path, monkeypatch, caps
     assert ("plan", "demo") in w.calls
 
 
+def fake_game(tmp_path):
+    game = tmp_path / "SnowboardAnywhere"
+    (game / "game").mkdir(parents=True)
+    (game / "game" / "package.json").write_text("{}")
+    return str(game)
+
+
 def test_ride_builds_the_game_shoots_and_records_the_build(tmp_path):
+    game = fake_game(tmp_path)
     out = tmp_path / "packs" / "demo"
     out.mkdir(parents=True)
     json.dump({"build": "b1"}, open(out / "meta.json", "w"))
@@ -165,22 +173,24 @@ def test_ride_builds_the_game_shoots_and_records_the_build(tmp_path):
 
     def runner(cmd, cwd, env=None):
         seen.append((os.path.basename(cmd[0]).split(".")[0], cmd[1:3], (env or {}).get("SHOT_PACKS")))
+        assert cwd == os.path.join(game, "game")
         text = "first frame ms 900\nconsole issues: 1\n   warning: slow" if "shoot.mjs" in " ".join(cmd) else "built"
         return types.SimpleNamespace(returncode=0, stdout=text, stderr="")
-    assert R.ride("demo", str(raw), str(out), runner, log=lambda *a: None) is True
+    assert R.ride("demo", str(raw), str(out), runner, log=lambda *a: None, game_repo=game) is True
     assert seen[0][0] == "npx" and seen[0][1] == ["vite", "build"]
     assert seen[1][1] == [os.path.join("tools", "shoot.mjs"), "demo"] and seen[1][2] == str(tmp_path / "packs")
     assert json.load(open(raw / "shots" / "ride.json"))["build"] == "b1"
-    assert R.ride("demo", str(raw), str(out), runner, log=lambda *a: None) is False      # same build: skipped
+    assert R.ride("demo", str(raw), str(out), runner, log=lambda *a: None, game_repo=game) is False  # same build
     json.dump({"build": "b2"}, open(out / "meta.json", "w"))
 
     def bad(cmd, cwd, env=None):
         return types.SimpleNamespace(returncode=0, stdout="console issues: 1\n   pageerror: x is undefined", stderr="")
     with pytest.raises(SystemExit, match="page errors"):
-        R.ride("demo", str(raw), str(out), bad, log=lambda *a: None)
+        R.ride("demo", str(raw), str(out), bad, log=lambda *a: None, game_repo=game)
 
 
 def test_ride_serves_packs_by_absolute_path(tmp_path, monkeypatch):
+    game = fake_game(tmp_path)
     out = tmp_path / "packs" / "demo"
     out.mkdir(parents=True)
     json.dump({"build": "b1"}, open(out / "meta.json", "w"))
@@ -190,9 +200,19 @@ def test_ride_serves_packs_by_absolute_path(tmp_path, monkeypatch):
     def runner(cmd, cwd, env=None):
         seen.append((env or {}).get("SHOT_PACKS"))
         return types.SimpleNamespace(returncode=0, stdout="console issues: 0", stderr="")
-    R.ride("demo", os.path.join("raw", "demo"), os.path.join("packs", "demo"), runner, log=lambda *a: None)
+    R.ride("demo", os.path.join("raw", "demo"), os.path.join("packs", "demo"), runner, log=lambda *a: None,
+           game_repo=game)
     assert seen[-1] == str(tmp_path / "packs")           # not "packs", which shoot.mjs would read from game/
     assert (tmp_path / "raw" / "demo" / "shots" / "ride.json").exists()
+
+
+def test_ride_without_the_game_says_where_it_looked(tmp_path):
+    out = tmp_path / "packs" / "demo"
+    out.mkdir(parents=True)
+    json.dump({"build": "b1"}, open(out / "meta.json", "w"))
+    with pytest.raises(SystemExit, match="ride stage needs the game: no SnowboardAnywhere checkout at .*--game-repo"):
+        R.ride("demo", str(tmp_path / "raw" / "demo"), str(out), log=lambda *a: None,
+               game_repo=str(tmp_path / "nowhere"))
 
 
 def test_gate_lines_and_published(tmp_path):
