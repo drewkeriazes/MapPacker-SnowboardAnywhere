@@ -36,6 +36,31 @@ Every stage is skipped when its inputs have not changed, so both are safe to re-
 
 More in the `pack-build` skill (`.claude/skills/pack-build/SKILL.md`) and the notes in `CLAUDE.md`.
 
+## Checks
+
+Before pushing: `python -m pytest pipeline/tests` (about 5 s; the tests marked `game` compare with files in the game clone and skip without it).
+
+Every PR gets the jobs in `.github/workflows/checks.yml` (FEAT-240), each its own check, and a review from the Claude PR reviewer (`pr-review.yml`, rules in `.claude/agents/pr-reviewer.md`):
+
+| Check | Runs when | What |
+|---|---|---|
+| `pipeline-tests` | `pipeline/` changed | pytest, without the game |
+| `format-check` | `pipeline/` changed | the `game` tests against the game's `main`: `FORMAT_VERSION` is the game's `PACK_FORMAT`, and the species crowns, course rule and `get_pack.mjs` still agree |
+| `render-budgets` | PRs, `pipeline/` changed | the game's `main` draws the synthetic pack from this repo's `main` and from the PR (its `cishot.mjs`, on SwiftShader): shader compile and scene budgets, more than 10% over `main` fails. The report goes on the PR as a comment. Add the `stills` label for before / after stills |
+| `repo-rules` | every PR | no em dashes in added Markdown, plain commit messages; warns when a new script or flag comes with no docs change |
+| `public-guards` | every PR | no `.env` files, no packs, raw data or data files in git, files up to 2 MB, images up to 1 MB under `docs/` or `reports/`, gitleaks |
+
+Rerun one: the PR's Checks tab > Re-run jobs, or Actions > Checks > Run workflow with the PR number.
+
+**On Drew's GPU**, `node tools/ci/local_render_budgets.mjs` (in the PR's worktree, clean tree) runs `render-budgets` on the real GPU, posts the report and a `render-budgets/local` status, and CI skips its own run for that commit. With the hook switched on, a plain `git push` of a PR branch that changes `pipeline/` does the same first (it never blocks the push; `--no-verify` or `SA_SKIP_GPU_BUDGETS=1` skips it). Once per clone:
+
+```
+git config core.hooksPath .githooks
+git config sa.gpuBudgets true
+```
+
+It needs the game clone next to this one with `npm ci` done in `game/`. Builds of the game's `main` and the synthetic packs are cached in `~/.cache/mappacker-ci` (`RB_CACHE`).
+
 ## What is here
 
 | Path | What |

@@ -29,7 +29,11 @@ def make_pack(root, slug="demo", fmt=FORMAT_VERSION):
 
 def test_client_reads_the_format_the_pipeline_writes(game_file):
     ts = open(game_file("game", "src", "pack", "format.ts"), encoding="utf-8").read()
-    assert int(re.search(r"PACK_FORMAT\s*=\s*(\d+)", ts).group(1)) == FORMAT_VERSION
+    game = int(re.search(r"PACK_FORMAT\s*=\s*(\d+)", ts).group(1))
+    assert game == FORMAT_VERSION, (
+        f"the game's PACK_FORMAT is {game}, pipeline/packwriter.py FORMAT_VERSION is {FORMAT_VERSION}: "
+        + ("the game's PR that reads the new format lands first (CLAUDE.md)" if FORMAT_VERSION > game
+           else "the game moved to a newer format; bump FORMAT_VERSION here to match"))
 
 
 def test_zip_is_stored_repeatable_and_leaves_out_debug(tmp_path):
