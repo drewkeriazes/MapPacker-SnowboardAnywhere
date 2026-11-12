@@ -14,9 +14,9 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from packwriter import FORMAT_VERSION  # noqa: E402
 
-MAX_PACK_BYTES = 1 << 30        # a release asset may be 2 GiB; the biggest pack so far is under 300 MB
-MAX_FILES = 10000               # the biggest pack so far has about 2100
-MAX_TREES_PER_KM2 = 100_000     # the densest pack so far has about 35000 (lidar crowns plus stand stems)
+MAX_PACK_BYTES = 600_000_000   # about twice today's largest: Vail 287 MB, 2,135 files, 39,201 per km2
+MAX_FILES = 5_000                # about twice today's largest (Vail, 2,135 files)
+MAX_TREES_PER_KM2 = 80_000       # about twice today's densest (39,201 per km2)
 TILE_SETS = ("terrain.fine", "terrain.coarse", "terrain.mid", "terrain.far", "mask", "ao", "dir", "moguls")
 RECORD_BYTES = 24               # one instance: six float32
 INSTANCE_DIRS = (("trees", "treeCells"), ("shrubs", "shrubCells"), ("rocks", "rockCells"), ("farTrees", "farTreeCells"))
