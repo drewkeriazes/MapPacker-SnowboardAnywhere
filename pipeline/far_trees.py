@@ -11,7 +11,7 @@ it on every side), only outside the pack bounds. The client draws them with the 
 Inputs: `raw/<slug>/ept/*.laz` and `raw/<slug>/ept_far/*.laz` (the ring's nodes, `lidar.far` in the resort config,
 selected by ept_select.py) and the pack's `mid` height set (the ground the client draws out there). There is no
 NAIP or LANDFIRE beyond the pack, so canopy is lidar height alone, there are no snags and species follow
-species.py's no-LANDFIRE rules (elevation, aspect, crests). Run it on a built pack, then cover.py (its mid level
+species.py's no-LANDFIRE rules for the pack's region (elevation, aspect, crests; FEAT-233). Run it on a built pack, then cover.py (its mid level
 takes the ring's forest from these trees). Takes a few minutes and about 3 GB of memory for Vail's 5 km ring."""
 import glob, json, math, os, sys, time
 import numpy as np
@@ -242,12 +242,15 @@ def main(argv):
     ridge = (tpi_s[gr, gc] > 1.5) & (tpi_l[gr, gc] > 15)
     del north, east, tpi_s, tpi_l
     n = len(tx)
+    # FEAT-233: the no-LANDFIRE rules of the pack's region (Colorado's in the west, bare hardwood and hemlock in the east)
+    region = spc.region_for(*(meta.get("lonlat") or (None, None)))
     sp = spc.assign_species(tx, ty, tz, hgt, np.zeros(n, np.int8), np.zeros(n, np.float32), np.zeros(n, bool),
-                            np.zeros(n, bool), northeast, np.zeros(n, np.float32), ridge, np.ones(n), False)
+                            np.zeros(n, bool), northeast, np.zeros(n, np.float32), ridge, np.ones(n), False, region=region)
     crown = spc.crown_radius(sp, hgt)
     recs = np.stack([tx, ty, tz, hgt, crown, sp.astype(np.float32)], axis=1).astype(np.float32)
-    cnt = np.bincount(sp.astype(np.int64), minlength=8)
-    log("  species " + ", ".join(f"{spc.SPECIES_NAMES[i]} {cnt[i] / max(n, 1) * 100:.0f}%" for i in range(8) if cnt[i]))
+    cnt = np.bincount(sp.astype(np.int64), minlength=spc.N_SPECIES)
+    meta.setdefault("vegetation", {})["farTreeSpecies"] = {spc.SPECIES_NAMES[i]: round(float(cnt[i] / max(n, 1)), 4) for i in range(spc.N_SPECIES) if cnt[i]}
+    log(f"  species ({region.name}) " + ", ".join(f"{spc.SPECIES_NAMES[i]} {cnt[i] / max(n, 1) * 100:.0f}%" for i in range(spc.N_SPECIES) if cnt[i]))
 
     # ---------------------------------------------------------------- write
     names = write_far_cells(pack, recs, inst, ring)
