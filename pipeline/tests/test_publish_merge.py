@@ -189,7 +189,7 @@ class FakeGitHub:
                        {"name": "pipeline-tests", "status": "completed", "conclusion": "skipped", "details_url": ""}],
             "catalogs": {"b0": {"resorts": []}, "h1": {"resorts": [entry("a", 1)]}, "m1": {"resorts": [entry("a", 1)]}},
             "release_draft": release_draft, "comments": [], "open_prs": [], "run_actor": "drewkeriazes",
-            "fail": [], "merge_says_moved": False,
+            "fail": [], "merge_says_moved": False, "closed_prs": [],
         }
         self.state.update(over)
         self.calls = Calls()
@@ -234,6 +234,8 @@ class FakeGitHub:
             return json.dumps(s["catalogs"][path.split("=")[1]])
         if path.startswith("actions/runs/"):
             return s["run_actor"]
+        if path.startswith("pulls?state=closed"):
+            return json.dumps(s["closed_prs"])
         if path.startswith("pulls?state=open"):
             return json.dumps(s["open_prs"])
         raise AssertionError(f"unexpected api path {path}")
@@ -513,3 +515,36 @@ def test_refresh_pushes_nothing_when_the_merge_did_not_start(tmp_path, monkeypat
     with pytest.raises(SystemExit, match="did not start"):
         publish_merge.refresh_branch("publish/a-v1", "h1", APP, "e", str(tmp_path))
     assert not any(c[:2] in (["git", "commit"], ["git", "push"]) or "commit" in c for c in seen)
+
+
+def test_ready_first_publishes_the_draft_of_a_recently_merged_publish_pr(monkeypatch):
+    other = [{"number": 7, "merged_at": "2026-11-12T10:00:00Z", "head": {"ref": "publish/a-v1"}},
+             {"number": 8, "merged_at": None, "head": {"ref": "publish/b-v1"}},          # closed unmerged: left alone
+             {"number": 9, "merged_at": "2026-11-12T10:00:00Z", "head": {"ref": "feature/x"}}]
+    calls = fake_gh(monkeypatch, pr={"merged": True, "state": "closed"}, release_draft=True, closed_prs=other)
+    publish_merge.sweep(REPO)
+    assert released(calls) == [["gh", "release", "edit", "a-v1", "--draft=false"]]
+    assert not any(c[:3] == ["gh", "release", "delete"] for c in calls)
+
+
+def test_sweep_leaves_a_draft_main_does_not_name_and_never_raises(monkeypatch):
+    other = [{"number": 7, "merged_at": "t", "head": {"ref": "publish/a-v1"}}]
+    calls = fake_gh(monkeypatch, pr={"merged": True, "state": "closed"}, release_draft=True, closed_prs=other,
+                    catalogs={"m1": {"resorts": []}})
+    publish_merge.sweep(REPO)
+    assert not released(calls)
+    calls = fake_gh(monkeypatch, pr={"merged": True, "state": "closed"}, release_draft=True)
+
+    def boom(*a, **k):
+        raise SystemExit("gh failed")
+    monkeypatch.setattr(publish_merge, "api_pages", boom)
+    publish_merge.sweep(REPO)
+    assert not released(calls)
+
+
+def test_ready_runs_the_sweep_before_its_own_decision(monkeypatch):
+    seen = []
+    fake_gh(monkeypatch, pr={}, release_draft=True)
+    monkeypatch.setattr(publish_merge, "sweep", lambda repo, skip=None: seen.append(skip))
+    publish_merge.main(["ready", "7"])
+    assert seen == [7]

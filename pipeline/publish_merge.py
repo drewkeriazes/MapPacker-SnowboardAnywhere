@@ -354,6 +354,26 @@ def release_then_merge(n: int, repo: str, tag: str, sha: str, me: str | None) ->
     return 1
 
 
+SWEEP = 20     # how many recently closed PRs `ready` looks through for a merged publish PR with its draft unpublished
+
+
+def sweep(repo: str, skip: int | None = None) -> None:
+    """a `closed` run can be dropped when runs queue up (one pending run per concurrency group), so each `ready` run
+    first does what `closed` would for the last SWEEP merged publish/ PRs: a draft still unpublished whose tag main's
+    catalog names is published (closed() keeps its fail-closed rules). Never raises: a failure here must not stop `ready`."""
+    try:
+        listed = api_pages(f"repos/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page={SWEEP}")[:SWEEP]
+    except (Exception, SystemExit) as e:
+        return print(f"sweep: could not list closed PRs: {e}") or None
+    for p in listed:
+        if p.get("number") == skip or not p.get("merged_at") or not parse_branch((p.get("head") or {}).get("ref", "")):
+            continue
+        try:
+            closed(p["number"], repo)
+        except (Exception, SystemExit) as e:
+            print(f"sweep: #{p.get('number')}: {e}")
+
+
 def ready(n: int, repo: str, app_login: str) -> int:
     pr = api(f"repos/{repo}/pulls/{n}")
     labels = [lb["name"] for lb in pr.get("labels", [])]
@@ -361,6 +381,7 @@ def ready(n: int, repo: str, app_login: str) -> int:
         return print(f"#{n} is not a publish PR") or 0
     if pr.get("state") != "open":
         return print(f"#{n} is {pr.get('state')}") or 0
+    sweep(repo, skip=n)
     try:
         decision, facts = assess(n, repo, pr, app_login)
     except (Exception, SystemExit) as e:
@@ -416,6 +437,8 @@ def pure(n: int, repo: str) -> bool:
         pr = api(f"repos/{repo}/pulls/{n}")
         parsed = parse_branch(pr["head"]["ref"])
         if not parsed or "publish" not in [lb["name"] for lb in pr.get("labels", [])]:
+            return False
+        if (pr["head"].get("repo") or {}).get("full_name", "").lower() != repo.lower() or pr["base"]["ref"] != "main":
             return False
         listed = api_pages(f"repos/{repo}/pulls/{n}/files")
         if len(listed) != pr.get("changed_files"):

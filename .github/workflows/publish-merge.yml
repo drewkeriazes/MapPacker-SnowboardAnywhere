@@ -14,6 +14,10 @@
 #   variable  PUBLISH_APP_LOGIN (the App's bot login, e.g. mappacker-publisher[bot])
 # The refresh commit's author is that login with its noreply address; publish_merge.py looks up the App's user id
 # itself (gh api users/<login>), so there is no PUBLISH_APP_USER_ID.
+# The App does not get the `workflows` permission: when main changed a file under .github/workflows since a PR
+# branched, the refresh push is refused (safely, nothing merges); that PR needs a hand refresh (merge main into the
+# branch locally and push).
+# Remaining risk: a `closed` run for a hand-merged PR is published by the next `ready` run, so it can wait until then.
 
 name: Publish merge
 
@@ -23,10 +27,6 @@ on:
     types: [completed]
   pull_request_target:
     types: [labeled, closed]
-
-concurrency:
-  group: publish-merge
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -42,6 +42,11 @@ jobs:
        startsWith(github.event.pull_request.head.ref, 'publish/') &&
        github.event.pull_request.head.repo.full_name == github.repository &&
        (github.event.action == 'closed' || github.event.label.name == 'automerge'))
+    # Per job, so a run the `if` skips never queues: GitHub keeps one pending run per group and cancels an older
+    # pending one. A dropped `closed` run is made up by the next `ready` run (it sweeps the last merged publish PRs).
+    concurrency:
+      group: publish-merge
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 30   # a branch refresh, then the draft zip is waited for
     env:
@@ -68,6 +73,15 @@ jobs:
         with:
           app-id: ${{ secrets.PUBLISH_APP_ID }}
           private-key: ${{ secrets.PUBLISH_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: read
+          permission-actions: read
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install numpy pillow   # publish_merge imports publish_pack, which imports packwriter
 
       # main, never the PR: the script that holds the token is main's. Full history, and the App's token so the
       # refresh's git push to the publish/ branch is made as the App (the tool's trust rule counts on that).
@@ -76,11 +90,6 @@ jobs:
           ref: main
           fetch-depth: 0
           token: ${{ steps.app.outputs.token }}
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - run: pip install numpy pillow   # publish_merge imports publish_pack, which imports packwriter
 
       - name: publish_merge.py
         env:

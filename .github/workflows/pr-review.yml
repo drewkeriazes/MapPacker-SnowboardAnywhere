@@ -97,8 +97,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
         run: |
-          pure=$(python .pure-main/pipeline/publish_merge.py pure "$PR_NUMBER" | tail -n 1)
+          # a manual run always reviews
+          pure=false
+          [ "$EVENT" = workflow_dispatch ] || pure=$(python .pure-main/pipeline/publish_merge.py pure "$PR_NUMBER" | tail -n 1)
           echo "pure=$pure"
           echo "pure=$pure" >> "$GITHUB_OUTPUT"
 
