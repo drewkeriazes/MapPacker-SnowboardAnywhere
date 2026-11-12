@@ -5,24 +5,30 @@ description: Build or rebuild a resort pack (packs/<slug>/) from raw downloads w
 
 # Build a resort pack
 
+## Where things are (MapPacker-SnowboardAnywhere, FEAT-238)
+- Configs, EPT node lists and data plans: `resorts/`; download manifests: `manifests/`; packs: `packs/<slug>/` (gitignored).
+- Raw data: `SBA_RAW_ROOT`, else `raw/` in the main checkout (worktrees share it). On Drew's PC it stays in the game's clone until it is moved: `SBA_RAW_ROOT=C:\Users\Drew\git\SnowboardAnywhere\raw`.
+- The game is a sibling clone, `..\SnowboardAnywhere` (`--game-repo` or `SBA_GAME_REPO` overrides). Only the ride stage, `pack_report.py`'s game-side lines (11's `resorts.ts`, 17 to 19) and the format test read it. To look at a pack in the game, copy `packs/<slug>/` into the game's `packs/`, or publish it and run `npm run get <slug>` there.
+- Usually you want `build_resort.cmd <slug>` (every stage, each skipped when done) or `add_resort.cmd "<name>"` (from a name to a published pack). The direct call below is for debugging one build.
+
 ## Run
 ```
 pip install -r pipeline/requirements.txt
 python pipeline/build_pack.py <slug> <raw_dir> packs/<slug>
 # Vail on Drew's PC:
-python pipeline/build_pack.py vail C:\Users\Drew\Documents\snowboard-sim\raw\vail packs\vail
+python pipeline/build_pack.py vail %SBA_RAW_ROOT%\vail packs\vail
 ```
-`raw_dir` is the folder that directly contains `dem1m/`, `ept/`, `osm/` etc. (manifest paths carry no slug prefix). Run from PowerShell or cmd, or quote `packs\vail` in Git Bash, where the unquoted backslash is eaten and the pack lands in an untracked `packsvail/`. The script reads `pipeline/resorts/<slug>.json` and `pipeline/manifests/<slug>.json` for chunk bboxes, so the manifest must be the one the data was fetched with. Needs about 6 GB RAM for Vail (11,600 x 11,700 1 m grid). Stages print `[  123s] name` lines; a full run is 5 to 15 minutes.
+`raw_dir` is the folder that directly contains `dem1m/`, `ept/`, `osm/` etc. (manifest paths carry no slug prefix). Run from PowerShell or cmd, or quote `packs\vail` in Git Bash, where the unquoted backslash is eaten and the pack lands in an untracked `packsvail/`. The script reads `resorts/<slug>.json` and `manifests/<slug>.json` for chunk bboxes, so the manifest must be the one the data was fetched with. Needs about 6 GB RAM for Vail (11,600 x 11,700 1 m grid). Stages print `[  123s] name` lines; a full run is 5 to 15 minutes.
 
 ## Stage checks (do these before loading the pack in the game)
 1. DEM: log line `dem (H, W), void x%` with void under 1%, range roughly 2400..3600 m for Vail. `packs/<slug>/fine/` should have ~24 x 23 PNG tiles of 200 to 500 KB each. Decode one with `python -c` using `pipeline/packwriter.decode_terrarium` and confirm heights are plausible at a known spot (Vail Village base about 2,475 m; Vail summit about 3,433 m).
 2. Mid and far: `mid/` 5 x 5 tiles at 16 m covering 40 km, `far/` 4 x 4 tiles at 128 m covering 262 km, far coverage above 95%.
 3. Lidar: `N M points`, `cells with data` above 70%, `CHM: x% of cells > 2 m` between 20% and 60% for Vail. If 0%, the EPT to UTM transform is wrong (EPT is EPSG:3857, see `docs/research/vegetation-and-landcover.md`).
 4. NAIP: coverage above 95%; canopy 20% to 50%; rock 2% to 10%. The crops are 2048 px (about 2 m), handled by the script.
-5. OSM: runs ~350, lifts ~33, buildings ~2,000 to 4,000, peaks a few hundred. Zero runs means `raw/<slug>/osm/ski.json` is missing or is an Overpass error page.
+5. OSM: runs ~350, lifts ~33, buildings ~2,000 to 4,000, peaks a few hundred. Zero runs means `<raw root>/<slug>/osm/ski.json` is missing or is an Overpass error page.
 6. Masks: `mask/` tiles 12 x 12 at 2 m. Open one as an image: blue = groomed corridors should follow pistes, alpha = canopy should show the trail cuts.
 7. Trees: `treeCount` in `meta.json` between 500k and 3M for Vail; `trees/*.bin` sizes are 24 bytes per tree. Krummholz only above ~3,350 m, aspen only below ~3,150 m.
-8. `meta.json`: `start` should be the top of a named chair lift; `bounds` match `pipeline/resorts/<slug>.json` `utm_bbox` minus origin.
+8. `meta.json`: `start` should be the top of a named chair lift; `bounds` match `resorts/<slug>.json` `utm_bbox` minus origin.
 
 ## Quick visual validation
 Render a top-down check image: decode `fine/` heights into one array, hillshade with numpy, overlay `mask/` alpha (canopy) and blue (groomed), draw `features.json` runs and lift lines, save PNG, compare against the official trail map. Trail cuts in the canopy must line up with the run polylines within about 5 m.
