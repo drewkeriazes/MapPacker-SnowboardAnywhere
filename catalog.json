@@ -153,14 +153,14 @@
    "tier": null,
    "status": "test",
    "pack": {
-    "version": 2,
+    "version": 3,
     "formatVersion": 1,
-    "build": "20261112T161724Z-1b2c96",
+    "build": "20261112T211309Z-66df5a",
     "built": "2026-11-12",
-    "pipeline": "a399de6",
+    "pipeline": "2ffd647",
     "bytes": 46381341,
-    "sha256": "9ffe438632f4f3b304f11658a533bb453c1809c869ca09c72bfe1069e7bd2bcc",
-    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/synth-v2/synth.zip",
+    "sha256": "f0028d7ebcc716df47ea2db7df99754b6818d569abb81859315445f3734c19fd",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/synth-v3/synth.zip",
     "content": "78f1680f9ed0e9ed"
    },
    "report": null
