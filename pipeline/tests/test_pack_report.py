@@ -103,6 +103,21 @@ def test_start_in_trees_and_cover(tmp_path):
     assert line(rep, "13")["status"] == pr.FAIL                    # mid / far cover without the WorldCover credit
 
 
+def test_line_20_passes_on_a_measured_treeline_or_a_measured_none(tmp_path):
+    """FEAT-234: `treeline: null` is measured (forest to the top of the box); absent is an older pack"""
+    pack = make_pack(tmp_path / "packs")
+    meta = json.load(open(pack / "meta.json", encoding="utf-8"))
+    derived = {"canopy.veg_ndvi": 0.41, "rock.ndvi": 0.25}
+    for tl, want, words in ((None, pr.PASS, "forested to the top"), (2700, pr.PASS, "2700 m measured"), ("absent", pr.FAIL, "3,480")):
+        m = dict(meta, derived=dict(derived, **({} if tl == "absent" else {"treeline": tl})))
+        if tl != "absent":
+            m["treeline"] = tl
+        write_meta(str(pack), m)
+        got = line(pr.build_report(str(pack), repo=str(tmp_path)), "20")
+        assert got["status"] == want and words in got["detail"], (tl, got)
+        assert "treeline None" not in got["detail"]
+
+
 def test_main_writes_json_and_markdown(tmp_path):
     pack = make_pack(tmp_path / "packs")
     with pytest.raises(SystemExit):
@@ -192,3 +207,17 @@ def test_real_packs_keep_or_gain_courses(slug, expect):
     runs = json.load(open(f, encoding="utf-8"))["runs"]
     names, th = pr.course_candidates(runs)
     assert th == pytest.approx(expect, abs=0.5) and names
+
+
+def test_landfire_line_logs_the_unknown_evt_share(tmp_path):
+    """FEAT-233: line 4 carries the share of the forest in EVT classes species.classify_evt doesn't name, and warns
+    over species.UNKNOWN_WARN"""
+    pack = make_pack(tmp_path / "packs")
+    meta_p = pack / "meta.json"
+    for unk, want in ((0.012, pr.PASS), (0.35, pr.WARN)):
+        meta = json.load(open(meta_p, encoding="utf-8"))
+        meta["attribution"] = meta["attribution"] + ["Vegetation type: LANDFIRE, USGS and U.S. Forest Service (public domain)"]
+        meta["vegetation"] = {"region": "east", "evtUnknown": unk}
+        json.dump(meta, open(meta_p, "w", encoding="utf-8"))
+        ln = line(pr.build_report(str(pack), repo=str(tmp_path)), "4")
+        assert ln["status"] == want and f"{unk:.1%} of the forest" in ln["detail"] and "east rules" in ln["detail"], ln

@@ -1,4 +1,4 @@
-"""DATA-020: tree species ids 0..7 and the shrub set."""
+"""DATA-020: tree species ids 0..9 and the shrub set; FEAT-233: the eastern classes and regions."""
 import os, sys
 import numpy as np
 
@@ -44,13 +44,13 @@ def test_hash_is_stable_and_uniform():
 
 
 def run(n=40000, elev=3000.0, group=spc.G_SPRUCE_FIR, chm=15.0, northeast=0.0, wet=0.0, ridge=False, aspen_frac=0.0,
-        alpine=False, aspen_like=False, have_evt=True, naip=None):
+        alpine=False, aspen_like=False, have_evt=True, naip=None, hardwood=None, region=spc.WEST):
     rng = np.random.default_rng(1)
     x, y = rng.uniform(0, 3000, n), rng.uniform(0, 3000, n)
     f = lambda v, dt=np.float64: np.full(n, v, dt)
     return spc.assign_species(x, y, f(elev), f(chm), f(group, np.int8), f(aspen_frac), f(alpine, bool), f(aspen_like, bool),
                               f(northeast), f(wet), f(ridge, bool), rng.uniform(0, 1, n), have_evt,
-                              None if naip is None else f(naip, bool))
+                              None if naip is None else f(naip, bool), None if hardwood is None else f(hardwood, np.float32), region)
 
 
 def share(sp, k):
@@ -91,7 +91,7 @@ def test_no_landfire_fallback():
 
 
 def test_crowns_and_snag_cap():
-    assert np.allclose(spc.crown_radius([0, 1, 2, 3, 4, 5, 6, 7], [10] * 8), [1.3, 2.0, 5.0, 1.0, 0.9, 1.7, 3.5, 0.5])
+    assert np.allclose(spc.crown_radius(list(range(10)), [10] * 10), [1.3, 2.0, 5.0, 1.0, 0.9, 1.7, 3.5, 0.5, 2.8, 1.7])
     ndvi = np.linspace(0.14, -0.1, 1000)
     keep = spc.cap_snags(ndvi, 9700)
     assert len(keep) == 300 and keep.min() == 700                       # 300 / 10,000 = 3 %, the greyest
@@ -262,3 +262,205 @@ def test_naip_conifer_group():
     # the same guard on the aspen fit falls back to Vail's thresholds
     tb, tn, info = spc.fit_aspen(flat * 100, flat * 200, lpc, ~lpc)
     assert (tb, tn) == spc.ASPEN_DEFAULT and info["weak"] and not info["fitted"]
+
+
+# FEAT-233: every EVT class in Vail's and Big Sky's LANDFIRE clips (Breckenridge has none) and what classify_evt made of
+# it before the eastern classes went in (MapPacker main c9f246c): (group, aspen, forest, open, alpine, riparian, sage, oak, built)
+WESTERN = [
+    ('Colorado Plateau Mixed Bedrock Canyon and Tableland', 'Sparse', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Colorado Plateau Pinyon-Juniper Woodland', 'Tree', (5, 0.0, True, False, False, False, False, False, False)),
+    ('Developed-High Intensity', 'Developed', (0, 0.0, False, False, False, False, False, False, True)),
+    ('Developed-Low Intensity', 'Developed', (0, 0.0, False, False, False, False, False, False, True)),
+    ('Developed-Medium Intensity', 'Developed', (0, 0.0, False, False, False, False, False, False, True)),
+    ('Developed-Roads', 'Developed', (0, 0.0, False, False, False, False, False, False, True)),
+    ('Great Basin & Intermountain Introduced Perennial Grassland and Forbland', 'Herb', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Inter-Mountain Basins Aspen-Mixed Conifer Forest and Woodland', 'Tree', (1, 0.5, True, False, False, False, False, False, False)),
+    ('Inter-Mountain Basins Big Sagebrush Shrubland', 'Shrub', (0, 0.0, False, True, False, False, True, False, False)),
+    ('Inter-Mountain Basins Montane Sagebrush Steppe', 'Shrub', (0, 0.0, False, True, False, False, True, False, False)),
+    ('Inter-Mountain Basins Semi-Desert Shrub-Steppe', 'Shrub', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Interior Western North American Temperate Ruderal Grassland', 'Herb', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Interior Western North American Temperate Ruderal Shrubland', 'Shrub', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Middle Rocky Mountain Montane Douglas-fir Forest and Woodland', 'Tree', (4, 0.0, True, False, False, False, False, False, False)),
+    ('North American Arid West Emergent Marsh', 'Herb', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Northern Rocky Mountain Lower Montane-Foothill-Valley Grassland', 'Herb', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Northern Rocky Mountain Montane-Foothill Deciduous Shrubland', 'Shrub', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Northern Rocky Mountain Subalpine Deciduous Shrubland', 'Shrub', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Northern Rocky Mountain Subalpine Woodland and Parkland', 'Tree', (5, 0.0, True, False, False, False, False, False, False)),
+    ('Northern Rocky Mountain Subalpine-Upper Montane Grassland', 'Herb', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Open Water', 'Water', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Quarries-Strip Mines-Gravel Pits-Well and Wind Pads', 'Barren', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Rocky Mountain Alpine Bedrock and Scree', 'Sparse', (0, 0.0, False, True, True, False, False, False, False)),
+    ('Rocky Mountain Alpine Dwarf-Shrubland', 'Shrub', (0, 0.0, False, True, True, False, False, False, False)),
+    ('Rocky Mountain Alpine Fell-Field', 'Herb', (0, 0.0, False, True, True, False, False, False, False)),
+    ('Rocky Mountain Alpine Turf', 'Herb', (0, 0.0, False, True, True, False, False, False, False)),
+    ('Rocky Mountain Alpine-Montane Wet Meadow', 'Herb', (0, 0.0, False, True, True, False, False, False, False)),
+    ('Rocky Mountain Aspen Forest and Woodland', 'Tree', (2, 0.85, True, False, False, False, False, False, False)),
+    ('Rocky Mountain Cliff Canyon and Massive Bedrock', 'Sparse', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Rocky Mountain Foothill Limber Pine-Juniper Woodland', 'Tree', (5, 0.0, True, False, False, False, False, False, False)),
+    ('Rocky Mountain Gambel Oak-Mixed Montane Shrubland', 'Shrub', (0, 0.0, False, True, False, False, False, True, False)),
+    ('Rocky Mountain Lodgepole Pine Forest', 'Tree', (3, 0.0, True, False, False, False, False, False, False)),
+    ('Rocky Mountain Lower Montane-Foothill Riparian Shrubland', 'Shrub', (0, 0.0, False, True, False, True, False, False, False)),
+    ('Rocky Mountain Lower Montane-Foothill Riparian Woodland', 'Tree', (1, 0.6, True, False, False, True, False, False, False)),
+    ('Rocky Mountain Lower Montane-Foothill Shrubland', 'Shrub', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Rocky Mountain Poor-Site Lodgepole Pine Forest', 'Tree', (3, 0.0, True, False, False, False, False, False, False)),
+    ('Rocky Mountain Subalpine Dry-Mesic Spruce-Fir Forest and Woodland', 'Tree', (1, 0.0, True, False, False, False, False, False, False)),
+    ('Rocky Mountain Subalpine Mesic-Wet Spruce-Fir Forest and Woodland', 'Tree', (1, 0.0, True, False, False, False, False, False, False)),
+    ('Rocky Mountain Subalpine-Montane Limber-Bristlecone Pine Woodland', 'Tree', (5, 0.0, True, False, False, False, False, False, False)),
+    ('Rocky Mountain Subalpine-Montane Mesic Meadow', 'Herb', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Rocky Mountain Subalpine-Montane Riparian Shrubland', 'Shrub', (0, 0.0, False, True, False, True, False, False, False)),
+    ('Rocky Mountain Subalpine-Montane Riparian Woodland', 'Tree', (1, 0.0, True, False, False, True, False, False, False)),
+    ('Southern Rocky Mountain Dry-Mesic Montane Mixed Conifer Forest and Woodland', 'Tree', (4, 0.0, True, False, False, False, False, False, False)),
+    ('Southern Rocky Mountain Mesic Montane Mixed Conifer Forest and Woodland', 'Tree', (4, 0.0, True, False, False, False, False, False, False)),
+    ('Southern Rocky Mountain Montane-Subalpine Grassland', 'Herb', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Southern Rocky Mountain Ponderosa Pine Savanna', 'Tree', (3, 0.0, True, False, False, False, False, False, False)),
+    ('Southern Rocky Mountain Ponderosa Pine Woodland', 'Tree', (3, 0.0, True, False, False, False, False, False, False)),
+    ('Western Cool Temperate Developed Deciduous Forest', 'Tree', (1, 1.0, True, False, False, False, False, False, False)),
+    ('Western Cool Temperate Developed Evergreen Forest', 'Tree', (1, 0.0, True, False, False, False, False, False, True)),
+    ('Western Cool Temperate Developed Herbaceous', 'Herb', (0, 0.0, False, False, False, False, False, False, True)),
+    ('Western Cool Temperate Developed Mixed Forest', 'Tree', (1, 0.5, True, False, False, False, False, False, True)),
+    ('Western Cool Temperate Developed Shrubland', 'Shrub', (0, 0.0, False, False, False, False, False, False, True)),
+    ('Western Cool Temperate Pasture and Hayland', 'Herb', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Western Cool Temperate Row Crop - Close Grown Crop', 'Agriculture', (0, 0.0, False, True, False, False, False, False, False)),
+    ('Western Cool Temperate Urban Deciduous Forest', 'Tree', (1, 1.0, True, False, False, False, False, False, False)),
+    ('Western Cool Temperate Urban Evergreen Forest', 'Tree', (1, 0.0, True, False, False, False, False, False, True)),
+    ('Western Cool Temperate Urban Herbaceous', 'Herb', (0, 0.0, False, False, False, False, False, False, True)),
+    ('Western Cool Temperate Urban Mixed Forest', 'Tree', (1, 0.5, True, False, False, False, False, False, True)),
+    ('Western Cool Temperate Urban Shrubland', 'Shrub', (0, 0.0, False, False, False, False, False, False, True)),
+]
+KEYS = ("group", "aspen", "forest", "open", "alpine", "riparian", "sage", "oak", "built")
+
+
+def test_western_classes_unchanged():
+    for name, lf, want in WESTERN:
+        c = spc.classify_evt(name, lf)
+        assert tuple(c[k] for k in KEYS) == want, name
+        assert not spc.is_eastern(name), name
+        assert c["hardwood"] == 0.0 and c["known"], name       # every western class in the two clips has a rule
+
+
+def west_inputs(n=20000, seed=4):
+    r = np.random.default_rng(seed)
+    x = r.uniform(-5000, 5000, n); y = r.uniform(-5000, 5000, n)
+    elev = r.uniform(2400, 3700, n); chm = r.uniform(0, 30, n)
+    group = r.integers(0, 6, n).astype(np.int8); af = r.choice([0, 0.5, 0.85, 1.0], n).astype(np.float32)
+    alpine = r.uniform(0, 1, n) < 0.1; al = r.uniform(0, 1, n) < 0.3
+    ne = r.uniform(-1, 1, n); wet = r.uniform(0, 1, n); ridge = r.uniform(0, 1, n) < 0.2; roll = r.uniform(0, 1, n)
+    nd = r.uniform(0, 1, n) < 0.2
+    return (x, y, elev, chm, group, af, alpine, al, ne, wet, ridge, roll), nd
+
+
+def test_west_species_draw_unchanged():
+    """the western groups (0..5) with and without LANDFIRE give every tree the species they did before FEAT-233
+    (counts and a hash of the ids from main c9f246c), in the regions of Vail, Breckenridge and Big Sky, so those
+    packs rebuild with the same species"""
+    import hashlib
+    a, nd = west_inputs()
+    want = {(True, False): ("a13246b526834b38", [3192, 8464, 552, 3730, 1942, 434, 1686, 0]),
+            (True, True): ("3cda0f6f4b4fd8f7", [3429, 7422, 552, 4050, 2185, 535, 1827, 0]),
+            (False, False): ("85b5d390a98dfbae", [5019, 3352, 552, 5936, 4923, 0, 218, 0])}
+    for (have, naip), (h, counts) in want.items():
+        for region in (spc.WEST, spc.region_for(-106.35, 39.6), spc.region_for(-106.08, 39.47), spc.region_for(-111.4, 45.28)):
+            sp = spc.assign_species(*a, have, nd if naip else None, region=region)
+            assert hashlib.sha256(sp.tobytes()).hexdigest()[:16] == h, (have, naip, region)
+            assert np.bincount(sp, minlength=8).tolist() == counts
+
+
+# the tree classes in Boston Mills' LANDFIRE clip (LF 2024), their share of the clip (%), and the group they map to
+BOSTON_MILLS = [
+    ("Northern & Central Native Ruderal Forest", 34.9, spc.G_HARDWOOD),
+    ("North-Central Interior Beech-Maple Forest", 15.5, spc.G_HARDWOOD),
+    ("North-Central Interior Dry Oak Forest and Woodland", 6.4, spc.G_HARDWOOD),
+    ("Eastern Cool Temperate Urban Mixed Forest", 5.5, spc.G_HARDWOOD),
+    ("North-Central Interior Dry-Mesic Oak Forest and Woodland", 5.3, spc.G_HARDWOOD),
+    ("Northern & Central Native Ruderal Flooded & Swamp Forest", 3.1, spc.G_HARDWOOD),
+    ("North-Central Interior Floodplain Forest", 1.1, spc.G_HARDWOOD),
+    ("Eastern Cool Temperate Developed Mixed Forest", 1.0, spc.G_HARDWOOD),
+    ("Eastern Cool Temperate Urban Deciduous Forest", 0.5, spc.G_HARDWOOD),
+    ("Eastern Cool Temperate Developed Deciduous Forest", 0.1, spc.G_HARDWOOD),
+    ("Northeastern North American Temperate Forest Plantation", 0.1, spc.G_SPRUCE_FIR),
+    ("North-Central Interior and Appalachian Rich Swamp", 0.1, spc.G_HARDWOOD),
+    ("North-Central Interior Wet Flatwoods", 0.1, spc.G_HARDWOOD),
+    ("North-Central Interior and Appalachian Acidic Peatland Woodland", 0.1, spc.G_HARDWOOD),
+    ("Northeastern Interior Dry-Mesic Oak Forest", 0.0, spc.G_HARDWOOD),
+    ("Eastern Cool Temperate Urban Evergreen Forest", 0.0, spc.G_SPRUCE_FIR),
+    ("Eastern Cool Temperate Developed Evergreen Forest", 0.0, spc.G_SPRUCE_FIR),
+    ("Eastern Cool Temperate Orchard", 0.0, spc.G_HARDWOOD),
+]
+
+
+def test_classify_eastern_classes():
+    for name, _, group in BOSTON_MILLS:
+        c = spc.classify_evt(name, "Tree")
+        assert spc.is_eastern(name) and c["forest"] and c["known"], name
+        assert c["group"] == group and c["aspen"] == 0.0, name
+        if group == spc.G_HARDWOOD:
+            assert 0.8 <= c["hardwood"] <= 1.0, name
+    c = spc.classify_evt
+    assert c("North-Central Interior Beech-Maple Forest", "Tree")["hardwood"] < c("North-Central Interior Dry Oak Forest and Woodland", "Tree")["hardwood"]
+    hem = c("Appalachian (Hemlock)-Northern Hardwood Forest", "Tree")
+    assert hem["group"] == spc.G_HEMLOCK and abs(hem["hardwood"] - 0.4) < 1e-6
+    sf = c("Acadian-Appalachian Montane Spruce-Fir-Hardwood Forest", "Tree")
+    assert sf["group"] == spc.G_SPRUCE_FIR and sf["hardwood"] == 0.4
+    assert c("Central Appalachian Dry Oak-Pine Forest", "Tree")["group"] == spc.G_LODGEPOLE
+    assert c("Eastern Cool Temperate Urban Mixed Forest", "Tree")["built"]          # filled from the forest around
+    assert not c("Eastern Cool Temperate Urban Deciduous Forest", "Tree")["built"]
+    assert c("Developed-Roads", "Developed")["known"] and c("Eastern Cool Temperate Pasture and Hayland", "Herb")["known"]
+    odd = c("North-Central Interior Mystery Forest", "Tree")      # an eastern class no rule names: bare hardwood, unknown
+    assert odd["group"] == spc.G_HARDWOOD and not odd["known"]
+    assert not c("Western Mystery Forest", "Tree")["known"]
+
+
+def test_unknown_forest_share_and_groups():
+    table = [{"VALUE": "1", "EVT_NAME": "North-Central Interior Beech-Maple Forest", "EVT_LF": "Tree"},
+             {"VALUE": "2", "EVT_NAME": "North-Central Interior Mystery Forest", "EVT_LF": "Tree"},
+             {"VALUE": "3", "EVT_NAME": "Developed-Roads", "EVT_LF": "Developed"}]
+    lut = spc.evt_luts(table, 4)
+    win = np.array([[1, 1, 1, 2], [3, 3, 3, 3]])
+    assert abs(spc.unknown_forest_share(win, lut) - 0.25) < 1e-9          # 1 of the 4 tree pixels
+    g = spc.group_shares(win, lut)
+    assert g[spc.G_HARDWOOD] == 1.0
+    assert spc.unknown_forest_share(np.array([[3, 3]]), lut) == 0.0
+
+
+def test_regions():
+    assert not spc.region_for(-106.35, 39.6).east                      # Vail
+    assert not spc.region_for(-111.4, 45.28).east                      # Big Sky
+    assert not spc.region_for(None, None).east
+    bm = spc.region_for(-81.56, 41.27)                                 # Boston Mills
+    assert bm.east and 1000 < bm.boreal < 1150
+    assert spc.boreal_line(35) == 1650 and spc.boreal_line(44) == 850 and spc.boreal_line(50) == 850
+    assert bm.shifted(-200).boreal == bm.boreal + 200 and spc.WEST.shifted(-200) is spc.WEST
+
+
+def test_eastern_species():
+    east = spc.region_for(-81.56, 41.27)
+    beech = run(group=spc.G_HARDWOOD, hardwood=0.88, elev=300, region=east)
+    assert set(np.unique(beech)) == {spc.HARDWOOD, spc.HEMLOCK}
+    assert abs(share(beech, spc.HEMLOCK) - 0.12) < 0.02
+    assert share(run(group=spc.G_HARDWOOD, hardwood=0.88, elev=300, northeast=1.0, wet=1.0, region=east), spc.HEMLOCK) > 0.2
+    assert share(run(group=spc.G_HARDWOOD, hardwood=1.0, elev=300, northeast=1.0, region=east), spc.HEMLOCK) == 0.0
+    assert abs(share(run(group=spc.G_HEMLOCK, hardwood=0.4, elev=300, region=east), spc.HEMLOCK) - 0.6) < 0.02
+    # no aspen in the east, whatever NAIP says (leaf-on hardwood reads bright)
+    assert share(run(group=spc.G_HARDWOOD, hardwood=0.9, elev=300, aspen_like=True, naip=True, region=east), spc.ASPEN) == 0.0
+    # eastern spruce-fir with a broadleaf share
+    sf = run(group=spc.G_SPRUCE_FIR, hardwood=0.4, elev=1200, region=east)
+    assert abs(share(sf, spc.HARDWOOD) - 0.4) < 0.02 and share(sf, spc.SPRUCE) + share(sf, spc.FIR) > 0.55
+
+
+def test_eastern_fallbacks():
+    east = spc.region_for(-81.56, 41.27)
+    for have in (True, False):        # a class with no group, and no LANDFIRE at all (the far ring)
+        lo = run(group=spc.G_NONE, elev=300, have_evt=have, aspen_like=True, region=east)
+        assert share(lo, spc.HARDWOOD) > 0.8 and share(lo, spc.HEMLOCK) > 0.05
+        assert share(lo, spc.LODGEPOLE) == 0.0 and share(lo, spc.ASPEN) == 0.0
+        hi = run(group=spc.G_NONE, elev=east.boreal + 50, have_evt=have, region=east)
+        assert share(hi, spc.SPRUCE) + share(hi, spc.FIR) == 1.0
+        mid = run(group=spc.G_NONE, elev=east.boreal - 75, have_evt=have, region=east)
+        assert 0.4 < share(mid, spc.SPRUCE) + share(mid, spc.FIR) < 0.6
+
+
+def test_group_report():
+    sp = np.array([8, 8, 9, 0, 3], np.int8); g = np.array([6, 6, 6, 1, 1], np.int8)
+    lines = spc.group_report(sp, g)
+    assert lines[0].strip().startswith("spruce-fir") and "fir 50.0%" in lines[0]
+    assert lines[1].strip().startswith("hardwood") and "hemlock 33.3%" in lines[1]

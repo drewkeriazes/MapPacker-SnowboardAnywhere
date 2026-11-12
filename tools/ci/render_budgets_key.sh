@@ -7,7 +7,7 @@
 set -euo pipefail
 rev=${1:-HEAD}
 files="tools/ci/synth_key.sh tools/ci/render_budgets_key.sh tools/ci/render_note.py tools/ci/local_render_budgets.mjs
-tools/ci/render_budgets_lib.mjs .github/workflows/checks.yml"
+tools/ci/render_budgets_lib.mjs tools/ci/pack_content_key.py .github/workflows/checks.yml"
 for f in $files; do
   echo "$f $(git rev-parse --verify -q "$rev:$f" || echo missing)"
 done | sha256sum | cut -c1-12
