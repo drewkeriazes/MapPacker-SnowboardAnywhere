@@ -27,7 +27,7 @@ build_resort.cmd vail             :: config to scored pack in packs\vail (no rid
 python pipeline\resort.py add --help
 ```
 
-Every stage is skipped when its inputs have not changed, so both are safe to re-run. The first `add_resort.cmd` run for a new resort stops after the data plan (`resorts/<slug>-plan.md`) so it can be read before a 1+ GB fetch.
+Every stage is skipped when its inputs have not changed, so both are safe to re-run. The first `add_resort.cmd` run for a new resort stops after the data plan (`resorts/<slug>/<slug>-plan.md`) so it can be read before a 1+ GB fetch.
 
 - **Raw data** goes to `SBA_RAW_ROOT`, else `raw\` in the main checkout (worktrees share it). It is gitignored and never committed. On Drew's PC `SBA_RAW_ROOT` points at the raw data still in the game's clone, `C:\Users\Drew\git\SnowboardAnywhere\raw`, until it is moved here.
 - **The game** must be cloned next to this repo (`..\SnowboardAnywhere`) for the headless ride, the game-side lines of the build report and a few tests. `--game-repo <path>` or `SBA_GAME_REPO` points elsewhere; without it those parts say so and stop or skip.
@@ -67,7 +67,7 @@ It needs the game clone next to this one with `npm ci` done in `game/`. Builds o
 |---|---|
 | `catalog.json` | Every published pack: slug, name, region, tier, status, and the release zip's version, pack format, size, sha256, URL and the pipeline commit that built it |
 | `pipeline/` | The pipeline: `resort.py` (name to config and data plan, and `add`), `build_resort.py`, `build_pack.py` and its stages, `pack_report.py`, `publish_pack.py`, the fetch scripts, tests in `pipeline/tests/`. Moved from the game repo with its history (FEAT-238) |
-| `resorts/<slug>.json` | The resort config the pipeline reads, plus its EPT node lists and data plan (`<slug>-plan.md`) |
+| `resorts/<slug>/` | A folder per resort: `<slug>.json`, the config the pipeline reads, the EPT node lists it names (`nodes_file`, beside it) and the data plan (`<slug>-plan.md`) |
 | `manifests/<slug>.json` | The download manifest the raw data was fetched with |
 | `reports/<slug>.md` | The build report of the published pack |
 | `*.cmd` | Launchers for Drew's PC (above) |

@@ -33,7 +33,7 @@ if (!slug || !email || (ri >= 0 && !rawArg)) {
   process.exit(1);
 }
 const root = path.resolve(import.meta.dirname, '..');
-const cfg = JSON.parse(await readFile(path.join(root, 'resorts', `${slug}.json`), 'utf8'));
+const cfg = JSON.parse(await readFile(path.join(root, 'resorts', slug, `${slug}.json`), 'utf8'));
 const [w, s, e, n] = cfg.lonlat_bbox; // lon0, lat0, lon1, lat1
 const pad = 0.02;
 const aoi = `${(w - pad).toFixed(5)} ${(s - pad).toFixed(5)} ${(e + pad).toFixed(5)} ${(n + pad).toFixed(5)}`; // W S E N, WGS84

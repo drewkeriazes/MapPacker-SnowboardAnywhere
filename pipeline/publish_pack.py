@@ -9,7 +9,7 @@ Runs on Drew's PC, in the main checkout on `main` (needs `gh` signed in with pus
      refuse a zip over 1.9 GiB (GitHub's limit per release asset is 2 GiB)
   3. `gh release create <slug>-v<N>` in this repo with the zip, meta.json and the report if there is one
   4. update catalog.json, copy the report to reports/<slug>.md, and commit them in place with the resort's
-     config, EPT node lists, data plan (resorts/) and manifest (manifests/), then push. Only those files go in
+     config, EPT node lists, data plan (resorts/<slug>/) and manifest (manifests/), then push. Only those files go in
      the commit; anything else uncommitted in the checkout is left alone.
 
 The catalog's `pipeline` is this repo's commit (FEAT-238; packs published before the move name a SnowboardAnywhere
@@ -124,9 +124,10 @@ def run(cmd: list, cwd: str | None = None, capture: bool = True) -> str:
 
 def resort_files(slug: str, repo_dir: str = REPO) -> list:
     """the resort's own files, relative to the repo: config, EPT node lists, data plan, manifest, report"""
-    rel = [os.path.join("resorts", f"{slug}.json"), os.path.join("resorts", f"{slug}-plan.md"),
+    own = os.path.join("resorts", slug)
+    rel = [os.path.join(own, f"{slug}.json"), os.path.join(own, f"{slug}-plan.md"),
            os.path.join("manifests", f"{slug}.json"), os.path.join("reports", f"{slug}.md")]
-    rel += [os.path.relpath(p, repo_dir) for p in sorted(glob.glob(os.path.join(repo_dir, "resorts", f"{slug}_*nodes*.txt")))]
+    rel += [os.path.relpath(p, repo_dir) for p in sorted(glob.glob(os.path.join(repo_dir, own, f"{slug}_*nodes*.txt")))]
     return [p.replace(os.sep, "/") for p in rel if os.path.isfile(os.path.join(repo_dir, p))]
 
 
@@ -163,7 +164,7 @@ def main(argv=None) -> None:
                          f"(python pipeline/build_pack.py {slug} <raw_dir> <out_dir>) before publishing")
     a.status, why = report_status(pack_dir, meta, a.status)
     print(f"status {a.status} ({why})")
-    cfg_path = os.path.join(paths.RESORTS, f"{slug}.json")
+    cfg_path = paths.config_path(slug)
     cfg = json.load(open(cfg_path, encoding="utf-8")) if os.path.isfile(cfg_path) else {}
     report = a.report or (os.path.join(pack_dir, "report.md") if os.path.isfile(os.path.join(pack_dir, "report.md")) else None)
     pipeline = run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO)

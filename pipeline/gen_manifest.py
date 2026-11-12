@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the download manifest for a resort.
 
-Reads resorts/<slug>.json and writes manifests/<slug>.json, a flat
+Reads resorts/<slug>/<slug>.json and writes manifests/<slug>.json, a flat
 list of {url, path, method?, body?} items that fetch.ps1 downloads on the PC.
 
 Sources:
@@ -23,9 +23,10 @@ import paths  # noqa: E402
 MANIFEST_VERSION = 1
 
 
-def manifest_items(cfg, resorts_dir=paths.RESORTS):
-    """The download list for one resort config: [{url, path, method?, body?, meta?}]. EPT node lists are read
-    from `resorts_dir` (the config's `nodes_file` names)."""
+def manifest_items(cfg, resorts_dir=None):
+    """The download list for one resort config: [{url, path, method?, body?, meta?}]. EPT node lists (the config's
+    `nodes_file` names) are read from `resorts_dir`, by default the config's own folder, resorts/<slug>/."""
+    resorts_dir = resorts_dir or paths.resort_dir(cfg["slug"])
     crs = cfg["crs"]
     to_utm = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
     to_ll = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
@@ -169,9 +170,9 @@ def manifest_items(cfg, resorts_dir=paths.RESORTS):
 
 def main(argv):
     if not argv:
-        sys.exit("usage: python pipeline/gen_manifest.py <slug>  (reads resorts/<slug>.json)")
+        sys.exit("usage: python pipeline/gen_manifest.py <slug>  (reads resorts/<slug>/<slug>.json)")
     slug = argv[0]
-    cfg = json.load(open(os.path.join(paths.RESORTS, f"{slug}.json"), encoding="utf-8"))
+    cfg = json.load(open(paths.config_path(slug), encoding="utf-8"))
     items = manifest_items(cfg)
     os.makedirs(paths.MANIFESTS, exist_ok=True)
     out = os.path.join(paths.MANIFESTS, f"{slug}.json")

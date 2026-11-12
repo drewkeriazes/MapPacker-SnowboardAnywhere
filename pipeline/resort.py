@@ -9,11 +9,11 @@ resolve  Finds the ski area in OpenSkiData (`ski_areas.geojson`) by name, case a
          matches: prints them and stops (`--id` picks one). A named neighbour within 3 km (Boston Mills and
          Brandywine): stops and asks for `--with <name>` (one pack over both) or `--alone` (the neighbour's runs
          and lifts are left out by OSM id, as Big Sky leaves out the Yellowstone Club). No match: prints the
-         closest names. Writes `resorts/<slug>.json` with the identity fields and `lonlat_bbox`, the
+         closest names. Writes `resorts/<slug>/<slug>.json` with the identity fields and `lonlat_bbox`, the
          extent of the area's polygon, lifts and runs.
 plan     Derives every other field the hand-written configs have (docs/research/resort-auto-pipeline.md section 1)
          from the hosts below, walks the EPT hierarchy for the node lists (`--no-nodes` skips it), writes the config
-         and `resorts/<slug>-plan.md` (the data plan: layer, source, year, resolution, size, tier).
+         and `resorts/<slug>/<slug>-plan.md` (the data plan: layer, source, year, resolution, size, tier).
          `publish_pack.py` commits the plan with the config when the pack is published.
 compare  Resolves a hand-written config's resort by name, plans it in memory and lists how it differs from the
          hand values (FEAT-223 check: Vail, Breckenridge, Big Sky). Writes nothing.
@@ -1068,6 +1068,7 @@ def keep_hand_fields(new, old):
 
 
 def write_json(path, obj):
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)   # resorts/<slug>/ on a new resort
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(obj, f, indent=2, ensure_ascii=False)
         f.write("\n")
@@ -1078,7 +1079,7 @@ def cmd_resolve(a, hosts):
 
 
 def resolve_and_write(a, hosts, keep_planned=False):
-    """resolve and write resorts/<slug>.json -> (exit code, slug). `keep_planned` (resort.py add): a config already
+    """resolve and write resorts/<slug>/<slug>.json -> (exit code, slug). `keep_planned` (resort.py add): a config already
     planned for the same ski areas is left as it is"""
     feats = load_json(hosts.index("ski_areas.geojson"))["features"]
     st, r = resolve(a.name, feats, hosts.index("lifts.geojson"), hosts.index("runs.geojson"),
@@ -1102,7 +1103,7 @@ def resolve_and_write(a, hosts, keep_planned=False):
     stub = r
     slug = a.slug or stub["slug"]
     stub["slug"] = slug
-    path = os.path.join(a.resorts_dir, f"{slug}.json")
+    path = paths.config_path(slug, a.resorts_dir)
     if os.path.isfile(path):
         old = load_json(path)
         if "openskidata" not in old and not a.force:
@@ -1128,7 +1129,7 @@ def same_areas(old, stub):
 
 
 def cmd_plan(a, hosts):
-    path = os.path.join(a.resorts_dir, f"{a.slug}.json")
+    path = paths.config_path(a.slug, a.resorts_dir)
     if not os.path.isfile(path):
         print(f"no {path}: run `resort.py resolve \"<name>\"` first")
         return 1
@@ -1141,10 +1142,10 @@ def cmd_plan(a, hosts):
     cfg = keep_hand_fields(cfg, old)
     write_json(path, cfg)
     for name, keys in nodes.items():
-        with open(os.path.join(a.resorts_dir, name), "w") as f:
+        with open(os.path.join(paths.resort_dir(a.slug, a.resorts_dir), name), "w") as f:
             f.write(" ".join(keys))
     md = plan_md(cfg, facts, walked=not a.no_nodes)
-    with open(os.path.join(a.resorts_dir, f"{a.slug}-plan.md"), "w", encoding="utf-8", newline="\n") as f:
+    with open(os.path.join(paths.resort_dir(a.slug, a.resorts_dir), f"{a.slug}-plan.md"), "w", encoding="utf-8", newline="\n") as f:
         f.write(md)
     print(md)
     print(f"wrote {path}, {len(nodes)} node lists and {a.slug}-plan.md")
@@ -1169,7 +1170,7 @@ def resolve_hand(hand, hosts, log=print):
 
 
 def cmd_compare(a, hosts):
-    path = os.path.join(a.resorts_dir, f"{a.slug}.json")
+    path = paths.config_path(a.slug, a.resorts_dir)
     hand = load_json(path)
     stub = resolve_hand(hand, hosts)
     cfg, facts, _ = plan(stub, hosts, walk_nodes=False)
@@ -1266,12 +1267,12 @@ def cmd_add(a, hosts, publish=None, br=None):
         code, slug = resolve_and_write(a, hosts, keep_planned=not forced & {"resolve", "all"})
         if code:
             return code
-    path = os.path.join(a.resorts_dir, f"{slug}.json")
+    path = paths.config_path(slug, a.resorts_dir)
     if "plan" in todo:
         cfg = load_json(path) if os.path.isfile(path) else {}
         if "openskidata" not in cfg and "crs" in cfg:
             head("plan", f"skip: {slug}.json is hand-written (--force resolve replaces it with a resolved one)")
-        elif "crs" in cfg and os.path.isfile(os.path.join(a.resorts_dir, f"{slug}-plan.md")) \
+        elif "crs" in cfg and os.path.isfile(os.path.join(paths.resort_dir(slug, a.resorts_dir), f"{slug}-plan.md")) \
                 and not forced & {"plan", "all"}:
             head("plan", f"skip: planned ({slug}-plan.md; --force plan re-plans)")
         else:
@@ -1280,7 +1281,7 @@ def cmd_add(a, hosts, publish=None, br=None):
             if code:
                 return code
             if getattr(a, "review_plan", False) and todo[-1] != "plan":
-                print(f"\nRead {os.path.join(a.resorts_dir, slug + '-plan.md')} (above), then run the same command "
+                print(f"\nRead {os.path.join(paths.resort_dir(slug, a.resorts_dir), slug + '-plan.md')} (above), then run the same command "
                       "again to fetch and build.")
                 return 0
     if not os.path.isfile(path):
@@ -1347,7 +1348,7 @@ def main(argv=None):
     ap.add_argument("--refresh", action="store_true", help="download the index files again")
     ap.add_argument("--resorts-dir", default=RESORTS_DIR, help=argparse.SUPPRESS)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    r = sub.add_parser("resolve", help="name to OpenSkiData ski area(s) and resorts/<slug>.json")
+    r = sub.add_parser("resolve", help="name to OpenSkiData ski area(s) and resorts/<slug>/<slug>.json")
     r.add_argument("name")
     r.add_argument("--id", help="OpenSkiData ski area id, when several match")
     r.add_argument("--with", dest="with_", action="append", help="a neighbour to build into the same pack")
