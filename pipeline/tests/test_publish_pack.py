@@ -1,8 +1,7 @@
-"""FEAT-222: publish_pack.py's zip and catalog, the format constant shared with the client, and a round trip
-through game/tools/get_pack.mjs (skipped when node is not installed)."""
+"""FEAT-222: publish_pack.py's zip and catalog, and a round trip through game/tools/get_pack.mjs (skipped when node
+is not installed). The format constant shared with the game is checked against the game's main in test_contract.py."""
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -26,11 +25,6 @@ def make_pack(root, slug="demo", fmt=FORMAT_VERSION):
     (d / ".catalog.json").write_text("{}")
     write_meta(str(d), {"version": 1, "formatVersion": fmt, "slug": slug, "name": "Demo Mountain", "lonlat": [-106, 39]})
     return d
-
-
-def test_client_reads_the_format_the_pipeline_writes(game_file):
-    ts = open(game_file("game", "src", "pack", "format.ts"), encoding="utf-8").read()
-    assert int(re.search(r"PACK_FORMAT\s*=\s*(\d+)", ts).group(1)) == FORMAT_VERSION
 
 
 def test_zip_is_stored_repeatable_and_leaves_out_debug(tmp_path):

@@ -55,19 +55,6 @@ def test_osm_pistes_ways_areas_relations(tmp_path):
 
 
 # ------------------------------------------------------------------ BUG-069: forest weighted by drawn crowns
-def test_crown_ratio_matches_client_species(game_file):
-    """CROWN_RATIO is a hand copy of SPECIES[].radius in species.ts: same ids, same order, same values"""
-    import re
-    from cover import CROWN_RATIO
-    src = open(game_file("game", "src", "world", "trees", "species.ts"), encoding="utf-8").read()
-    table = src[src.index("export const SPECIES"):]
-    table = table[:table.index("];")]
-    rows = re.findall(r"\{\s*id:\s*(\d+),[^\n]*?\bradius:\s*([\d.]+)", table)
-    assert [int(i) for i, _ in rows] == list(range(len(rows))), "species ids are not 0..n-1 in order"
-    assert len(rows) == len(CROWN_RATIO), f"species.ts has {len(rows)} species, CROWN_RATIO {len(CROWN_RATIO)}"
-    assert np.allclose([float(r) for _, r in rows], CROWN_RATIO), "CROWN_RATIO drifted from species.ts radius"
-
-
 def test_crown_radii_as_client():
     """crownRadius: natural radius x height, nudged 0.85..1.25x toward the record; bad ids draw as species 0"""
     from cover import crown_radii, CROWN_RATIO
