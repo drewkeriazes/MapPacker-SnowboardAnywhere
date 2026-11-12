@@ -76,7 +76,7 @@ for (const L of layers) {
   if (r.ok && r.body.jobId) { job = r.body.jobId; layer = L; break; }
   console.log(`  rejected (HTTP ${r.status}): ${r.body.message ?? JSON.stringify(r.body)}`);
 }
-if (!job) { console.error('No layer was accepted. Check the layer names at https://lfps.usgs.gov/products and pass one as the third argument.'); process.exit(2); }
+if (!job) { console.error('No layer was accepted. Check the layer names at https://lfps.usgs.gov/products and pass one after <slug> (after the email when it is given as an argument).'); process.exit(2); }
 console.log('jobId', job);
 
 const t0 = Date.now();
