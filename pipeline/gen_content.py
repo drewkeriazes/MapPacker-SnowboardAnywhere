@@ -11,15 +11,17 @@ rendered from this build stays valid:
   most-ridden run from there (most grooming reports, then groomed, then the easiest of intermediate / easy /
   advanced, then the longest). The rider stands on the run's centre line where it is on snow (mask rock and scree
   under half), clear of trees (no crown edge within 3 m, no stand with a stem chance over 0.25 within 6 m: the
-  same rule as `pack_report.py` line 10), 20 m clear of any lift station and on a slope that falls 2 to 35 degrees
-  along the run; facing down it. `{x, y, heading, run, lift, label, source: "generated"}`. Lifts are tried highest
+  same rule as `pack_report.py` line 10), 20 m clear of any lift station, on a slope that falls 4 to 35 degrees
+  along the run and where the run falls on (6 m over the next 60 m of its centre line, never rising 0.3 m above the
+  start on the way, so the rider rolls off rather than stopping in a flat); facing down it. `{x, y, heading, run, lift, label, source: "generated"}`. Lifts are tried highest
   top first; expert and freeride runs only when nothing else leaves a lift.
 - **menu shots** (`attract/shots.json`, `attract/index.json`, and `meta.attract = {"generated": true}` so the game
   knows to ask for them): about five camera spots from the lift tops, the named peaks inside the bounds and the start.
   From each, a panorama is ray-marched over the height sets (fine, then mid, then far; the earth's curvature
   included) and every heading and pitch is scored by how much of the frame is terrain against sky (best near 60 %
   terrain) and how far you can see (the median and the far tenth of the hit distances), less any slope that blocks
-  the upper half close by. The first shot, the one the menu uses, must see the start run (the ghost riders ride it,
+  the upper half close by. The first shot, the one the menu uses, must see the start run (and still score at least
+  60 % of the best view) (the ghost riders ride it,
   `game/tools/auto_attract.mjs`); the rest are the best of the other spots, at least 250 m apart. Each is an
   `AttractShot` (`game/src/world/AttractShots.ts`) in the default conditions, with a `note` giving its numbers.
   The folder has the shape FEAT-243 gives the pack's `attract/`: `index.json` is one resort's manifest entry
@@ -50,8 +52,11 @@ START_FROM_TOP_M = 15.0        # the walk down the run starts this far from the 
 START_WALK_M = 400.0           # and gives up this far down
 START_STEP_M = 3.0
 START_LIFT_CLEAR_M = 20.0      # closer, the chase camera starts inside the terminal (FEAT-219)
-START_SLOPE_DEG = (2.0, 35.0)  # the fall along the run over START_SLOPE_M: the rider must move, but not off a cliff
+START_SLOPE_DEG = (4.0, 35.0)  # the fall along the run over START_SLOPE_M: the rider must move, but not off a cliff
 START_SLOPE_M = 12.0
+START_ROLL_M = 60.0            # and the run falls on from there: START_ROLL_DROP over this, never rising START_ROLL_RISE
+START_ROLL_DROP = 6.0
+START_ROLL_RISE = 0.3
 RUN_NEAR_TOP_M = 120.0         # a run leaves a lift when it passes this close to its top station
 LIFT_TRIES = 6                 # highest lift tops tried
 DIFF_RANK = {"intermediate": 0, "easy": 1, "novice": 1, "advanced": 2}
@@ -69,6 +74,7 @@ MARCH = (3.0, 1.025, 40000.0)  # first step m, growth per step, farthest m
 EARTH_R = 6371000.0 / 0.87     # curvature with standard refraction (k = 0.13)
 LIFT_PAST_M = (30.0, 70.0)     # camera spots this far past a lift's top station, along the lift
 START_BACK_M = (40.0, 80.0)    # and this far up the start run behind the start
+START_HIGH_EYE = 30.0          # each also this high, to see out of a bowl (Big Sky's Powder Seeker top)
 EYE_MIN, EYE_MAX = 10.0, 32.0  # camera height over the snow; raised over the trees round it
 TREE_LOOK_M = 25.0
 SHOT_APART_M = 250.0
@@ -78,6 +84,7 @@ BLOCK_M = 150.0
 RUN_VIEW_M = (20.0, 700.0)     # the stretch of the start run the menu shot should see
 MENU_RUN_MIN = 0.2             # share of it in view, unoccluded
 MENU_RUN_WEIGHT = 1.2           # the menu shot: its view score plus this times the start run in view
+MENU_VIEW_SHARE = 0.6          # and its view score at least this share of the best spot's
 RUN_CLOSE_M = 120.0            # a point of it further from the camera counts for RUN_CLOSE_M / distance
 STATION_NEAR_M = 90.0          # a lift station this close in the frame is a roof in the foreground
 STATION_PENALTY = 0.3
@@ -186,6 +193,9 @@ class StartCheck:
         self.meta, self.ground, self.mask, self.trees, self.stands = meta, ground, mask, trees, stands
         self.stations = np.array([s[:2] for lf in lifts for s in (lf.get("stations") or [])] or np.zeros((0, 2)))
 
+    def rolls_on(self, pts, d, i):
+        return rolls_on(self.ground, pts, d, i)
+
     def why_not(self, x, y, ux, uy):
         """None when (x, y) facing (ux, uy) is a good start, else the reason"""
         b = self.meta["bounds"]
@@ -219,6 +229,24 @@ class StartCheck:
         return None
 
 
+def rolls_on(ground, pts, d, i):
+    """None when the run falls on from point i (the ground along its centre line drops START_ROLL_DROP over the next
+    START_ROLL_M and never rises over START_ROLL_RISE above the start on the way), else the reason. A rider dropped
+    on a flat or into a dip just stops (Big Sky's Morningstar under the Powder Seeker top, 2026-11-12)"""
+    ahead = (d > d[i]) & (d <= d[i] + START_ROLL_M)
+    if not ahead.any() or d[ahead][-1] < d[i] + START_ROLL_M * 0.8:
+        return "run ends"
+    z0 = ground.at(pts[i, 0], pts[i, 1])
+    z = ground.z(pts[ahead, 0], pts[ahead, 1])
+    if not np.isfinite(z0) or not np.isfinite(z).all():
+        return "no ground"
+    if z.max() > z0 + START_ROLL_RISE:
+        return f"the run rises {z.max() - z0:.1f} m ahead"
+    if z0 - z[-1] < START_ROLL_DROP:
+        return f"the run falls only {z0 - z[-1]:.1f} m in {START_ROLL_M:.0f} m"
+    return None
+
+
 def place_on(run, tx, ty, check):
     """the first good start on `run` walking down from the point nearest (tx, ty); (x, y, heading) or (None, why)"""
     pts, d = walk_from(run["points"], tx, ty)
@@ -234,7 +262,7 @@ def place_on(run, tx, ty, check):
         ux, uy = pts[j, 0] - pts[i, 0], pts[j, 1] - pts[i, 1]
         L = math.hypot(ux, uy) or 1.0
         ux, uy = ux / L, uy / L
-        why = check.why_not(pts[i, 0], pts[i, 1], ux, uy)
+        why = check.why_not(pts[i, 0], pts[i, 1], ux, uy) or check.rolls_on(pts, d, i)
         if why is None:
             return (float(pts[i, 0]), float(pts[i, 1]), math.atan2(ux, uy)), None
     return None, why
@@ -422,12 +450,13 @@ def viewpoints(meta, features, start, trees, ground):
     if start:
         hx, hy = math.sin(start["heading"]), math.cos(start["heading"])
         for back in START_BACK_M:
-            out.append({"kind": "start", "x": start["x"] - hx * back, "y": start["y"] - hy * back,
-                        "name": start.get("run"), "z": None})
+            for lift in (0.0, START_HIGH_EYE):      # and high, to see out of a bowl
+                out.append({"kind": "start", "x": start["x"] - hx * back, "y": start["y"] - hy * back,
+                            "name": start.get("run"), "z": None, "eyeMin": lift})
     for v in out:
         g = ground.at(v["x"], v["y"])
         v["ground"] = g
-        v["eye"] = eye_height(trees, v["x"], v["y"])
+        v["eye"] = max(eye_height(trees, v["x"], v["y"]), v.get("eyeMin", 0.0))
     return [v for v in out if np.isfinite(v["ground"])]
 
 
@@ -499,7 +528,10 @@ def choose_shots(meta, features, ground, trees, start, count=SHOTS, log=print):
             f"score {best[0]:.2f} {best[3]}" + (f"; sees the start run {menu[3]['run']:.0%} at {menu[1]:.0f} deg" if menu else ""))
     shots = []
     picked = []
-    with_run = [t for t in scored if t[2] is not None]
+    # the menu's view must still be a view: at least MENU_VIEW_SHARE of the best spot's score (Big Sky picked a
+    # spot staring into the slope above the start once, for its run in view)
+    top = max((t[1][0] for t in scored), default=0.0)
+    with_run = [t for t in scored if t[2] is not None and t[2][4] >= MENU_VIEW_SHARE * top]
     if with_run:
         v, _, m = max(with_run, key=lambda t: t[2][0])
         shots.append(shot_of(v, (m[4], m[1], m[2], m[3]), region, region, 1))

@@ -91,3 +91,22 @@ def test_in_frame():
     assert gc.in_frame(cam, 90, 0, 100, 0, 10)           # east
     assert not gc.in_frame(cam, 0, 0, 0, 10, -30)        # far below a level frame
     assert gc.in_frame(cam, 0, -45, 0, 10, 0)            # but in one pitched down
+
+
+def test_rolls_on_needs_the_run_to_fall_on():
+    class G:                                   # flat for 30 m, then a 10 % fall (a cat track rolling over)
+        def z(self, x, y):
+            x = np.asarray(x, float)
+            return np.where(x < 30, 100.0, 100.0 - 0.1 * (x - 30))
+
+        def at(self, x, y):
+            return float(self.z(np.array([x]), np.array([y]))[0])
+    pts = np.stack([np.arange(0, 200, 3.0), np.zeros(67)], 1)
+    d = pts[:, 0].copy()
+    assert "falls only" in gc.rolls_on(G(), pts, d, 0)          # 3 m in the first 60 m
+    assert gc.rolls_on(G(), pts, d, 10) is None                  # from 30 m on: 6 m
+    bump = lambda x: np.where((x > 40) & (x < 50), 101.0, 100.0 - 0.2 * x)
+    class B(G):
+        def z(self, x, y):
+            return bump(np.asarray(x, float))
+    assert "rises" in gc.rolls_on(B(), pts, d, 0)
