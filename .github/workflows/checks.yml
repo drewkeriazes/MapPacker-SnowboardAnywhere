@@ -18,7 +18,11 @@
 #                     when asked for: the `stills` label, or a manual run with
 #                     `stills` ticked. Skipped (still green) when
 #                     tools/ci/local_render_budgets.mjs passed on Drew's GPU for the
-#                     same commit, merge base, tools, synthetic pack and game commit
+#                     same commit, merge base, tools, synthetic pack and game commit.
+#                     Not drawn either (FEAT-251, no stills asked for) when main and
+#                     the PR build the same pack (tools/ci/pack_content_key.py), or
+#                     when an earlier commit of the PR passed with the same two packs,
+#                     game commit and tools: that run's report is reused
 #   repo-rules        no em dashes in added Markdown, plain commit messages,          always (PRs)
 #                     docs-travel warning
 #   public-guards     no .env files, no packs, raw data or data files in git, files   always
@@ -229,26 +233,11 @@ jobs:
           echo "sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
 
       - if: steps.local.outputs.skip != 'true'
-        uses: actions/checkout@v6
-        with:
-          repository: ${{ env.GAME_REPO }}
-          ref: ${{ steps.game.outputs.sha }}
-          path: game-main
-      - if: steps.local.outputs.skip != 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: game-main/game/package-lock.json
-      - if: steps.local.outputs.skip != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
-      - if: steps.local.outputs.skip != 'true'
-        run: npm ci
-        working-directory: game-main/game
       - if: steps.local.outputs.skip != 'true'
         run: pip install numpy pillow
 
@@ -294,35 +283,118 @@ jobs:
           echo '{"packs":["synth"]}' > packs/index.json
           echo '{"packs":["synth"]}' > "$MAIN_PACKS/index.json"
 
+      # FEAT-251: the result depends only on what the two packs hold, the game commit and these tools. When main and
+      # the PR build the same pack (a refactor, or code the synthetic pack never runs) there is nothing to compare;
+      # when an earlier commit of this PR passed with the same four, its report is reused (the cache is the PR's own).
+      # Either way nothing is drawn here. Stills asked for: always drawn.
       - if: steps.local.outputs.skip != 'true'
+        name: Same packs, or a passing result to reuse?
+        id: keys
+        env:
+          STILLS: ${{ steps.want.outputs.stills }}
+          GAME_SHA: ${{ steps.game.outputs.sha }}
+        run: |
+          main_content=$(python tools/ci/pack_content_key.py "$MAIN_PACKS/synth")
+          pr_content=$(python tools/ci/pack_content_key.py packs/synth)
+          tools=$(bash tools/ci/render_budgets_key.sh HEAD)
+          echo "main's pack $main_content, the PR's pack $pr_content, game ${GAME_SHA:0:12}, tools $tools"
+          if [ "$main_content" = "$pr_content" ]; then same=true; else same=false; fi
+          if [ "$STILLS" = true ]; then reuse=false; else reuse=true; fi
+          {
+            echo "key=render-budgets-$main_content-$pr_content-${GAME_SHA:0:12}-$tools"
+            echo "content=$pr_content"
+            echo "same=$same"
+            echo "reuse=$reuse"
+          } | tee -a "$GITHUB_OUTPUT"
+      - if: steps.keys.outputs.reuse == 'true' && steps.keys.outputs.same != 'true'
+        uses: actions/cache/restore@v4
+        id: reused
+        with:
+          path: ci-stills/report
+          key: ${{ steps.keys.outputs.key }}
+      - if: steps.local.outputs.skip != 'true'
+        name: Draw here?
+        id: reuse
+        env:
+          SAME: ${{ steps.keys.outputs.same }}
+          REUSE: ${{ steps.keys.outputs.reuse }}
+          HIT: ${{ steps.reused.outputs.cache-hit }}
+          CONTENT: ${{ steps.keys.outputs.content }}
+          GAME_SHA: ${{ steps.game.outputs.sha }}
+          HEAD_SHA: ${{ steps.local.outputs.sha }}
+        run: |
+          render=true
+          game="[\`${GAME_SHA:0:12}\`](https://github.com/$GAME_REPO/commit/$GAME_SHA)"
+          if [ "$REUSE" != true ]; then echo "stills asked for: drawing here"
+          elif [ "$SAME" = true ]; then
+            render=false
+            mkdir -p "$OUT/report"
+            {
+              echo '<!-- ci-stills -->'
+              echo '## Shader compile and scene budgets (synthetic pack)'
+              echo
+              echo "This PR builds the same synthetic pack as \`main\` (content \`$CONTENT\`), so the game's \`main\` at $game would draw the same scene on both sides: nothing to compare, not drawn in CI (FEAT-251). Add the \`stills\` label to draw it anyway."
+            } > "$OUT/report/report.md"
+            echo "::notice::the PR builds the same synthetic pack as main ($CONTENT): render-budgets not drawn"
+          elif [ "$HIT" = true ] && [ -f "$OUT/report/report.md" ] && [ -f "$OUT/report/source.txt" ]; then
+            render=false
+            read -r src_run src_sha < "$OUT/report/source.txt"
+            {
+              echo
+              echo "reused in CI at $HEAD_SHA: the same synthetic packs, game commit and tools as $src_sha, which passed ([run]($src_run)); the numbers above are from that run (FEAT-251)."
+            } >> "$OUT/report/report.md"
+            echo "::notice::reused the passing result of $src_sha ($src_run): render-budgets not drawn"
+          else
+            rm -rf "$OUT/report"
+            echo "no passing result for these packs, game commit and tools: drawing here"
+          fi
+          echo "render=$render" >> "$GITHUB_OUTPUT"
+
+      - if: steps.reuse.outputs.render == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.GAME_REPO }}
+          ref: ${{ steps.game.outputs.sha }}
+          path: game-main
+      - if: steps.reuse.outputs.render == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: game-main/game/package-lock.json
+      - if: steps.reuse.outputs.render == 'true'
+        run: npm ci
+        working-directory: game-main/game
+
+      - if: steps.reuse.outputs.render == 'true'
         id: pw
         working-directory: game-main/game
         run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
-      - if: steps.local.outputs.skip != 'true'
+      - if: steps.reuse.outputs.render == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ steps.pw.outputs.version }}
-      - if: steps.local.outputs.skip != 'true'
+      - if: steps.reuse.outputs.render == 'true'
         run: npx playwright install --with-deps chromium
         working-directory: game-main/game
-      - if: steps.local.outputs.skip != 'true'
+      - if: steps.reuse.outputs.render == 'true'
         run: npx vite build
         working-directory: game-main/game
 
-      - if: steps.local.outputs.skip != 'true'
+      - if: steps.reuse.outputs.render == 'true'
         name: Render main's pack (before)
         working-directory: game-main/game
         continue-on-error: true
         run: SHOT_PACKS="$MAIN_PACKS" node tools/cishot.mjs synth "$OUT/before" --cpu
-      - if: steps.local.outputs.skip != 'true'
+      - if: steps.reuse.outputs.render == 'true'
         name: Render the PR's pack (after)
         id: after
         working-directory: game-main/game
         continue-on-error: true
         run: SHOT_PACKS="$GITHUB_WORKSPACE/packs" node tools/cishot.mjs synth "$OUT/after" --cpu
 
-      - if: steps.local.outputs.skip != 'true'
+      - if: steps.reuse.outputs.render == 'true'
         name: Report
         id: report
         continue-on-error: true
@@ -338,6 +410,23 @@ jobs:
             python tools/ci/render_note.py "$OUT/report/report.md" --game-repo "$GAME_REPO" --game-sha "$GAME_SHA" $SAME
           fi
           exit $rc
+
+      # FEAT-251: a pass with no stills is kept for the PR's later commits, under the key from "Same packs, or a
+      # passing result to reuse?"
+      - if: >-
+          steps.reuse.outputs.render == 'true' && steps.keys.outputs.reuse == 'true' &&
+          steps.after.outcome == 'success' && steps.report.outcome == 'success'
+        name: Keep the passing result
+        env:
+          HEAD_SHA: ${{ steps.local.outputs.sha }}
+        run: echo "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} $HEAD_SHA" > "$OUT/report/source.txt"
+      - if: >-
+          steps.reuse.outputs.render == 'true' && steps.keys.outputs.reuse == 'true' &&
+          steps.after.outcome == 'success' && steps.report.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: ci-stills/report
+          key: ${{ steps.keys.outputs.key }}
       - uses: actions/upload-artifact@v4
         if: always() && steps.local.outputs.skip != 'true'
         with:
@@ -345,7 +434,7 @@ jobs:
           path: ci-stills
           retention-days: 14
           if-no-files-found: ignore
-      - if: steps.local.outputs.skip != 'true'
+      - if: steps.reuse.outputs.render == 'true'
         name: Result
         run: |
           [ "${{ steps.after.outcome }}" = "success" ] || { echo "::error::cishot on the PR's pack failed (shader message, page error or crash): see 'Render the PR's pack'"; exit 1; }
