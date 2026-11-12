@@ -9,7 +9,8 @@ Every published pack, grouped by resort, newest version first. The game download
 
 ## Boston Mills / Brandywine
 
-- [v2](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/boston-mills/v2) (latest) 60 MB, 2026-11-12
+- [v3](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/boston-mills/v3) (latest) 60 MB, 2026-11-12
+- [v2](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/boston-mills/v2) 60 MB, 2026-11-12
 
 ## Breckenridge
 
