@@ -1127,7 +1127,6 @@ def resolve_and_write(a, hosts, keep_planned=False):
     to pass."""
     feats = load_json(hosts.index("ski_areas.geojson"))["features"]
     pick_id, with_, alone = a.id, list(a.with_ or ()), a.alone
-    answered = False
     while True:
         st, r = resolve(a.name, feats, hosts.index("lifts.geojson"), hosts.index("runs.geojson"),
                         pick_id=pick_id, with_=with_, alone=alone)
@@ -1140,7 +1139,6 @@ def resolve_and_write(a, hosts, keep_planned=False):
             continue
         if not can_ask():
             break
-        answered = True
         if st == "many":
             print(f"{len(r['matches'])} ski areas match {a.name!r}:")
             print("\n".join(f"{k:>3}. {describe(f).strip()}" for k, f in enumerate(r["matches"], 1)))
