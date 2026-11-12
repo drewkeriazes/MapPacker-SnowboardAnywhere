@@ -14,6 +14,11 @@ packs/<slug>). The config is resorts/<slug>/<slug>.json, the manifest manifests/
   landfire  fetch_landfire.mjs EVT, EVC, EVH (US only; the LFPS service wants an email: --email or LANDFIRE_EMAIL)
   grooming  fetch_grooming.py, when the config has a terrain_status_url
   build     build_pack.py (DEM, lidar, NAIP, masks, moguls, piste directions, AO, trees, far trees, cover)
+  content   gen_content.py (FEAT-175 step 4): the default start and the main menu shots, from the pack
+  attract   the game's tools/auto_attract.mjs: the menu still and ghost takes down the start run (on the GPU; skipped
+            without a SnowboardAnywhere checkout that has the tool, paths.game_repo)
+  spots     the game's tools/propose_spots.py: 10 proposed compare spots with game stills in the game checkout's
+            docs/compare/<slug>/, for Drew to add Street View links (once, while the resort has no spots there)
   index     packs/index.json lists the pack
   report    pack_report.py: the DATA-022 scorecard (report.json, report.md in the pack)
 
@@ -29,14 +34,14 @@ JSON and not an Overpass error page, the pack's meta.json in this pipeline's for
 (`--force all` runs every one), `--dry-run` prints what would run and why. Exit status: 0 done, 1 a stage failed
 (the message says which and what to do), 2 bad arguments. `build_resort.cmd` is the launcher on Drew's PC.
 """
-import argparse, glob, hashlib, json, os, subprocess, sys, time
+import argparse, glob, hashlib, json, os, shutil, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import paths  # noqa: E402
 
-STAGES = ["nodes", "manifest", "fetch", "landfire", "grooming", "build", "index", "report"]
+STAGES = ["nodes", "manifest", "fetch", "landfire", "grooming", "build", "content", "attract", "spots", "index", "report"]
 STATE = "build_resort.json"
 LANDFIRE = (("EVT", "landfire"), ("EVC", os.path.join("landfire", "evc")), ("EVH", os.path.join("landfire", "evh")))
 # raw layers build_pack.py needs (pack_report.py line 2): folder, and a file that must be in it
@@ -69,7 +74,8 @@ def file_sha(path) -> str | None:
 # and went back to the game (FEAT-242), so neither shapes a pack
 NOT_BUILD = ("pipeline/tests", "pipeline/resorts", "pipeline/manifests", "pipeline/build_resort.py",
              "pipeline/resort.py", "pipeline/publish_pack.py", "pipeline/pack_report.py", "pipeline/contract.py",
-             "pipeline/prep_textures.py")
+             "pipeline/prep_textures.py", "pipeline/gen_content.py")
+# FEAT-175 step 4: gen_content.py is its own stage (content) after the build, with its own fingerprint
 NOT_BUILD_SPEC = [f":!{p}" for p in NOT_BUILD]
 
 
@@ -362,6 +368,96 @@ def build_run(r, ctx):
     print(f"  built in {time.time() - t:.0f} s, build {m.get('build')}")
 
 
+# FEAT-175 step 4: the generated start, menu shots, still, ghosts and compare spots (gen_content.py, the game's tools)
+def content_inputs(r):
+    m = meta(r) or {}
+    return sha(m.get("build"), file_sha(os.path.join(HERE, "gen_content.py")), file_sha(r.cfg_path))
+
+
+def content_present(r):
+    return ((meta(r) or {}).get("start") or {}).get("source") == "generated"
+
+
+def content_run(r, ctx):
+    if ctx.run([sys.executable, os.path.join(HERE, "gen_content.py"), r.out, "--config", r.cfg_path]):
+        raise Failed("gen_content.py failed: the log above says where")
+
+
+def game_tool(rel):
+    """the game checkout's file `rel` (game/tools/...), or None without one (paths.game_repo: SBA_GAME_REPO)"""
+    p = os.path.join(paths.game_repo(), *rel.split("/"))
+    return p if os.path.isfile(p) else None
+
+
+def attract_index(r):
+    try:
+        with open(os.path.join(r.out, "attract", "index.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def attract_inputs(r):
+    return sha((meta(r) or {}).get("build"), file_sha(os.path.join(r.out, "attract", "shots.json")))
+
+
+def attract_present(r):
+    idx = attract_index(r)
+    return bool(idx) and (not idx.get("generated") or (bool(idx.get("stills")) and bool(idx.get("ghosts"))))
+
+
+def with_packs(r, fn):
+    """run fn() with SHOT_PACKS at the folder that holds the pack (the game's tools serve /packs/<slug>/ from it)"""
+    if os.path.basename(os.path.normpath(r.out)) != r.slug:
+        raise Failed(f"the game serves packs by slug: {r.out} must be named {r.slug}")
+    old = os.environ.get("SHOT_PACKS")
+    os.environ["SHOT_PACKS"] = os.path.dirname(os.path.normpath(r.out))
+    try:
+        return fn()
+    finally:
+        if old is None:
+            os.environ.pop("SHOT_PACKS", None)
+        else:
+            os.environ["SHOT_PACKS"] = old
+
+
+def attract_run(r, ctx):
+    idx = attract_index(r)
+    if idx is not None and not idx.get("generated"):
+        print("  the pack's attract/ is hand-made: left alone")
+        return
+    if not os.path.isfile(os.path.join(r.out, "attract", "shots.json")):
+        print("  no generated shots (gen_content.py found no camera spot): no menu still or ghosts")
+        return
+    game = os.path.dirname(os.path.dirname(game_tool("game/tools/auto_attract.mjs")))
+    if ctx.run([shutil.which("npx") or "npx", "vite", "build"], game):
+        raise Failed("the game did not build (cd game && npx vite build)")
+    code = with_packs(r, lambda: ctx.run(["node", os.path.join("tools", "auto_attract.mjs"), r.slug], game))
+    if code == 1:
+        print("  warning: auto_attract.mjs has things to look at (above); the still and takes are written")
+    elif code:
+        raise Failed(f"auto_attract.mjs exited {code} (above)")
+
+
+def compare_dir(r):
+    return os.path.join(paths.game_repo(), "docs", "compare", r.slug)
+
+
+def spots_inputs(r):
+    return sha(r.slug)            # once: the proposals are a start; Drew's own spots then live there
+
+
+def spots_present(r):
+    return bool(glob.glob(os.path.join(compare_dir(r), "*", "spot.json")))
+
+
+def spots_run(r, ctx):
+    tool = game_tool("tools/propose_spots.py")
+    code = with_packs(r, lambda: ctx.run([sys.executable, tool, r.slug, "--shoot"], paths.game_repo()))
+    if code:
+        raise Failed(f"propose_spots.py exited {code} (above)")
+
+
 def index_inputs(r):
     return None      # always: cheap, and another pack may have changed the index
 
@@ -398,6 +494,7 @@ def report_run(r, ctx):
 
 STAGE_FN = {s: (globals()[f"{s}_inputs"], globals()[f"{s}_present"], globals()[f"{s}_run"]) for s in STAGES}
 ADOPT = {"build": build_adoptable}     # stricter than "present" for outputs this tool did not record
+GAME_TOOL = {"attract": "game/tools/auto_attract.mjs", "spots": "tools/propose_spots.py"}   # stages that need the game
 
 
 # ------------------------------------------------------------------------------------------------ runner
@@ -413,6 +510,8 @@ class Context:
 def decide(r, stage, ctx):
     """(run?, why) for one stage"""
     inputs, present, _ = STAGE_FN[stage]
+    if stage in GAME_TOOL and not game_tool(GAME_TOOL[stage]):
+        return False, f"no {GAME_TOOL[stage]} in a game checkout at {paths.game_repo()} (SBA_GAME_REPO)"
     if ctx.forced(stage):
         return True, "forced"
     fp = inputs(r)

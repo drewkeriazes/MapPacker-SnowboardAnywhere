@@ -8,7 +8,8 @@ raw-data lines). The pack is **playable** when no MVP line (F and 1 to 14) is fa
 `publish_pack.py` reads that. `--gate` exits 1 when it is not.
 
 Reads only the pack, the resort config, the raw folder when given (file presence, no decoding), the catalog, and
-the hand content in the game checkout (`docs/compare/<slug>/`, `game/public/attract/<slug>/`,
+the hand content in the game checkout (`docs/compare/<slug>/`, `game/public/attract/<slug>/` or else the pack's
+generated `attract/` (gen_content.py, FEAT-175 step 4),
 `game/src/world/Landmarks.ts`, `game/src/resorts.ts`; ../SnowboardAnywhere, or --game-repo / SBA_GAME_REPO, until
 FEAT-243 moves that content into the pack). Without the game those lines say so and skip. About a minute on Vail. The numbers it measures, besides the checklist:
 - surface: rock share (mask R at least half), canopy share, canopy left on run centre lines (trail cuts should
@@ -432,9 +433,12 @@ class Report:
 
         # compare spots
         for p in sorted(glob.glob(os.path.join(self.game, "docs", "compare", self.slug, "*", "spot.json"))):
-            g = load_json(p).get("game", {})
+            spec = load_json(p)
+            g = spec.get("game", {})
             if "x" in g:
-                self.spots.append({"spot": os.path.basename(os.path.dirname(p)),
+                # FEAT-175: a spot propose_spots.py made has no Street View link until Drew adds one
+                paired = any(v.get("streetview") for v in spec.get("views", []))
+                self.spots.append({"spot": os.path.basename(os.path.dirname(p)), "paired": paired,
                                    "treesPerHa": round(trees_per_ha(self.trees, self.stand_pts, float(g["x"]), float(g["y"])))})
 
         # layers on disk
@@ -667,18 +671,19 @@ class Report:
                       "raw/names present" if self.raw_has("names") else "no raw/names", mvp=False)
         else:
             self.line("16", "Place names", SKIP, "pass --raw", mvp=False)
+        self.line("17", "Main menu shot and ghosts", *self.check_menu(), mvp=False)
         if self.has_game:
-            shots = os.path.join(self.game, "game", "public", "attract", self.slug, "shots.json")
-            self.line("17", "Main menu shot and ghosts", PASS if os.path.isfile(shots) else FAIL,
-                      f"game/public/attract/{self.slug}/shots.json" + ("" if os.path.isfile(shots) else " missing"), mvp=False)
             lm = os.path.join(self.game, "game", "src", "world", "Landmarks.ts")
             has_lm = os.path.isfile(lm) and bool(re.search(rf"^\s*'?{re.escape(self.slug)}'?\s*:\s*\[", open(lm, encoding="utf-8").read(), re.M))
             self.line("18", "Landmark", PASS if has_lm else FAIL, "in Landmarks.ts" if has_lm else "none (optional)", mvp=False)
-            self.line("19", "Compare spots against photos", PASS if self.spots else FAIL,
-                      f"{len(self.spots)} spots in docs/compare/{self.slug}", mvp=False)
+            paired = sum(1 for sp in self.spots if sp["paired"])
+            proposed = len(self.spots) - paired
+            self.line("19", "Compare spots against photos", PASS if paired else WARN if proposed else FAIL,
+                      f"{paired} spots with Street View in docs/compare/{self.slug}" +
+                      (f", {proposed} proposed waiting for a Street View link (propose_spots.py)" if proposed else ""), mvp=False)
         else:
             why = f"no SnowboardAnywhere checkout at {self.game} (--game-repo or SBA_GAME_REPO)"
-            for i, item in (("17", "Main menu shot and ghosts"), ("18", "Landmark"), ("19", "Compare spots against photos")):
+            for i, item in (("18", "Landmark"), ("19", "Compare spots against photos")):
                 self.line(i, item, SKIP, why, mvp=False)
         derived = meta.get("derived") or {}
         tl = meta.get("treeline")
@@ -688,6 +693,24 @@ class Report:
         self.line("20", "Values derived for the resort, not copied from Vail", PASS if tuned else FAIL,
                   "; ".join(parts) + ("" if tuned else "; rock and canopy thresholds are Vail's (FEAT-175 step 2)"), mvp=False)
 
+    def check_menu(self):
+        """line 17: the game's hand-made menu for the resort, else the pack's generated one (FEAT-175 step 4)"""
+        hand = self.has_game and os.path.isfile(os.path.join(self.game, "game", "public", "attract", self.slug, "shots.json"))
+        if hand:
+            return PASS, f"hand-made, game/public/attract/{self.slug}/"
+        ip = os.path.join(self.pack, "attract", "index.json")
+        idx = load_json(ip) if os.path.isfile(ip) else None
+        if idx and idx.get("generated"):
+            sp = os.path.join(self.pack, "attract", "shots.json")
+            n = len(load_json(sp)) if os.path.isfile(sp) else 0
+            still = bool(idx.get("stills")) and (idx.get("looks") or {}).get(idx["stills"][0], {}).get("pack") == self.meta.get("build")
+            ghosts = len(idx.get("ghosts") or [])
+            detail = f"generated (gen_content.py): {n} shots, " + ("a still of this build" if still else "no still of this build") +                 f", {ghosts} ghost takes" + ("" if still and ghosts else " (the game's tools/auto_attract.mjs makes them)")
+            return (PASS if still and ghosts else WARN), detail
+        if idx:
+            return PASS, "the pack's own attract/"
+        return FAIL, "none: no hand-made menu in the game" + ("" if self.has_game else " (no game checkout to look in)") +             " and no attract/ in the pack (gen_content.py)"
+
     def check_start(self):
         s = self.meta.get("start")
         if not s:
@@ -695,6 +718,8 @@ class Report:
         x, y = float(s["x"]), float(s["y"])
         b = self.meta["bounds"]
         where = f"on {s['run']}" if s.get("run") else "start"
+        if s.get("source") == "generated":
+            where = f"generated (gen_content.py) {where}" + (f", top of {s['lift']}" if s.get("lift") else "")
         if not (b["minX"] <= x < b["maxX"] and b["minY"] <= y < b["maxY"]):
             return FAIL, f"{where} is outside the bounds"
         probs = []

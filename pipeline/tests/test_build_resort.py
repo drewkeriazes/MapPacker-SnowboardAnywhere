@@ -60,6 +60,19 @@ class Fake:
             os.makedirs(r.out, exist_ok=True)
             json.dump({"slug": "demo", "name": "Demo", "formatVersion": FORMAT_VERSION, "pipeline": "abc1234",
                        "build": "b1"}, open(os.path.join(r.out, "meta.json"), "w"))
+        elif script == "gen_content.py":
+            m = json.load(open(os.path.join(r.out, "meta.json")))
+            m["start"] = {"x": 0, "y": 0, "heading": 0, "source": "generated"}
+            json.dump(m, open(os.path.join(r.out, "meta.json"), "w"))
+            os.makedirs(os.path.join(r.out, "attract"), exist_ok=True)
+            json.dump([{"id": "a"}], open(os.path.join(r.out, "attract", "shots.json"), "w"))
+            json.dump({"shots": True, "generated": True}, open(os.path.join(r.out, "attract", "index.json"), "w"))
+        elif script == "auto_attract.mjs":
+            self.packs = os.environ.get("SHOT_PACKS")
+            json.dump({"shots": True, "generated": True, "stills": ["a"], "ghosts": ["a-start-run-1.json"]},
+                      open(os.path.join(r.out, "attract", "index.json"), "w"))
+        elif script == "propose_spots.py":
+            self.packs = os.environ.get("SHOT_PACKS")
         return 0
 
 
@@ -70,6 +83,7 @@ def resort(tmp_path, monkeypatch):
     json.dump(CFG, open(res / "demo" / "demo.json", "w"))   # FEAT-244: a folder per resort
     monkeypatch.setattr(B, "pipeline_code", lambda repo=B.REPO: "code1")
     monkeypatch.setattr(B, "same_code", lambda commit, repo=B.REPO: commit == "abc1234")
+    monkeypatch.setattr(B, "game_tool", lambda rel: None)     # no game checkout: attract and spots skip
     r = B.Resort("demo", str(tmp_path / "raw" / "demo"), str(tmp_path / "packs" / "demo"), str(res), str(man))
     return r
 
@@ -86,7 +100,7 @@ def test_first_run_runs_every_stage_then_nothing_but_index_and_report(resort):
     go(resort, f)
     assert f.calls == ["ept_select.py", "gen_manifest.py", "fetch.ps1", "fetch_landfire.mjs EVT",
                        "fetch_landfire.mjs EVC", "fetch_landfire.mjs EVH", "fetch_grooming.py", "build_pack.py",
-                       "pack_report.py"]
+                       "gen_content.py", "pack_report.py"]
     assert json.load(open(os.path.join(resort.out, "..", "index.json")))["packs"] == ["demo"]
     f2 = Fake(resort)
     lines = go(B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests), f2)
@@ -132,7 +146,7 @@ def test_existing_outputs_are_adopted_on_the_first_run(resort):
     r = B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests)
     f = Fake(r)
     go(r, f)
-    assert f.calls == ["build_pack.py", "pack_report.py"]
+    assert f.calls == ["build_pack.py", "gen_content.py", "pack_report.py"]
 
 
 def test_a_new_manifest_fetches_again(resort):
@@ -143,7 +157,7 @@ def test_a_new_manifest_fetches_again(resort):
     f = Fake(r)
     lines = go(r, f)
     assert "[manifest] run: inputs changed" not in lines        # the manifest's own inputs did not change
-    assert f.calls == ["fetch.ps1", "build_pack.py", "pack_report.py"]
+    assert f.calls == ["fetch.ps1", "build_pack.py", "gen_content.py", "pack_report.py"]
 
 
 def test_failed_downloads_stop_with_a_message(resort):
@@ -223,10 +237,10 @@ def test_from_stop_after_force_and_dry_run(resort):
     go(resort, Fake(resort))
     f = Fake(resort)
     go(resort, f, first="build", force=["build"])
-    assert f.calls == ["build_pack.py", "pack_report.py"]
+    assert f.calls == ["build_pack.py", "gen_content.py", "pack_report.py"]   # a new meta.json: the content again
     f = Fake(resort)
     go(resort, f, force=["all"])
-    assert len(f.calls) == 9
+    assert len(f.calls) == 10                      # attract and spots skip without the game, forced or not
 
 
 def test_a_failed_build_and_the_gate(resort):
@@ -316,3 +330,22 @@ def test_pipeline_code_ignores_tests_and_configs():
     if code is None:
         pytest.skip("not a git checkout")
     assert len(code.split("+")[0]) == 16
+
+
+def test_content_attract_and_spots_with_the_game(resort, monkeypatch, tmp_path):
+    game = tmp_path / "game"
+    monkeypatch.setattr(B, "game_tool", lambda rel: str(game / rel))
+    monkeypatch.setattr(B.paths, "game_repo", lambda *a, **k: str(game))
+    f = Fake(resort)
+    lines = go(resort, f)
+    assert f.calls[-6:] == ["build_pack.py", "gen_content.py", "vite", "auto_attract.mjs", "propose_spots.py",
+                            "pack_report.py"]
+    assert f.packs == os.path.dirname(resort.out)          # the game's tools serve the pack from where it was built
+    assert "SHOT_PACKS" not in os.environ
+    # done: the still and ghosts are there; spots run again only while the game has none for the resort
+    (game / "docs" / "compare" / "demo" / "top").mkdir(parents=True)
+    (game / "docs" / "compare" / "demo" / "top" / "spot.json").write_text("{}")
+    f = Fake(resort)
+    lines = go(B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests), f)
+    assert f.calls == ["pack_report.py"]
+    assert "[content] skip: inputs unchanged" in lines and "[attract] skip: inputs unchanged" in lines
