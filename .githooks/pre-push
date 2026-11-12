@@ -3,7 +3,7 @@
 # clone; every worktree shares it). core.hooksPath hides .git/hooks, so a local pre-push there runs first, as it would
 # without this folder. Then, only with `git config sa.gpuBudgets true` (Drew's PC), tools/ci/pre_push_render_budgets.mjs
 # runs CI's render-budgets on the GPU before the push of a PR branch that changes pipeline/. That part never blocks
-# the push, and a push to main (publish_pack.py) is never checked. Skip: --no-verify or SA_SKIP_GPU_BUDGETS=1.
+# the push, and a publish branch (publish/<slug>-v<N>, publish_pack.py pushes it) is never checked. Skip: --no-verify or SA_SKIP_GPU_BUDGETS=1.
 input=$(cat)
 local_hook="$(git rev-parse --git-common-dir)/hooks/pre-push"
 if [ -x "$local_hook" ]; then
