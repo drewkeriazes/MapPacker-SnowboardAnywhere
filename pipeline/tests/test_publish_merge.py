@@ -537,7 +537,7 @@ def test_sweep_leaves_a_draft_main_does_not_name_and_never_raises(monkeypatch):
 
     def boom(*a, **k):
         raise SystemExit("gh failed")
-    monkeypatch.setattr(publish_merge, "api_pages", boom)
+    monkeypatch.setattr(publish_merge, "api", boom)
     publish_merge.sweep(REPO)
     assert not released(calls)
 
@@ -548,3 +548,19 @@ def test_ready_runs_the_sweep_before_its_own_decision(monkeypatch):
     monkeypatch.setattr(publish_merge, "sweep", lambda repo, skip=None: seen.append(skip))
     publish_merge.main(["ready", "7"])
     assert seen == [7]
+
+
+def test_sweep_reads_one_page_not_the_whole_history(monkeypatch):
+    calls = fake_gh(monkeypatch, pr={"merged": True, "state": "closed"}, release_draft=True)
+    publish_merge.sweep(REPO)
+    listing = [c for c in calls if len(c) > 2 and "pulls?state=closed" in c[2]]
+    assert len(listing) == 1 and "--paginate" not in listing[0] and "per_page=20" in listing[0][2]
+
+
+@pytest.mark.parametrize("pr, base", [({"fork": True}, "main"), ({}, "dev")])
+def test_sweep_leaves_a_merged_fork_or_non_main_pr_alone(monkeypatch, pr, base):
+    other = [{"number": 7, "merged_at": "t", "head": {"ref": "publish/a-v1"}}]
+    calls = fake_gh(monkeypatch, pr={"merged": True, "state": "closed", **pr}, release_draft=True, closed_prs=other)
+    calls.state["pr"]["base"]["ref"] = base
+    publish_merge.sweep(REPO)
+    assert not released(calls)

@@ -362,7 +362,7 @@ def sweep(repo: str, skip: int | None = None) -> None:
     first does what `closed` would for the last SWEEP merged publish/ PRs: a draft still unpublished whose tag main's
     catalog names is published (closed() keeps its fail-closed rules). Never raises: a failure here must not stop `ready`."""
     try:
-        listed = api_pages(f"repos/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page={SWEEP}")[:SWEEP]
+        listed = api(f"repos/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page={SWEEP}")[:SWEEP]  # page 1 only
     except (Exception, SystemExit) as e:
         return print(f"sweep: could not list closed PRs: {e}") or None
     for p in listed:
