@@ -11,9 +11,140 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from packwriter import FORMAT_VERSION, write_meta  # noqa: E402
+import publish_pack  # noqa: E402
 from publish_pack import (catalog_entry, content_key, find_test_pack, next_version, pack_files,  # noqa: E402
                           update_catalog, zip_pack)
+from pack_fixtures import tiny_pack, write_json  # noqa: E402
 
+ENTRY = catalog_entry({"slug": "demo", "name": "Demo Mountain", "formatVersion": FORMAT_VERSION,
+                       "build": "20260101T000000Z-abc123", "pipeline": "abc1234", "lonlat": [0, 0]}, {},
+                      version=3, size=12_000_000, sha256="ab" * 32, pipeline="abc1234", tier="gold",
+                      status="preview", report=None)
+
+
+def tiny_pack_with_stamp(tmp_path, stamp="abc1234"):
+    """pack_fixtures.tiny_pack as resort `demo`, built by pipeline `stamp`"""
+    d = tiny_pack(tmp_path, pipeline=stamp)
+    meta = json.load(open(os.path.join(d, "meta.json"), encoding="utf-8"))
+    write_json(os.path.join(d, "meta.json"), {**meta, "slug": "demo", "name": "Demo Mountain", "lonlat": [0, 0]})
+    return d
+
+
+def fake_gh_and_git(monkeypatch, maintainer=True, catalog=None):
+    """publish_pack.run records every argv and answers the gh and git queries; `git worktree add` makes the folder
+    with origin/main's catalog.json and `git worktree remove` deletes it, so open_publish_pr runs end to end"""
+    calls = []
+    catalog = catalog or {"formatVersion": FORMAT_VERSION, "resorts": []}
+    monkeypatch.delenv("GITHUB_TRIGGERING_ACTOR", raising=False)   # set on a GitHub runner
+
+    def run(cmd, cwd=None, capture=True):
+        calls.append(list(cmd))
+        line = " ".join(cmd)
+        if line.startswith("gh release list"):
+            return json.dumps([{"tagName": "other-v1"}])
+        if line.startswith("gh release create"):
+            return f"https://github.com/o/r/releases/tag/untagged-{cmd[3]}"
+        if line.startswith("gh api user"):
+            return "drewkeriazes" if maintainer else "someone-else"
+        if line.startswith("gh pr create"):
+            return "https://github.com/o/r/pull/7"
+        if line.startswith("git branch -r --contains"):
+            return "  origin/main\n  origin/issue-1-x"
+        if line.startswith("git show origin/main:catalog.json"):
+            return json.dumps(catalog)
+        if line.startswith("git worktree add"):
+            os.makedirs(cmd[-2])
+            write_json(os.path.join(cmd[-2], "catalog.json"), catalog)
+        if line.startswith("git worktree remove"):
+            shutil.rmtree(cmd[-1])
+        return ""
+    monkeypatch.setattr(publish_pack, "run", run)
+    return calls
+
+
+def test_stamp_problem_accepts_a_clean_stamp_on_main():
+    assert publish_pack.stamp_problem({"slug": "demo", "pipeline": "abc1234"}, lambda s: True) is None
+
+
+def test_stamp_problem_refuses_a_missing_stamp():
+    msg = publish_pack.stamp_problem({"slug": "bigsky"}, lambda s: True)
+    assert "no pipeline stamp" in msg and "build_resort.py bigsky --force build" in msg
+
+
+def test_stamp_problem_refuses_dirty_and_unmerged():
+    assert "+dirty" in publish_pack.stamp_problem({"slug": "d", "pipeline": "abc1234+dirty"}, lambda s: True)
+    assert "not on origin/main" in publish_pack.stamp_problem({"slug": "d", "pipeline": "abc1234"}, lambda s: False)
+
+
+def test_next_version_counts_draft_tags():
+    assert publish_pack.next_version("vail", ["vail-v3", "vail-v4"], {"resorts": []}) == 5
+
+
+def test_maintainers_ignores_comments_and_blanks(tmp_path):
+    (tmp_path / ".github").mkdir()
+    (tmp_path / ".github" / "maintainers.txt").write_text("# who\ndrewkeriazes\n\n")
+    assert publish_pack.maintainers(str(tmp_path)) == {"drewkeriazes"}
+
+
+def test_pr_body_names_the_requester_and_the_build():
+    body = publish_pack.pr_body(ENTRY, why="report passes", release_url="u", started_by="drewkeriazes",
+                                run_url="https://github.com/o/r/actions/runs/42", requested_by="player-1-id")
+    assert "Requested by: player-1-id" in body and "Run: https://github.com/o/r/actions/runs/42" in body
+    assert f"Build: {ENTRY['pack']['build']}" in body and "not the merge button" in body
+    local = publish_pack.pr_body(ENTRY, why="w", release_url="u", started_by="d", run_url=None, requested_by=None)
+    assert "Run:" not in local and "Requested by:" not in local
+
+
+def test_publish_opens_a_pr_and_never_pushes_main(tmp_path, monkeypatch):
+    calls = fake_gh_and_git(monkeypatch, maintainer=True)       # records every run() argv, answers gh queries
+    publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview"])
+    flat = [" ".join(c) for c in calls]
+    assert any(c.startswith("gh release create demo-v1") and "--draft" in c for c in flat)
+    assert any(c.startswith("git push -u origin publish/demo-v1") for c in flat)
+    assert any("gh pr create" in c and "--label publish" in c and "--label automerge" in c for c in flat)
+    assert not any(c.startswith("git push") and "main" in c.split()[-1] for c in flat)
+
+
+def test_a_non_maintainer_publish_gets_no_automerge(tmp_path, monkeypatch):
+    calls = fake_gh_and_git(monkeypatch, maintainer=False)
+    publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview"])
+    assert not any("--label automerge" in " ".join(c) for c in calls)
+
+
+def test_the_pr_branch_carries_the_new_entry_on_origin_mains_catalog(tmp_path, monkeypatch):
+    other = {"slug": "vail", "name": "Vail", "pack": {"version": 4, "formatVersion": FORMAT_VERSION}}
+    calls = fake_gh_and_git(monkeypatch, catalog={"formatVersion": FORMAT_VERSION, "resorts": [other]})
+    seen = {}
+    fake_run = publish_pack.run
+
+    def run(cmd, cwd=None, capture=True):        # read the worktree's catalog at commit time
+        if cmd[:2] == ["git", "commit"]:
+            seen["catalog"] = json.load(open(os.path.join(cwd, "catalog.json"), encoding="utf-8"))
+            seen["message"] = cmd[-1]
+        return fake_run(cmd, cwd, capture)
+    monkeypatch.setattr(publish_pack, "run", run)
+    publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview", "--accept-change",
+                       "--requested-by", "player-1-id"])
+    assert [r["slug"] for r in seen["catalog"]["resorts"]] == ["demo", "vail"]
+    assert seen["catalog"]["resorts"][0]["pack"]["pipeline"] == "abc1234"
+    assert seen["message"] == "demo v1: preview, 0 MB, pipeline abc1234"
+    pr = next(c for c in calls if c[:3] == ["gh", "pr", "create"])
+    assert "accept-change" in pr
+    assert not any(os.path.exists(c[-2]) for c in calls if c[:3] == ["git", "worktree", "add"])
+
+
+def test_a_stamp_problem_refuses_before_any_release(tmp_path, monkeypatch):
+    calls = fake_gh_and_git(monkeypatch)
+    with pytest.raises(SystemExit, match=r"\+dirty"):
+        publish_pack.main([str(tiny_pack_with_stamp(tmp_path, "abc1234+dirty")), "--status", "preview"])
+    assert not any(c[:2] in (["gh", "release"], ["git", "push"]) for c in calls)
+
+
+def test_dry_run_prints_the_branch_and_calls_no_gh_and_no_fetch(tmp_path, monkeypatch, capsys):
+    calls = fake_gh_and_git(monkeypatch)
+    publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview", "--dry-run"])
+    assert "publish/demo-v" in capsys.readouterr().out
+    assert not any(c[0] == "gh" or c[:2] in (["git", "fetch"], ["git", "push"], ["git", "worktree"]) for c in calls)
 
 
 def make_pack(root, slug="demo", fmt=FORMAT_VERSION):

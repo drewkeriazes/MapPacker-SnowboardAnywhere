@@ -1,37 +1,44 @@
 """FEAT-222: publish a built pack as a release of this repo, so the game's `npm run get <slug>` can download it.
 
     python pipeline/publish_pack.py packs/vail [--status preview|playable] [--tier gold] [--report report.md]
-                                               [--dry-run]
+                                               [--accept-change] [--requested-by <id>] [--run-url <url>] [--dry-run]
     python pipeline/publish_pack.py --synth [--force] [--dry-run]
 
 `--synth` (FEAT-241) builds the synthetic pack (synth_pack.py, about 2 minutes) into packs/synth and publishes it
 as a test pack, release `synth-v<N>`, for the game's CI (`node game/tools/get_pack.mjs synth`). It publishes only
-when the pack's content differs from the catalog's synth for this format (`--force` publishes anyway). Run it on
-main after merging a change to the pipeline or the pack format.
+when the pack's content differs from the catalog's synth for this format (`--force` publishes anyway). Run it from
+a clean checkout of main after merging a change to the pipeline or the pack format.
 
-Runs on Drew's PC, in the main checkout on `main` (needs `gh` signed in with push access to this repo). Steps:
-  1. refuse a pack whose meta.json `formatVersion` is not this pipeline's FORMAT_VERSION (rebuild it on main)
+Runs from any checkout or worktree (needs `gh` signed in with push access to this repo); nothing here pushes to
+main (FEAT-272). Steps:
+  1. refuse a pack whose meta.json `formatVersion` is not this pipeline's FORMAT_VERSION (rebuild it on main), and
+     one whose build stamp (meta.json `pipeline`) is missing, `+dirty` or not on origin/main (stamp_problem)
   2. zip the pack, stored (PNG tiles do not compress), fixed timestamps so the same pack gives the same sha256;
      refuse a zip over 1.9 GiB (GitHub's limit per release asset is 2 GiB)
-  3. `gh release create <slug>-v<N>` in this repo with the zip, meta.json and the report if there is one
-  4. update catalog.json, copy the report to reports/<slug>.md, and commit them in place with the resort's
-     config, EPT node lists, data plan (resorts/<slug>/) and manifest (manifests/), then push. Only those files go in
-     the commit; anything else uncommitted in the checkout is left alone.
+  3. `gh release create <slug>-v<N> --draft` in this repo with the zip, meta.json and the report if there is one;
+     the version counts draft tags, so two publishes in flight never pick the same number. Players and the catalog
+     don't see a draft.
+  4. open a publish PR (open_publish_pr): in a throwaway worktree off a fresh origin/main, branch
+     `publish/<slug>-v<N>` with catalog.json plus the new entry, reports/<slug>.md and the resort's config, EPT node
+     lists, data plan (resorts/<slug>/) and manifest (manifests/), copied from this checkout; labels `publish`,
+     `automerge` when the publisher is in .github/maintainers.txt, `accept-change` with --accept-change. The merge
+     workflow releases the draft, then merges. The command prints the PR link and does not wait.
 
 Test packs (`--test`, and `--synth`) go in the catalog's `test` list, not `resorts`, so the resort picker never
 shows them; the list keeps one entry per slug and pack format, so a format bump publishes the new synth beside the
 old one and the game's main keeps its own until it moves to the new format.
-The catalog's `pipeline` is this repo's commit (FEAT-238; packs published before the move name a SnowboardAnywhere
-commit). Catalog schema: SnowboardAnywhere docs/research/resort-auto-pipeline.md section 2; download side: the
+The catalog's `pipeline` is the pack's build stamp, the commit here that built it (FEAT-272; before it, the
+publisher's HEAD, and before FEAT-238 a SnowboardAnywhere commit). Catalog schema: SnowboardAnywhere docs/research/resort-auto-pipeline.md section 2; download side: the
 game's game/tools/get_pack.mjs.
 A pack is `playable` only when every DATA-022 MVP line passes in its report (EPIC-15 rule 2): the status comes
 from `<pack_dir>/report.json` (`pack_report.py`, FEAT-175) when it was made for this build, `preview` without one,
 and `--status playable` is refused unless the report passes.
 """
 import argparse, glob, hashlib, json, os, re, shutil, subprocess, sys, tempfile, time, zipfile
+from typing import Callable
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from packwriter import FORMAT_VERSION  # noqa: E402
+from packwriter import FORMAT_VERSION, pipeline_commit  # noqa: E402
 import paths  # noqa: E402
 
 RESORTS_REPO = "drewkeriazes/MapPacker-SnowboardAnywhere"
@@ -181,16 +188,110 @@ def resort_files(slug: str, repo_dir: str = REPO) -> list:
     return [p.replace(os.sep, "/") for p in rel if os.path.isfile(os.path.join(repo_dir, p))]
 
 
-def ready_to_commit(repo_dir: str = REPO) -> str:
-    """the checkout publish commits in: on main, catalog.json unchanged, up to date with origin"""
-    branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_dir)
-    if branch != "main":
-        raise SystemExit(f"{repo_dir} is on {branch}: publish from the main checkout on main (the catalog commit "
-                         "goes straight to main)")
-    if run(["git", "status", "--porcelain", "--", "catalog.json"], cwd=repo_dir):
-        raise SystemExit(f"{os.path.join(repo_dir, 'catalog.json')} has uncommitted changes; commit or discard them first")
-    run(["git", "pull", "--ff-only", "--quiet"], cwd=repo_dir)
-    return repo_dir
+def stamp_why(meta: dict, on_origin_main: Callable[[str], bool]) -> str | None:
+    """why the pipeline commit that built the pack (meta.json `pipeline`) can't be rebuilt from main, or None"""
+    slug, stamp = meta.get("slug"), meta.get("pipeline")
+    if not stamp:
+        return f"{slug} has no pipeline stamp in meta.json (built before the stamp existed)"
+    if "+dirty" in stamp:
+        return f"{slug} was built from uncommitted pipeline code (pipeline {stamp})"
+    if not on_origin_main(stamp):
+        return f"{slug} was built by pipeline {stamp}, which is not on origin/main (a branch build)"
+    return None
+
+
+def stamp_problem(meta: dict, on_origin_main: Callable[[str], bool]) -> str | None:
+    """FEAT-272: None when the pack's build stamp is a clean commit on origin/main; else why not, ending with the
+    rebuild command"""
+    why = stamp_why(meta, on_origin_main)
+    return why and f"{why}: rebuild it on main, python pipeline/build_resort.py {meta.get('slug')} --force build"
+
+
+def on_origin_main(sha: str, repo_dir: str = REPO, fetch: bool = True) -> bool:
+    """`sha` is on origin/main (`git branch -r --contains`), after fetching main unless `fetch` is False"""
+    if fetch:
+        run(["git", "fetch", "origin", "main"], cwd=repo_dir)
+    try:
+        out = run(["git", "branch", "-r", "--contains", sha], cwd=repo_dir)
+    except SystemExit:                # not a commit this clone has
+        return False
+    return "origin/main" in [line.strip() for line in out.splitlines()]
+
+
+def maintainers(repo_dir: str = REPO) -> set[str]:
+    """the GitHub logins whose publishes merge themselves: .github/maintainers.txt, one per line, # comments"""
+    path = os.path.join(repo_dir, ".github", "maintainers.txt")
+    if not os.path.isfile(path):
+        return set()
+    with open(path, encoding="utf-8") as f:
+        return {line.split("#")[0].strip() for line in f} - {""}
+
+
+def publisher_login() -> str:
+    """who started this publish: the workflow's triggering actor, else gh's signed-in user"""
+    return os.environ.get("GITHUB_TRIGGERING_ACTOR") or run(["gh", "api", "user", "--jq", ".login"])
+
+
+def publish_branch(slug: str, version: int) -> str:
+    return f"publish/{slug}-v{version}"
+
+
+def pr_body(entry: dict, *, why: str, release_url: str, started_by: str, run_url: str | None,
+            requested_by: str | None) -> str:
+    """the publish PR's description; `Build:` and `Run:` are read back by resort.py and the merge workflow"""
+    p = entry["pack"]
+    lines = [f"Publishes **{entry['name']}** v{p['version']}: {entry['status']} ({why}).", "",
+             f"Draft release: {release_url}",
+             f"Size: {p['bytes'] / 1e6:.0f} MB ({p['bytes']} bytes), sha256 `{p['sha256']}`", "",
+             f"Started by: {started_by}"]
+    lines += [f"Run: {run_url}"] if run_url else []
+    lines += [f"Requested by: {requested_by}"] if requested_by else []
+    lines += [f"Build: {p['build']}", f"Pipeline: {p['pipeline']}", "",
+              "Approve with the `automerge` label, not the merge button: the merge workflow publishes the draft "
+              "release before it merges, so the catalog never names a download that is not live (FEAT-272)."]
+    return "\n".join(lines) + "\n"
+
+
+def open_publish_pr(*, slug: str, version: int, entry: dict, test: bool, src_repo: str, labels: list[str],
+                    body: str, repo: str) -> str:
+    """Commit the catalog entry and the resort's own files (copied from `src_repo`) on publish/<slug>-v<N>, in a
+    throwaway worktree off a fresh origin/main (never the publisher's checkout), push that branch, open the PR
+    against main. Returns the PR URL."""
+    branch = publish_branch(slug, version)
+    tmp = tempfile.mkdtemp(prefix=f"publish-pr-{slug}-")
+    wt = os.path.join(tmp, "wt")
+    try:
+        run(["git", "fetch", "origin", "main"], cwd=src_repo)
+        run(["git", "worktree", "add", "--detach", wt, "origin/main"], cwd=src_repo)
+        cat_path = os.path.join(wt, "catalog.json")
+        with open(cat_path, encoding="utf-8") as f:
+            catalog = json.load(f)
+        with open(cat_path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(update_catalog(catalog, entry, test=test), f, indent=1)
+            f.write("\n")
+        own = [] if test else resort_files(slug, src_repo)
+        for rel in own:
+            os.makedirs(os.path.dirname(os.path.join(wt, rel)), exist_ok=True)
+            shutil.copy2(os.path.join(src_repo, rel), os.path.join(wt, rel))
+        p = entry["pack"]
+        run(["git", "switch", "-c", branch], cwd=wt)
+        run(["git", "add", "--", "catalog.json", *own], cwd=wt)
+        run(["git", "commit", "-q", "-m",
+             f"{slug} v{version}: {entry['status']}, {p['bytes'] / 1e6:.0f} MB, pipeline {p['pipeline']}"], cwd=wt)
+        run(["git", "push", "-u", "origin", branch], cwd=wt)
+        body_path = os.path.join(tmp, "body.md")
+        with open(body_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(body)
+        return run(["gh", "pr", "create", "-R", repo, "--base", "main", "--head", branch,
+                    "--title", f"{slug} v{version}: publish", "--body-file", body_path,
+                    *[arg for label in ["publish", *labels] for arg in ("--label", label)]], cwd=wt)
+    finally:
+        if os.path.isdir(wt):
+            try:
+                run(["git", "worktree", "remove", "--force", wt], cwd=src_repo)
+            except SystemExit as e:
+                print(f"warning: {e}")
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def build_synth(out_dir: str) -> str:
@@ -213,14 +314,22 @@ def main(argv=None) -> None:
                     help="build the synthetic pack into packs/synth and publish it as a test pack if it changed")
     ap.add_argument("--force", action="store_true", help="with --synth: publish even when the content is unchanged")
     ap.add_argument("--repo", default=RESORTS_REPO)
-    ap.add_argument("--dry-run", action="store_true", help="zip and print the catalog entry; no release, no commit")
+    ap.add_argument("--accept-change", action="store_true",
+                    help="label the PR accept-change: a big change from the previous version is intended (FEAT-264)")
+    ap.add_argument("--requested-by", help="the game account that asked for this build (Build it, FEAT-245)")
+    ap.add_argument("--run-url", help="the workflow run that built and publishes the pack (FEAT-245)")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="zip and print the catalog entry and the PR branch; no fetch, no release, no PR")
     a = ap.parse_args(argv)
     if a.synth == bool(a.pack_dir):
         ap.error("give a pack_dir, or --synth")
     test = a.test or a.synth
+    origin_main = lambda sha: on_origin_main(sha, fetch=not a.dry_run)   # noqa: E731 (a dry run reads the local ref)
 
-    # on main and up to date before the two-minute synth build, not after it
-    repo_dir = None if a.dry_run else ready_to_commit()
+    if a.synth:   # the synth is stamped with this checkout's pipeline: refuse before the two-minute build, not after
+        why = stamp_why({"slug": SYNTH, "pipeline": pipeline_commit()}, origin_main)
+        if why:
+            raise SystemExit(f"refusing --synth: {why}; run it from a clean checkout of main")
     pack_dir = build_synth(os.path.join(paths.PACKS, SYNTH)) if a.synth else os.path.abspath(a.pack_dir)
     with open(os.path.join(pack_dir, "meta.json"), encoding="utf-8") as f:
         meta = json.load(f)
@@ -229,6 +338,10 @@ def main(argv=None) -> None:
     if fmt != FORMAT_VERSION:
         raise SystemExit(f"{pack_dir} is pack format {fmt}, this pipeline writes {FORMAT_VERSION}: rebuild it on main "
                          f"(python pipeline/build_pack.py {slug} <raw_dir> <out_dir>) before publishing")
+    problem = stamp_problem(meta, origin_main)
+    if problem:
+        raise SystemExit(f"refusing to publish: {problem}")
+    pipeline = meta["pipeline"]
     if test:
         a.status, why, a.tier, report, cfg = "test", "test pack, not in the picker", None, None, {}
     else:
@@ -239,13 +352,14 @@ def main(argv=None) -> None:
             raise SystemExit(f"{slug} is a relocate source (source_only, FEAT-268), not a pack: it is not published")
         report = a.report or (os.path.join(pack_dir, "report.md") if os.path.isfile(os.path.join(pack_dir, "report.md")) else None)
     print(f"status {a.status} ({why})")
-    pipeline = run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO)
-    if run(["git", "status", "--porcelain", "--", "pipeline"], cwd=REPO):
-        print("warning: pipeline/ has uncommitted changes; the catalog records the commit, not them")
 
-    # a dry run reads this checkout's catalog as it is (no pull), so --synth can still say whether it changed
-    cat_path = os.path.join(repo_dir or REPO, "catalog.json")
-    catalog = json.load(open(cat_path, encoding="utf-8")) if os.path.isfile(cat_path) else {"resorts": []}
+    # origin/main's catalog (fetched by on_origin_main), not this checkout's, which may be stale; a dry run reads
+    # this checkout's as it is, so --synth can still say whether it changed
+    if a.dry_run:
+        cat_path = os.path.join(REPO, "catalog.json")
+        catalog = json.load(open(cat_path, encoding="utf-8")) if os.path.isfile(cat_path) else {"resorts": []}
+    else:
+        catalog = json.loads(run(["git", "show", "origin/main:catalog.json"], cwd=REPO))
     content = content_key(pack_dir) if test else None
     if test:
         old = find_test_pack(catalog, slug, fmt)
@@ -275,6 +389,7 @@ def main(argv=None) -> None:
             entry["pack"]["content"] = content
         if a.dry_run:
             print(json.dumps(entry, indent=1))
+            print(f"would upload draft release {tag} and open a PR from {publish_branch(slug, version)}")
             return
 
         if test:
@@ -286,27 +401,29 @@ def main(argv=None) -> None:
             notes = (f"{meta['name']} pack v{version} ({a.status}, {a.tier} tier). Pack format {fmt}, build {meta.get('build')}, "
                      f"pipeline {pipeline}. {size / 1e6:.0f} MB, sha256 `{sha}`.\n\n"
                      f"Get it: `cd game && npm run get {slug}` in SnowboardAnywhere.")
+        login = publisher_login()        # before the upload, so a gh that is not signed in leaves no draft behind
+        trusted = login in maintainers()
+        labels = (["automerge"] if trusted else []) + (["accept-change"] if a.accept_change else [])
         assets = [zip_path, os.path.join(pack_dir, "meta.json")] + ([report] if report else [])
-        print(f"creating release {tag} in {a.repo}")
-        run(["gh", "release", "create", tag, *assets, "-R", a.repo, "--title", f"{meta['name']} v{version}",
-             "--notes", notes], capture=False)
+        print(f"uploading draft release {tag} to {a.repo}")
+        release_url = run(["gh", "release", "create", tag, *assets, "-R", a.repo, "--draft",
+                           "--title", f"{meta['name']} v{version}", "--notes", notes])
 
-        with open(cat_path, "w", encoding="utf-8", newline="\n") as f:
-            json.dump(update_catalog(catalog, entry, test=test), f, indent=1)
-            f.write("\n")
-        # the recipe that built it is committed beside the catalog: config, node lists, plan, manifest, report
-        os.makedirs(os.path.join(repo_dir, "reports"), exist_ok=True)
-        if report and os.path.abspath(report) != os.path.abspath(os.path.join(repo_dir, report_rel)):
-            shutil.copy2(report, os.path.join(repo_dir, report_rel))
-        files = ["catalog.json"] + ([] if test else resort_files(slug, repo_dir))
-        run(["git", "add", "--", *files], cwd=repo_dir)
-        run(["git", "commit", "-q", "-m", f"{slug} v{version}: {a.status}, {size / 1e6:.0f} MB, pipeline {pipeline}",
-             "--", *files], cwd=repo_dir)
+        # the recipe that built it goes in the PR beside the catalog: config, node lists, plan, manifest, report
+        if report and os.path.abspath(report) != os.path.abspath(os.path.join(REPO, report_rel)):
+            os.makedirs(os.path.join(REPO, "reports"), exist_ok=True)
+            shutil.copy2(report, os.path.join(REPO, report_rel))
+        body = pr_body(entry, why=why, release_url=release_url, started_by=login, run_url=a.run_url,
+                       requested_by=a.requested_by)
         try:
-            run(["git", "push", "-q"], cwd=repo_dir)
+            pr = open_publish_pr(slug=slug, version=version, entry=entry, test=test, src_repo=REPO, labels=labels,
+                                 body=body, repo=a.repo)
         except SystemExit as e:
-            raise SystemExit(f"{e}\nThe release {tag} exists; push the catalog commit by hand from {repo_dir}")
-        print(f"published {tag}: {entry['pack']['url']}")
+            raise SystemExit(f"{e}\nThe draft release {tag} exists with nothing pointing at it: open the PR by hand, "
+                             f"or delete the draft (gh release delete {tag} -R {a.repo} --yes)")
+        print(f"opened {pr} (draft release {tag}): " + (
+            "it releases and merges itself once checks pass" if trusted else
+            f"{login} is not in .github/maintainers.txt, so a maintainer approves it with the automerge label"))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
