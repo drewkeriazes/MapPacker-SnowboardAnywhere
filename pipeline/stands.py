@@ -26,7 +26,8 @@ H_STEP = 0.25
 Z_SCALE = 32.0
 # crown area per m2 of canopy that reads as closed forest: the stems' crowns cover the canopy once over
 K_CLOSE = 1.0
-# the client's crown radius / height per species id (game/src/world/trees/species.ts SPECIES[].radius)
+# the client's crown radius / height per species id (game/src/world/trees/species.ts SPECIES[].radius;
+# tests/test_contract.py checks it against the game's main)
 CROWN_RATIO = np.array([0.13, 0.17, 1.1, 0.1, 0.09, 0.17, 0.35, 0.05])
 # detected crowns count against the stand over this radius (m), so stems fill gaps instead of doubling clumps
 DETECTED_SIGMA = 6.0

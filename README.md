@@ -42,6 +42,7 @@ More in the `pack-build` skill (`.claude/skills/pack-build/SKILL.md`) and the no
 |---|---|
 | `catalog.json` | Every published pack: slug, name, region, tier, status, and the release zip's version, pack format, size, sha256, URL and the pipeline commit that built it |
 | `pipeline/` | The pipeline: `resort.py` (name to config and data plan, and `add`), `build_resort.py`, `build_pack.py` and its stages, `pack_report.py`, `publish_pack.py`, the fetch scripts, tests in `pipeline/tests/`. Moved from the game repo with its history (FEAT-238) |
+| `docs/pack-format.md` | The pack format: the layout, the encodings, `formatVersion` and its bump rule, and the Contract, every value this repo and the game must agree on (FEAT-239) |
 | `resorts/<slug>/` | A folder per resort: `<slug>.json`, the config the pipeline reads, the EPT node lists it names (`nodes_file`, beside it) and the data plan (`<slug>-plan.md`) |
 | `manifests/<slug>.json` | The download manifest the raw data was fetched with |
 | `reports/<slug>.md` | The build report of the published pack |
@@ -50,7 +51,7 @@ More in the `pack-build` skill (`.claude/skills/pack-build/SKILL.md`) and the no
 
 Packs live in releases, never in git history: a pack is 50 to 250 MB per build, and releases can be deleted when a build is replaced. A catalog entry's `pipeline` is the commit of this repo that built the pack; entries published before the pipeline moved here (FEAT-238) name a SnowboardAnywhere commit instead.
 
-`status` is `playable` when every DATA-022 check passes in the build report, else `preview`. `formatVersion` is the pack format; a game reads only its own format and shows an older pack as "needs rebuild".
+`status` is `playable` when every DATA-022 check passes in the build report, else `preview`. `formatVersion` is the pack format; a game reads only its own format and shows an older pack as "needs rebuild". A format change goes into the game first or together ([`docs/pack-format.md`](docs/pack-format.md) > formatVersion); `python pipeline/contract.py` compares this pipeline with the game's `main`.
 
 ## Data sources and licences
 

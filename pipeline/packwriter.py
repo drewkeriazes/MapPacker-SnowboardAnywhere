@@ -9,8 +9,9 @@ from PIL import Image
 TILE = 512
 
 # FEAT-222: the pack format's version, written to meta.json as `formatVersion` by every full build and to the
-# catalog by publish_pack.py. Bump it (and PACK_FORMAT in game/src/pack/format.ts, the same number) on any
-# change a client must know about, and add a line to docs/pack-format.md > formatVersion.
+# catalog by publish_pack.py. Bump it on any change a current game can't read, after or with PACK_FORMAT in the
+# game's game/src/pack/format.ts (the same number; tests/test_contract.py checks against the game's main), and add
+# a line to docs/pack-format.md > formatVersion.
 FORMAT_VERSION = 1
 
 def encode_terrarium(h: np.ndarray) -> np.ndarray:
