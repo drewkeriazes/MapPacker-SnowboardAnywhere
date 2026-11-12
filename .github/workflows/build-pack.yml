@@ -1,0 +1,206 @@
+# Build pack (FEAT-245, EPIC-17): one resort in, one publish PR out. The game's Build it button starts it
+# (FEAT-246, through the dev server and Drew's gh); by hand:
+#   gh workflow run build-pack.yml -f slug=boston-mills -f name="Boston Mills" -f osm_id=<OSM way id>
+#   gh workflow run build-pack.yml -f slug=vail            (an existing slug: rebuilt from its committed config)
+#
+#   queue    one build at a time, in the order they were started (tools/ci/wait_turn.py). Not `concurrency`:
+#            GitHub keeps one pending run per group and cancels the older pending one, so a third build would drop
+#            the second.
+#   probe    one small request to every data host the build calls (tools/ci/probe_hosts.py); a host that is down
+#            fails here, in a minute, instead of hours into the fetch
+#   build    tools/ci/build_pack_ci.py, one step per stage (resolve, fetch, build, report, publish; the game reads
+#            the step names for progress, FEAT-247, and the run summary has a line per stage). A new slug is
+#            resolved and planned from the OSM id (resort.py add --osm, --alone); an existing one is rebuilt from
+#            resorts/<slug>/, never skipped for being in the catalog. No ride, and attract and spots skip: there
+#            is no game on the runner (publish design section 5). publish_pack.py opens the publish PR with the
+#            App token, labelled automerge when the run's triggering actor is in .github/maintainers.txt, and
+#            publishes nothing when the pack's content equals the published version's or an open publish PR's.
+#            Never a push to main.
+#
+# Security: the inputs are untrusted text. They reach steps only as environment variables, never in a `run:`
+# line (pipeline/tests/test_workflows.py checks), and build_pack_ci.py inputs refuses any outside their shapes
+# first. The LANDFIRE email is a secret in the env of the fetch step only (BUG-111: never an argument). The App
+# token is minted just before publishing (it lasts an hour; builds take longer) and only that step holds it.
+#
+# Limits: the free runner (about 14 GB disk before the clean-up below, 16 GB RAM, 6 hours a job). A resort too big
+# for it is built on Drew's PC (add_resort.cmd / build_resort.cmd) and published from there through the same PR.
+# Setup: secrets PUBLISH_APP_ID, PUBLISH_APP_KEY, LANDFIRE_EMAIL; variable PUBLISH_APP_LOGIN (publish-merge.yml).
+
+name: Build pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: Pack slug (an existing one is rebuilt)
+        required: true
+        type: string
+      name:
+        description: Resort name (a new slug)
+        required: false
+        type: string
+      osm_id:
+        description: OSM id of the ski area picked in the game (a new slug), e.g. 123456 or way/123456
+        required: false
+        type: string
+      requested_by:
+        description: The game account that asked (FEAT-273), written into the publish PR
+        required: false
+        type: string
+
+run-name: Build pack ${{ inputs.slug }}
+
+permissions:
+  contents: read
+
+env:
+  SLUG: ${{ inputs.slug }}
+  NAME: ${{ inputs.name }}
+  OSM_ID: ${{ inputs.osm_id }}
+  REQUESTED_BY: ${{ inputs.requested_by }}
+
+jobs:
+  queue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: wait for the builds started before this one
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/ci/wait_turn.py
+
+  probe:
+    needs: queue
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: inputs
+        run: python tools/ci/build_pack_ci.py check
+      - name: data hosts
+        run: python tools/ci/probe_hosts.py
+
+  build:
+    needs: probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      actions: read
+      contents: read
+    env:
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      SBA_INDEX_DIR: /home/runner/osd-index
+    steps:
+      - name: disk
+        run: |
+          df -h / /mnt || true
+          # preinstalled toolsets the build never uses (about 30 GB)
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift
+          root=$(df --output=avail -B1 / | tail -1)
+          mnt=$(df --output=avail -B1 /mnt 2>/dev/null | tail -1 || echo 0)
+          if [ "${mnt:-0}" -gt "$root" ]; then
+            sudo mkdir -p /mnt/sba-raw && sudo chown "$USER" /mnt/sba-raw
+            echo "SBA_RAW_ROOT=/mnt/sba-raw" >> "$GITHUB_ENV"
+          else
+            mkdir -p "$HOME/sba-raw" && echo "SBA_RAW_ROOT=$HOME/sba-raw" >> "$GITHUB_ENV"
+          fi
+          df -h / /mnt || true
+
+      # main, so the pack's pipeline stamp is a commit on origin/main (publish_pack refuses anything else). Full
+      # history for publish_pack's git worktree; no credentials kept: only the publish step can push.
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r pipeline/requirements.txt
+      # again: "Re-run failed jobs" skips a queue job that passed, so a re-run must not jump the queue here
+      - name: still my turn
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/ci/wait_turn.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - id: inputs
+        name: inputs
+        run: python tools/ci/build_pack_ci.py inputs
+
+      # resolve and plan read OpenSkiData's index files (runs.geojson is about 800 MB); resort.py downloads them
+      # again after 30 days, so a monthly key
+      - id: month
+        if: steps.inputs.outputs.mode == 'new'
+        run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+      - if: steps.inputs.outputs.mode == 'new'
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/osd-index
+          key: openskidata-index-${{ steps.month.outputs.month }}
+          restore-keys: openskidata-index-
+
+      - name: resolve
+        run: python tools/ci/build_pack_ci.py resolve
+      - name: fetch
+        env:
+          LANDFIRE_EMAIL: ${{ secrets.LANDFIRE_EMAIL }}
+        run: python tools/ci/build_pack_ci.py fetch
+      - name: build
+        run: python tools/ci/build_pack_ci.py build
+      - name: report
+        run: python tools/ci/build_pack_ci.py report
+
+      - name: the App is set up
+        env:
+          APP_ID: ${{ secrets.PUBLISH_APP_ID }}
+          APP_KEY: ${{ secrets.PUBLISH_APP_KEY }}
+          APP_LOGIN: ${{ vars.PUBLISH_APP_LOGIN }}
+        run: |
+          missing=""
+          [ -n "$APP_ID" ] || missing="$missing secret:PUBLISH_APP_ID"
+          [ -n "$APP_KEY" ] || missing="$missing secret:PUBLISH_APP_KEY"
+          [ -n "$APP_LOGIN" ] || missing="$missing variable:PUBLISH_APP_LOGIN"
+          if [ -n "$missing" ]; then
+            echo "::error::Publishing needs the GitHub App (FEAT-272). Missing:$missing. See the top of .github/workflows/publish-merge.yml."
+            exit 1
+          fi
+      - id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.PUBLISH_APP_ID }}
+          private-key: ${{ secrets.PUBLISH_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: publish
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          APP_LOGIN: ${{ vars.PUBLISH_APP_LOGIN }}
+        run: |
+          # the publish commit and push are the App's, so the PR's Checks run and publish-merge trusts it
+          gh auth setup-git
+          id=$(gh api "users/$APP_LOGIN" --jq .id)
+          git config user.name "$APP_LOGIN"
+          git config user.email "$id+$APP_LOGIN@users.noreply.github.com"
+          python tools/ci/build_pack_ci.py publish

@@ -52,6 +52,7 @@ MAX_ZIP = int(1.9 * 1024 ** 3)
 ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 SKIP_DIRS = {"debug"}        # pipeline diagnostics (debug/species.png), not read by the game
 STAMPS = ("build", "pipeline")  # meta.json fields every build writes afresh (packwriter.stamp_build)
+REPORT_FILES = ("report.json", "report.md")   # pack_report.py's output: build stamps, a time, file dates
 SYNTH = "synth"
 
 
@@ -86,10 +87,13 @@ def zip_pack(pack_dir: str, zip_path: str) -> tuple:
 
 
 def content_key(pack_dir: str) -> str:
-    """sha256 (16 hex) of what the pack holds, leaving out meta.json's build stamps: two builds of the same pack
-    from the same code give the same key, so `--synth` can tell whether a rebuild changed anything."""
+    """sha256 (16 hex) of what the pack holds, leaving out meta.json's build stamps and the report (derived from
+    the pack, and stamped with the build and the time it ran): two builds of the same pack from the same code give
+    the same key, so a rebuild that changed nothing is not published again (FEAT-241, FEAT-245)."""
     h = hashlib.sha256()
     for rel in pack_files(pack_dir):
+        if rel in REPORT_FILES:
+            continue
         h.update(rel.encode() + b"\0")
         path = os.path.join(pack_dir, rel)
         if rel == "meta.json":
@@ -111,6 +115,28 @@ def find_test_pack(catalog: dict, slug: str, fmt: int) -> dict | None:
     """the catalog's test pack `slug` at pack format `fmt`, or None"""
     return next((t for t in catalog.get("test", []) if t.get("slug") == slug
                  and (t.get("pack") or {}).get("formatVersion") == fmt), None)
+
+
+def find_resort(catalog: dict, slug: str) -> dict | None:
+    """the catalog's resort entry for `slug`, or None"""
+    return next((r for r in catalog.get("resorts", []) if r.get("slug") == slug), None)
+
+
+CONTENT_LINE = "Content: "
+
+
+def pending_same_content(slug: str, content: str, repo: str) -> str | None:
+    """FEAT-245: the URL of an open publish PR for `slug` whose body names this `content` (a rerun while the first
+    publish is still waiting for its checks), or None"""
+    prs = json.loads(run(["gh", "pr", "list", "-R", repo, "--label", "publish", "--state", "open",
+                          "--json", "number,url,headRefName,body"]) or "[]")
+    for pr in prs:
+        head = pr.get("headRefName", "")
+        if not (head.startswith(f"publish/{slug}-v") and head[len(f"publish/{slug}-v"):].isdigit()):
+            continue
+        if f"{CONTENT_LINE}{content}" in [line.strip() for line in (pr.get("body") or "").splitlines()]:
+            return pr.get("url") or f"https://github.com/{repo}/pull/{pr.get('number')}"
+    return None
 
 
 def next_version(slug: str, tags: list, catalog: dict) -> int:
@@ -251,7 +277,9 @@ def pr_body(entry: dict, *, why: str, release_url: str, started_by: str, run_url
              f"Started by: {started_by}"]
     lines += [f"Run: {run_url}"] if run_url else []
     lines += [f"Requested by: {requested_by}"] if requested_by else []
-    lines += [f"Build: {p['build']}", f"Pipeline: {p['pipeline']}", "",
+    lines += [f"Build: {p['build']}", f"Pipeline: {p['pipeline']}"]
+    lines += [f"{CONTENT_LINE}{p['content']}"] if p.get("content") else []   # read back by pending_same_content
+    lines += ["",
               "Approve with the `automerge` label, not the merge button: the merge workflow publishes the draft "
               "release before it merges, so the catalog never names a download that is not live (FEAT-272)."]
     return "\n".join(lines) + "\n"
@@ -354,7 +382,8 @@ def main(argv=None) -> None:
     ap.add_argument("--test", action="store_true", help="a test pack: the catalog's `test` list, not the picker")
     ap.add_argument("--synth", action="store_true",
                     help="build the synthetic pack into packs/synth and publish it as a test pack if it changed")
-    ap.add_argument("--force", action="store_true", help="with --synth: publish even when the content is unchanged")
+    ap.add_argument("--force", action="store_true",
+                    help="publish even when the content is unchanged since the catalog's version or an open publish PR")
     ap.add_argument("--repo", default=RESORTS_REPO)
     ap.add_argument("--accept-change", action="store_true",
                     help="label the PR accept-change: a big change from the previous version is intended (FEAT-264)")
@@ -403,15 +432,23 @@ def main(argv=None) -> None:
         catalog = json.load(open(cat_path, encoding="utf-8")) if os.path.isfile(cat_path) else {"resorts": []}
     else:
         catalog = json.loads(run(["git", "show", "origin/main:catalog.json"], cwd=REPO))
-    content = content_key(pack_dir) if test else None
-    if test:
-        old = find_test_pack(catalog, slug, fmt)
-        if old and old["pack"].get("content") == content and not a.force:
-            print(f"{slug} at pack format {fmt} is unchanged since v{old['pack']['version']} (content {content}): "
-                  f"nothing to publish (--force publishes anyway)")
-            return
-        print(f"content {content}" + (f", v{old['pack']['version']} has {old['pack'].get('content')}" if old else
-                                      f", no {slug} at pack format {fmt} in the catalog yet"))
+    # FEAT-241, FEAT-245: a rebuild that changed nothing is not published again (no release, no version). An entry
+    # published before content keys existed has none, so the first rebuild after that publishes. A resort whose tier
+    # or status changed (a re-plan, a report that now passes) is published again even with the same content.
+    content = content_key(pack_dir)
+    old = find_test_pack(catalog, slug, fmt) if test else find_resort(catalog, slug)
+    where = f"{slug} at pack format {fmt}" if test else slug
+    same_listing = test or (old and (old.get("tier"), old.get("status")) == (a.tier, a.status))
+    if old and old["pack"].get("content") == content and same_listing and not a.force:
+        print(f"{where} is unchanged since v{old['pack']['version']} (content {content}): "
+              f"nothing to publish (--force publishes anyway)")
+        return
+    print(f"content {content}" + (f", v{old['pack']['version']} has {old['pack'].get('content') or 'no content key'}"
+                                  if old else f", no {where} in the catalog yet"))
+    if not a.dry_run and not a.force and (url := pending_same_content(slug, content, a.repo)):
+        print(f"{url} is open with this content: nothing to publish")
+        print(f"(content {content}; --force publishes anyway)")
+        return
     tags = [] if a.dry_run else [r["tagName"] for r in json.loads(run(
         ["gh", "release", "list", "-R", a.repo, "--limit", "1000", "--json", "tagName"]) or "[]")]
     version = next_version(slug, tags, catalog)
@@ -428,8 +465,7 @@ def main(argv=None) -> None:
         report_rel = f"reports/{slug}.md" if report else None
         entry = catalog_entry(meta, cfg, version=version, size=size, sha256=sha, pipeline=pipeline,
                               tier=a.tier, status=a.status, report=report_rel, repo=a.repo)
-        if content:
-            entry["pack"]["content"] = content
+        entry["pack"]["content"] = content
         if a.dry_run:
             print(json.dumps(entry, indent=1))
             print(f"would upload draft release {tag} and open a PR from {publish_branch(slug, version)}")

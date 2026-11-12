@@ -158,3 +158,62 @@ def test_pure_prints_true_only_for_a_publish_pr_changing_only_its_files(monkeypa
     fake_pr(monkeypatch, **kw)
     assert publish_merge.main(["pure", "7"]) == 0
     assert capsys.readouterr().out.strip().splitlines()[-1] == want
+
+
+# ------------------------------------------------------------------------------------------------ build-pack (FEAT-245)
+
+BUILD = ".github/workflows/build-pack.yml"
+
+
+def test_build_pack_never_interpolates_an_input_or_a_secret_into_a_shell_line():
+    for step in all_steps(load(BUILD)):
+        run = step.get("run", "")
+        assert "${{" not in run, f"step {step.get('name') or run[:40]!r} puts an expression in its shell line"
+
+
+def test_build_pack_inputs_reach_the_steps_as_env():
+    wf = load(BUILD)
+    assert set(triggers(wf)["workflow_dispatch"]["inputs"]) == {"slug", "name", "osm_id", "requested_by"}
+    assert wf["env"] == {"SLUG": "${{ inputs.slug }}", "NAME": "${{ inputs.name }}",
+                         "OSM_ID": "${{ inputs.osm_id }}", "REQUESTED_BY": "${{ inputs.requested_by }}"}
+
+
+def test_build_pack_queues_then_probes_then_builds_on_hosted_runners():
+    wf = load(BUILD)
+    jobs = wf["jobs"]
+    assert list(jobs) == ["queue", "probe", "build"]
+    assert jobs["probe"]["needs"] == "queue" and jobs["build"]["needs"] == "probe"
+    assert all(j["runs-on"] == "ubuntu-latest" for j in jobs.values())
+    assert "concurrency" not in wf and not any("concurrency" in j for j in jobs.values())   # wait_turn.py queues
+    assert any("wait_turn.py" in s.get("run", "") for s in jobs["queue"]["steps"])
+    assert any("probe_hosts.py" in s.get("run", "") for s in jobs["probe"]["steps"])
+
+
+def test_build_pack_runs_main_without_kept_credentials():
+    for step in all_steps(load(BUILD)):
+        if step.get("uses", "").startswith("actions/checkout"):
+            assert step["with"]["ref"] == "main" and step["with"]["persist-credentials"] is False
+
+
+def test_build_pack_names_a_step_per_stage_in_order():
+    names = [s.get("name") for s in load(BUILD)["jobs"]["build"]["steps"]]
+    stages = ["inputs", "resolve", "fetch", "build", "report", "publish"]
+    assert [n for n in names if n in stages] == stages
+    for s in load(BUILD)["jobs"]["build"]["steps"]:
+        if s.get("name") in stages:
+            assert s["run"].strip().splitlines()[-1] == f"python tools/ci/build_pack_ci.py {s['name']}"
+
+
+def test_build_pack_gives_the_secrets_only_to_the_steps_that_need_them():
+    steps = load(BUILD)["jobs"]["build"]["steps"]
+    holders = {s.get("name") or s.get("id"): s for s in steps if "secrets." in str(s) or "steps.app" in str(s)}
+    assert set(holders) == {"fetch", "the App is set up", "app", "publish"}
+    assert holders["fetch"]["env"] == {"LANDFIRE_EMAIL": "${{ secrets.LANDFIRE_EMAIL }}"}
+    assert holders["publish"]["env"]["GH_TOKEN"] == "${{ steps.app.outputs.token }}"
+    names = [s.get("name") or s.get("id") for s in steps]
+    assert names.index("app") == names.index("publish") - 1     # minted last: the token lasts an hour
+
+
+def test_build_pack_narrows_the_app_token_to_publishing():
+    (app,) = [s for s in all_steps(load(BUILD)) if "create-github-app-token" in s.get("uses", "")]
+    assert {k for k in app["with"] if k.startswith("permission-")} == {"permission-contents", "permission-pull-requests"}

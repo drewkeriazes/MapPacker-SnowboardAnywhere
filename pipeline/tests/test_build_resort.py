@@ -29,7 +29,7 @@ class Fake:
 
     def __call__(self, cmd, cwd=None, env=None):
         self.envs.append(env)
-        script = os.path.basename(cmd[1] if cmd[0] != "powershell" else cmd[cmd.index("-File") + 1])
+        script = os.path.basename(cmd[1] if "-File" not in cmd else cmd[cmd.index("-File") + 1])
         self.calls.append(script if "fetch_landfire" not in script else f"{script} {cmd[3]}")
         if self.fail and self.fail in script:
             return 1
@@ -493,3 +493,15 @@ def test_fetch_landfire_reads_the_email_from_the_environment_or_the_argument():
     assert _lf_args("vail", "rider@example.com", "EVH")["layerArg"] == "EVH"
     assert _lf_args("vail", "rider@example.com")["email"] == "rider@example.com"
     assert _lf_args("vail")["email"] is None
+
+
+def test_fetch_runs_windows_powershell_else_pwsh(monkeypatch):
+    """FEAT-245: fetch.ps1 runs under Windows PowerShell on Drew's PC and under pwsh on the Linux build runner"""
+    have = {"pwsh"}
+    monkeypatch.setattr(B.shutil, "which", lambda exe: f"/usr/bin/{exe}" if exe in have else None)
+    assert B.powershell() == "pwsh"
+    have.add("powershell")
+    assert B.powershell() == "powershell"
+    have.clear()
+    with pytest.raises(B.Failed, match="pwsh"):
+        B.powershell()

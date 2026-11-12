@@ -278,6 +278,106 @@ def test_content_key_ignores_the_build_stamps_but_not_the_content(tmp_path):
     assert content_key(str(pack)) != key
 
 
+def test_content_key_leaves_out_the_report(tmp_path):
+    """FEAT-245: report.json and report.md carry the build, the time and file dates; a rebuild that changed
+    nothing else keeps its key"""
+    pack = make_pack(tmp_path / "a")
+    key = content_key(str(pack))
+    (pack / "report.json").write_text('{"build": "b2", "generated": "2026-11-12T10:00:00Z"}')
+    (pack / "report.md").write_text("# report, generated now")
+    assert content_key(str(pack)) == key
+    (pack / "fine" / "0_0.png").write_bytes(b"other tile")
+    assert content_key(str(pack)) != key
+
+
+def published_demo(pack, content=True):
+    """origin/main's catalog with demo v2, carrying the pack's content key when `content`"""
+    e = catalog_entry({"slug": "demo", "name": "Demo Mountain", "formatVersion": FORMAT_VERSION}, {}, version=2,
+                      size=1, sha256="d", pipeline="p", tier="gold", status="preview", report=None)
+    if content:
+        e["pack"]["content"] = content_key(pack)
+    return {"formatVersion": FORMAT_VERSION, "resorts": [e]}
+
+
+def released(calls):
+    return [c for c in calls if c[:3] == ["gh", "release", "create"]]
+
+
+def test_an_identical_resort_pack_is_not_published_again(tmp_path, monkeypatch, capsys):
+    pack = tiny_pack_with_stamp(tmp_path)
+    calls = fake_gh_and_git(monkeypatch, catalog=published_demo(pack))
+    publish_pack.main([pack, "--status", "preview"])
+    assert "demo is unchanged since v2" in capsys.readouterr().out
+    assert not any(c[0] == "gh" for c in calls)                   # stopped before any gh call
+
+
+def test_an_entry_without_a_content_key_counts_as_changed(tmp_path, monkeypatch):
+    pack = tiny_pack_with_stamp(tmp_path)
+    calls = fake_gh_and_git(monkeypatch, catalog=published_demo(pack, content=False))
+    publish_pack.main([pack, "--status", "preview"])
+    assert [c[3] for c in released(calls)] == ["demo/v3"]
+
+
+@pytest.mark.parametrize("flags", [["--tier", "silver"], ["--status", "playable"]])
+def test_the_same_content_with_another_tier_or_status_is_published(tmp_path, monkeypatch, flags):
+    pack = tiny_pack_with_stamp(tmp_path)
+    calls = fake_gh_and_git(monkeypatch, catalog=published_demo(pack))
+    monkeypatch.setattr(publish_pack, "report_status", lambda d, m, s: (s or "preview", "test"))
+    publish_pack.main([pack, "--status", "preview", *flags] if "--status" not in flags else [pack, *flags])
+    assert [c[3] for c in released(calls)] == ["demo/v3"]
+
+
+def test_force_publishes_an_identical_pack(tmp_path, monkeypatch):
+    pack = tiny_pack_with_stamp(tmp_path)
+    calls = fake_gh_and_git(monkeypatch, catalog=published_demo(pack))
+    publish_pack.main([pack, "--status", "preview", "--force"])
+    assert [c[3] for c in released(calls)] == ["demo/v3"]
+
+
+def test_the_entry_and_the_pr_body_carry_the_content_key(tmp_path, monkeypatch):
+    pack = tiny_pack_with_stamp(tmp_path)
+    calls = fake_gh_and_git(monkeypatch)
+    fake_run = publish_pack.run
+    seen = {}
+
+    def run(cmd, cwd=None, capture=True):        # read the catalog and the body file while they exist
+        if cmd[:2] == ["git", "commit"]:
+            seen["catalog"] = json.load(open(os.path.join(cwd, "catalog.json"), encoding="utf-8"))
+        if cmd[:3] == ["gh", "pr", "create"]:
+            seen["body"] = open(cmd[cmd.index("--body-file") + 1], encoding="utf-8").read()
+        return fake_run(cmd, cwd, capture)
+    monkeypatch.setattr(publish_pack, "run", run)
+    publish_pack.main([pack, "--status", "preview"])
+    key = content_key(pack)
+    assert seen["catalog"]["resorts"][0]["pack"]["content"] == key
+    assert f"Content: {key}" in seen["body"].splitlines()
+    assert released(calls)
+
+
+def test_an_open_publish_pr_with_the_same_content_skips(tmp_path, monkeypatch, capsys):
+    pack = tiny_pack_with_stamp(tmp_path)
+    key = content_key(pack)
+    calls = fake_gh_and_git(monkeypatch)
+    fake_run = publish_pack.run
+    prs = [{"number": 8, "url": "", "headRefName": "publish/demo-extra-v1", "body": f"Content: {key}\n"},  # other slug
+           {"number": 9, "url": "https://github.com/o/r/pull/9", "headRefName": "publish/demo-v1",
+            "body": f"Build: b\nContent: {key}\n"}]
+
+    def run(cmd, cwd=None, capture=True):
+        if cmd[:3] == ["gh", "pr", "list"]:
+            calls.append(list(cmd))
+            return json.dumps(prs)
+        return fake_run(cmd, cwd, capture)
+    monkeypatch.setattr(publish_pack, "run", run)
+    publish_pack.main([pack, "--status", "preview"])
+    assert "https://github.com/o/r/pull/9 is open with this content: nothing to publish" in capsys.readouterr().out
+    assert not released(calls)
+    prs[1]["body"] = "Content: 0000000000000000\n"                  # an open PR with other content: publish
+    publish_pack.main([pack, "--status", "preview"])
+    assert [c[3] for c in released(calls)] == ["demo/v1"]
+    assert publish_pack.pending_same_content("demo", key, "o/r") is None
+
+
 def synth_entry(version, fmt, content="c1"):
     meta = {"slug": "synth", "name": "Synthetic test mountain", "formatVersion": fmt, "build": "b", "lonlat": [0, 0]}
     e = catalog_entry(meta, {}, version=version, size=1, sha256=f"s{version}", pipeline="p", tier=None,

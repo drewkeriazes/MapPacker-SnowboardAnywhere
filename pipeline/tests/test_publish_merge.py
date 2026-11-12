@@ -237,7 +237,9 @@ class FakeGitHub:
         if path.startswith("contents/catalog.json?ref="):
             return json.dumps(s["catalogs"][path.split("=")[1]])
         if path.startswith("actions/runs/"):
-            return s["run_actor"]
+            return json.dumps(s["run"] if "run" in s else
+                              {"triggering_actor": {"login": s["run_actor"]}, "path": publish_merge.BUILD_WORKFLOW,
+                               "head_branch": "main", "event": "workflow_dispatch"})
         if path.startswith("pulls?state=closed"):
             return json.dumps(s["closed_prs"])
         if path.startswith("pulls?state=open&base=main"):          # advance_open's listing
@@ -327,6 +329,10 @@ def test_ready_releases_the_draft_then_merges_pinned_to_the_checked_head(monkeyp
     ("label by the App, no run", {}, {"timeline": [labeled("automerge", APP)]}),
     ("label by the App for a stranger's run", {"body": "Run: https://github.com/o/r/actions/runs/5\n"},
      {"timeline": [labeled("automerge", APP)], "run_actor": "someone"}),
+    ("label by the App for a maintainer's run of a branch's workflow copy",
+     {"body": "Run: https://github.com/o/r/actions/runs/5\n"},
+     {"timeline": [labeled("automerge", APP)], "run": {"triggering_actor": {"login": "drewkeriazes"},
+      "path": ".github/workflows/build-pack.yml", "head_branch": "evil", "event": "workflow_dispatch"}}),
     ("timeline unreadable", {}, {"fail": [["gh", "api", f"repos/{REPO}/issues/7/timeline"]]}),
     ("a backdated commit pushed after the label", {}, {"activity": [act("branch_creation", "drewkeriazes",
      "2026-11-12T09:00:00Z", after="h0"), act("push", "someone", "2026-11-12T11:00:00Z")]}),
@@ -702,3 +708,18 @@ def test_a_failed_branch_delete_only_warns(monkeypatch, capsys):
     fake_gh(monkeypatch, pr={"merged": False}, release_draft=True, fail=[["gh", "api", "-X", "DELETE"]])
     assert publish_merge.closed(7, REPO) == 0
     assert "could not delete the branch publish/a-v1" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("run,want", [
+    ({"path": ".github/workflows/build-pack.yml", "head_branch": "main", "event": "workflow_dispatch",
+      "triggering_actor": {"login": "drewkeriazes"}}, "drewkeriazes"),
+    ({"path": ".github/workflows/build-pack.yml", "head_branch": "evil", "event": "workflow_dispatch",
+      "triggering_actor": {"login": "drewkeriazes"}}, None),
+    ({"path": ".github/workflows/other.yml", "head_branch": "main", "event": "workflow_dispatch",
+      "triggering_actor": {"login": "drewkeriazes"}}, None),
+    ({"path": ".github/workflows/build-pack.yml", "head_branch": "main", "event": "push",
+      "triggering_actor": {"login": "drewkeriazes"}}, None),
+    ({}, None),
+])
+def test_only_a_build_pack_run_dispatched_on_main_vouches_for_an_app_label(run, want):
+    assert publish_merge.build_run_actor(run) == want

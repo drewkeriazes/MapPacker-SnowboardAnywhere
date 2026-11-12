@@ -104,13 +104,20 @@ const buf = Buffer.from(await res.arrayBuffer());
 const zipPath = path.join(out, `${layer}.zip`);
 await writeFile(zipPath, buf);
 console.log(`saved ${zipPath} (${(buf.length / 1e6).toFixed(1)} MB)`);
-// unzip in place: tar.exe ships with Windows 10+ and reads zip files
+// unzip in place: on Windows tar.exe (bsdtar, ships with Windows 10+) reads zip files; elsewhere (the Linux
+// build runner, FEAT-245) GNU tar cannot, so `unzip`
 try {
-  // Windows' own bsdtar by full path: a GNU tar earlier on PATH (Git Bash) reads "C:" as a remote host
-  const tar = process.platform === 'win32' ? path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
-  execFileSync(tar, ['-xf', zipPath, '-C', out], { stdio: 'inherit' });
+  if (process.platform === 'win32') {
+    // Windows' own bsdtar by full path: a GNU tar earlier on PATH (Git Bash) reads "C:" as a remote host
+    const tar = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
+    execFileSync(tar, ['-xf', zipPath, '-C', out], { stdio: 'inherit' });
+  } else {
+    execFileSync('unzip', ['-o', '-q', zipPath, '-d', out], { stdio: 'inherit' });
+  }
   console.log('unzipped into', out);
 } catch {
-  console.log('Could not unzip automatically; right-click the zip > Extract All.');
+  // no GeoTIFF means no LANDFIRE layer: fail the stage rather than let the build go on without it
+  console.error(`Could not unzip ${zipPath}: extract it into ${out} by hand (Extract All on Windows, unzip elsewhere), then run again.`);
+  process.exit(5);
 }
 console.log(`The GeoTIFF is the ${product} raster (${layer}) in EPSG:${epsg} at 30 m.`);

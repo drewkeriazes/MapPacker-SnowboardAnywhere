@@ -1,18 +1,20 @@
 # Snowboard sim data fetcher. Downloads everything listed in manifests/<slug>.json
 # into <raw root>/<slug>/ (-RawDir, else SBA_RAW_ROOT, else raw\ in this checkout). Safe to re-run: finished files are skipped, partial files are retried.
-# Works on Windows PowerShell 5.1 and PowerShell 7. No installs needed.
+# Works on Windows PowerShell 5.1 and PowerShell 7, on Windows and on Linux (pwsh, the FEAT-245 build runner). No installs needed.
 param(
     [string]$Slug = "vail",
     [int]$Concurrency = 6,
     # parent folder for raw data; downloads go to <RawDir>\<Slug>. Default: SBA_RAW_ROOT, else raw\ inside the repo.
-    [string]$RawDir = ""
+    [string]$RawDir = "",
+    # the manifest to fetch. Default: manifests/<Slug>.json in this checkout (a test passes its own)
+    [string]$ManifestPath = ""
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13 } catch { try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {} }
 
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)   # repo root
-$manifestPath = Join-Path $root "manifests\$Slug.json"
+if (-not $ManifestPath) { $ManifestPath = Join-Path (Join-Path $root "manifests") "$Slug.json" }
 if (-not $RawDir) { $RawDir = if ($env:SBA_RAW_ROOT) { $env:SBA_RAW_ROOT } else { Join-Path $root "raw" } }
 $rawDir = Join-Path $RawDir $Slug
 if (-not (Test-Path $manifestPath)) { Write-Host "Manifest not found: $manifestPath" -ForegroundColor Red; exit 1 }
@@ -57,7 +59,9 @@ function HostLimit($url) {
 $work = New-Object System.Collections.Generic.List[object]
 $skipped = 0
 foreach ($it in $items) {
-    $dest = Join-Path $rawDir ($it.path -replace "/", "\")
+    # the manifest's paths use /; the platform's own separator, so the .NET file calls below get a real path on
+    # Linux too (a \ there is part of the file name)
+    $dest = Join-Path $rawDir ($it.path -replace "/", [System.IO.Path]::DirectorySeparatorChar)
     if ((Test-Path $dest) -and ((Get-Item $dest).Length -gt 0)) { $skipped++; continue }
     $alts = @(); if ($it.alts) { $alts = @($it.alts) }
     $work.Add([pscustomobject]@{ url = $it.url; path = $it.path; dest = $dest; method = $it.method; body = $it.body; tries = 0; alts = $alts })

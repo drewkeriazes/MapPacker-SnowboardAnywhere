@@ -29,6 +29,21 @@ python pipeline\resort.py add --help
 
 Every stage is skipped when its inputs have not changed, so both are safe to re-run. The first `add_resort.cmd` run for a new resort stops after the data plan (`resorts/<slug>/<slug>-plan.md`) so it can be read before a 1+ GB fetch.
 
+### Build in GitHub Actions
+
+`build-pack.yml` (FEAT-245) builds one resort on a free GitHub-hosted runner and ends in the same publish PR as a build on Drew's PC. The game's Build it button starts it (FEAT-246); by hand:
+
+```
+gh workflow run build-pack.yml -f slug=boston-mills -f name="Boston Mills" -f osm_id=<OSM way id>   :: a new resort
+gh workflow run build-pack.yml -f slug=vail                                                       :: rebuild from resorts/vail/
+```
+
+- **Inputs:** `slug`, and for a new slug `name` and `osm_id` (the ski area picked in the game: `123`, `way/123` or `relation/123`; `resort.py add --osm` finds the OpenSkiData area built from it, so `add` never asks which of several areas). A new resort is built `--alone`: a neighbour sold with it (Brandywine beside Boston Mills) needs a hand config. `requested_by` is the game account that asked (FEAT-273), written into the publish PR. The inputs are untrusted text: they reach the steps only as environment variables, and `tools/ci/build_pack_ci.py` refuses anything outside their shapes before any build step runs.
+- **Jobs:** `queue` waits for every build started before it (`tools/ci/wait_turn.py`, one at a time in the order started; the build job checks again, so "Re-run failed jobs" waits its turn too; a run that waits more than 5.5 hours gives up and is started again); `probe` sends one small request to each data host (`tools/ci/probe_hosts.py`) and fails per host, so a host that is down stops the run in a minute; `build` has one step per stage (resolve, fetch, build, report, publish) and a line per stage in the run summary. An existing slug is rebuilt from its committed config, with the raw data it builds on (`raw_from`, relocate sources) fetched first; no slug is skipped for being in the catalog. No ride, and the attract and spots stages (the menu shots and ghost runs, the compare spots) skip, since there is no game on the runner; a pack that needs them is built on Drew's PC.
+- **Nothing new, nothing published:** `publish_pack.py` compares the pack's `content` hash (every file, without `meta.json`'s build stamps and the report) with the catalog entry on `main` and with any open publish PR for the slug, and publishes nothing and bumps no version when one matches with the same tier and status (`--force` publishes anyway). Entries published before FEAT-245 have no `content`, so their first rebuild always publishes.
+- **Publishing** uses the publish App's token, minted just before the publish step; the PR gets `automerge` when the run's triggering actor is in `.github/maintainers.txt`, and `publish-merge.yml` releases and merges it as usual.
+- **Limits:** the free runner has about 14 GB of disk (the workflow removes unused toolsets first and uses `/mnt` when it is bigger), 16 GB of RAM and 6 hours a job. A resort too big for it is built on Drew's PC and published from there. Setup: the secret `LANDFIRE_EMAIL` (passed to the fetch step's environment only, BUG-111), plus the publish App's secrets and variable below.
+
 ### Add a resort yourself, step by step
 
 Without Claude, on Windows:
@@ -111,7 +126,7 @@ It needs the game clone next to this one with `npm ci` done in `game/`. Builds o
 
 | Path | What |
 |---|---|
-| `catalog.json` | Every published pack: slug, name, region, tier, status, and the release zip's version, pack format, size, sha256, URL and the pipeline commit that built it. Test packs (the synthetic pack) are in a separate `test` list the resort picker does not read, one entry per pack format, with a `content` hash |
+| `catalog.json` | Every published pack: slug, name, region, tier, status, and the release zip's version, pack format, size, sha256, URL and the pipeline commit that built it. Test packs (the synthetic pack) are in a separate `test` list the resort picker does not read, one entry per pack format. Entries published since FEAT-245 carry a `content` hash, so an unchanged rebuild is not published again |
 | `pipeline/` | The pipeline: `resort.py` (name to config and data plan, and `add`), `build_resort.py`, `build_pack.py` and its stages, `pack_report.py`, `publish_pack.py`, the fetch scripts, tests in `pipeline/tests/`. Moved from the game repo with its history (FEAT-238) |
 | `docs/pipeline-scripts.md` | Every script in `pipeline/`: what it reads and writes, its options (moved from the game's developer guide in FEAT-242) |
 | `docs/pack-format.md` | The pack format: the layout, the encodings, `formatVersion` and its bump rule, and the Contract, every value this repo and the game must agree on (FEAT-239) |
