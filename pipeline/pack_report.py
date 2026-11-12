@@ -33,6 +33,7 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from canopy_spots import run_half_width  # noqa: E402
 from packwriter import FORMAT_VERSION, decode_terrarium  # noqa: E402
+from species import UNKNOWN_WARN  # noqa: E402
 import paths  # noqa: E402
 
 REPO = paths.REPO
@@ -510,16 +511,22 @@ class Report:
                       "mid and far cover levels built from them (pass --raw to check pistes_wide)" if ok else
                       "no mid / far cover levels, so the land cover was missing at build time")
 
-        # 4 LANDFIRE
+        # 4 LANDFIRE, and (FEAT-233) the share of the forest in EVT classes the species rules don't name
+        veg = meta.get("vegetation") or {}
+        unk = veg.get("evtUnknown")
+        unk_note = "" if unk is None else (f"; {unk:.1%} of the forest in EVT classes the species rules don't name ({veg.get('region', '?')} rules)"
+                                           + (f": over {UNKNOWN_WARN:.0%}, map them in species.classify_evt" if unk > UNKNOWN_WARN else ""))
+        unk_warn = unk is not None and unk > UNKNOWN_WARN
         if raw:
             evt = self.raw_has("landfire", pattern="*.tif")
             evc, evh = self.raw_has("landfire", "evc", pattern="*.tif"), self.raw_has("landfire", "evh", pattern="*.tif")
-            self.line("4", "Raw: LANDFIRE", PASS if evt and evc and evh else (WARN if evt else FAIL),
-                      "EVT, EVC and EVH" if evt and evc and evh else
-                      (f"EVT only, no {' or '.join(x for x, h in (('EVC', evc), ('EVH', evh)) if not h)} (stand heights fall back "
-                       "to the lidar)" if evt else "none: species from elevation and aspect only (fetch_landfire)"))
+            st = PASS if evt and evc and evh else (WARN if evt else FAIL)
+            self.line("4", "Raw: LANDFIRE", WARN if st == PASS and unk_warn else st,
+                      ("EVT, EVC and EVH" if evt and evc and evh else
+                       (f"EVT only, no {' or '.join(x for x, h in (('EVC', evc), ('EVH', evh)) if not h)} (stand heights fall back "
+                        "to the lidar)" if evt else "none: species from elevation and aspect only (fetch_landfire)")) + unk_note)
         elif "LANDFIRE" in attribution:
-            self.line("4", "Raw: LANDFIRE", PASS, "LANDFIRE in the attribution")
+            self.line("4", "Raw: LANDFIRE", WARN if unk_warn else PASS, "LANDFIRE in the attribution" + unk_note)
         else:
             self.line("4", "Raw: LANDFIRE", SKIP, "no LANDFIRE line in the attribution; pass --raw to check")
 
