@@ -5,13 +5,16 @@
 
 `ready` merges only a `publish/<slug>-v<N>` PR from this repo (not a fork) into main, labelled `publish` and
 `automerge`, whose latest `automerge` label came from a maintainer (.github/maintainers.txt, main's copy) or from
-the App (PUBLISH_APP_LOGIN) on a PR whose `Run:` line names a run a maintainer started; with no commit after that
-label except the App's own refresh; changing only the publish file set and in catalog.json only <slug> v<N>, at
-this repo's release url; with every check run on the head success or skipped and `publish-check` success. Then it
-re-checks the release, publishes it if it is still a draft (a rollback's release is already out), and squash-merges
-pinned to the head it checked. Any gh failure or missing data waits or refuses, never merges. A refusal comments on
-the PR once per reason. Env: GITHUB_REPOSITORY, PUBLISH_APP_LOGIN, GITHUB_RUN_ID (this run's jobs don't count as
-checks); gh signed in with the App token, run from a full-history checkout of main."""
+the App (PUBLISH_APP_LOGIN) on a PR whose `Run:` line names a run a maintainer started; with no push to the branch
+after that label (GitHub's activity log) except the App's own refresh; changing only the publish file set and in
+catalog.json only <slug> v<N>, at this repo's release url; with every check run on the head success or skipped and
+`publish-check` success. Then it re-checks the release, publishes it if it is still a draft (a rollback's release
+is already out), and squash-merges pinned to the head it checked (a branch that moved stops it, no retry). Any gh
+failure or missing data waits or refuses, never merges. A refusal comments on the PR once per reason (counting
+only the tool's own comments). Env: GITHUB_REPOSITORY, PUBLISH_APP_LOGIN, GITHUB_RUN_ID (this run's jobs don't count as
+checks); gh signed in with the App token, run from a full-history checkout of main.
+Trust assumption: GitHub's server-side push record is accurate and only this workflow holds the App's token, so a
+push by the App after the label is the refresh."""
 import argparse, json, os, re, shutil, subprocess, sys, tempfile, time
 from datetime import datetime
 from typing import Callable
@@ -90,20 +93,29 @@ def _time(s: str) -> datetime:
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
-def commits_after_label_ok(commits: list[dict], label_time: str, app_login: str) -> bool:
-    """no commit has a git date after `label_time`, except ones GitHub attributes to `app_login` as both author and
-    committer (the refresh); a commit with no dates counts as after"""
+def activity_complete(activity: list[dict], label_time: str, head_sha: str) -> bool:
+    """the branch's activity log covers the label: some entry is at or before it, and the newest one left the branch
+    at `head_sha` (else the log is stale or cut short)"""
+    try:
+        acts = sorted(activity, key=lambda a: _time(a["timestamp"]))
+        return bool(acts) and _time(acts[0]["timestamp"]) <= _time(label_time) and acts[-1].get("after") == head_sha
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return False
+
+
+def pushes_after_label_ok(activity: list[dict], label_time: str, app_login: str) -> bool:
+    """no entry in the branch's activity log (push, force_push, branch_deletion, ...) at or after `label_time` by
+    anyone but `app_login`; a branch_creation at the label's second is before it (a PR needs its branch first)"""
     try:
         t = _time(label_time)
-        for c in commits:
-            meta = c.get("commit") or {}
-            dates = [(meta.get(k) or {}).get("date") for k in ("author", "committer")]
-            if None in dates or any(_time(d) > t for d in dates):
-                who = {(c.get(k) or {}).get("login") for k in ("author", "committer")}
-                if not app_login or who != {app_login}:
-                    return False
+        for a in activity:
+            ts, who = _time(a["timestamp"]), (a.get("actor") or {}).get("login")
+            if app_login and who == app_login:
+                continue
+            if ts > t or (ts == t and a.get("activity_type") != "branch_creation"):
+                return False
         return True
-    except (TypeError, ValueError, AttributeError):
+    except (KeyError, TypeError, ValueError, AttributeError):
         return False
 
 
@@ -187,12 +199,23 @@ def release_draft(tag: str) -> bool | None:
         return None
 
 
-def say(n: int, repo: str, text: str) -> None:
-    """comment `[publish-merge] text` on the PR, unless it is already this tool's last comment"""
+def whoami(app_login: str) -> str | None:
+    """the login comments are posted as: the App's in the workflow, else gh's signed-in user (None if unknown)"""
+    if app_login:
+        return app_login
+    try:
+        return gh("api", "user", "--jq", ".login") or None
+    except SystemExit:
+        return None
+
+
+def say(n: int, repo: str, text: str, me: str | None) -> None:
+    """comment `[publish-merge] text` on the PR, unless it is already the last such comment by `me` (anyone can
+    post the prefix; with `me` unknown it always comments)"""
     body = f"{PREFIX} {text}"
     try:
-        mine = [c.get("body") for c in api_pages(f"repos/{repo}/issues/{n}/comments") if
-                str(c.get("body", "")).startswith(PREFIX)]
+        mine = [c.get("body") for c in api_pages(f"repos/{repo}/issues/{n}/comments") if me and
+                (c.get("user") or {}).get("login") == me and str(c.get("body", "")).startswith(PREFIX)]
         if mine and mine[-1] == body:
             return print(f"already said: {body}")
         gh("pr", "comment", str(n), "--body", body)
@@ -223,14 +246,19 @@ def assess(n: int, repo: str, pr: dict, app_login: str) -> tuple[str, dict]:
     trusted = False
     if "automerge" in labels:
         events = api_pages(f"repos/{repo}/issues/{n}/timeline")
-        commits = api_pages(f"repos/{repo}/pulls/{n}/commits")
+        ref = f"refs/heads/{branch}"
+        activity = [a for a in api_pages(f"repos/{repo}/activity?ref={quote(ref)}&per_page=100")
+                    if a.get("ref") in (ref, branch)]
         ev, maint = last_label(events, "automerge"), maintainers()
         run_actor = lambda i: gh("api", f"repos/{repo}/actions/runs/{i}", "--jq", ".triggering_actor.login")
         if not ev or not label_ok(events, "automerge", maint, app_login, pr.get("body") or "", run_actor, repo):
             who = ((ev or {}).get("actor") or {}).get("login")
             return f"{UNTRUSTED}: added by {who}, not a maintainer (nor by the App on a maintainer's run)", {}
-        if len(commits) != pr.get("commits") or not commits_after_label_ok(commits, ev["created_at"], app_login):
-            return f"{UNTRUSTED}: a commit came after it (other than the App's refresh)", {}
+        if not activity_complete(activity, ev["created_at"], sha):
+            print(f"the activity log of {branch} does not reach {sha[:7]} or back to the label yet")
+            return "wait", {}
+        if not pushes_after_label_ok(activity, ev["created_at"], app_login):
+            return f"{UNTRUSTED}: someone other than the App pushed to {branch} after it", {}
         trusted = True
     cmp = json.loads(gh("api", f"repos/{repo}/compare/main...{sha}", "--jq",
                         "{behind_by: .behind_by, base: .merge_base_commit.sha}"))
@@ -246,7 +274,7 @@ def assess(n: int, repo: str, pr: dict, app_login: str) -> tuple[str, dict]:
 def refresh_branch(branch: str, sha: str, name: str, email: str, src: str = REPO) -> str:
     """merge origin/main into `branch` at `sha` with catalog.json rebuilt by rebase_catalog, committed as
     `name <email>`, pushed to that branch (only a publish/ one); stops when the branch is no longer at `sha` and
-    raises on a conflict in any other file"""
+    raises, pushing nothing, when the merge did not start (no MERGE_HEAD) or conflicts in any other file"""
     if not parse_branch(branch):
         raise SystemExit(f"refusing to push {branch}: not a publish branch")
     run(["git", "fetch", "origin", "main", f"+refs/heads/{branch}:refs/remotes/origin/{branch}"], cwd=src)
@@ -261,8 +289,14 @@ def refresh_branch(branch: str, sha: str, name: str, email: str, src: str = REPO
                                 for ref in (base, sha, "origin/main"))
         try:
             run(["git", *who, "merge", "--no-commit", "--no-ff", "origin/main"], cwd=wt)
+        except SystemExit as e:       # a conflict (catalog.json is rewritten below) still leaves MERGE_HEAD
+            merge_error = e
+        else:
+            merge_error = None
+        try:
+            run(["git", "rev-parse", "-q", "--verify", "MERGE_HEAD"], cwd=wt)
         except SystemExit:
-            pass                      # catalog.json conflicts, and is rewritten below; any other conflict stops
+            raise SystemExit(f"git merge of main did not start, nothing pushed: {merge_error}")
         with open(os.path.join(wt, "catalog.json"), "w", encoding="utf-8", newline="\n") as f:
             json.dump(rebase_catalog(base_c, pr_c, main_c), f, indent=1)
             f.write("\n")
@@ -283,16 +317,26 @@ def refresh(repo: str, branch: str, sha: str, app_login: str) -> str:
     return refresh_branch(branch, sha, app_login, f"{uid}+{app_login}@users.noreply.github.com")
 
 
-def release_then_merge(n: int, repo: str, tag: str, sha: str) -> int:
+def head_moved(n: int, repo: str, sha: str, err: SystemExit) -> bool:
+    """the merge failed because the branch is no longer at `sha` (--match-head-commit)"""
+    if "head branch was modified" in str(err).lower():
+        return True
+    try:
+        return api(f"repos/{repo}/pulls/{n}")["head"]["sha"] != sha
+    except (Exception, SystemExit):
+        return False
+
+
+def release_then_merge(n: int, repo: str, tag: str, sha: str, me: str | None) -> int:
     draft = release_draft(tag)        # re-read right before publishing
     if draft is None:
-        say(n, repo, f"Not merging: can't read release {tag}")
+        say(n, repo, f"Not merging: can't read release {tag}", me)
         return 0
     try:
         if draft:
             gh("release", "edit", tag, "--draft=false")
     except SystemExit as e:           # no merge without a live release
-        say(n, repo, f"Not merging: publishing release {tag} failed: {e}")
+        say(n, repo, f"Not merging: publishing release {tag} failed: {e}", me)
         return 1
     for attempt in range(4):
         try:
@@ -300,9 +344,12 @@ def release_then_merge(n: int, repo: str, tag: str, sha: str) -> int:
             return 0
         except SystemExit as e:
             err = e
+            if head_moved(n, repo, sha, e):
+                say(n, repo, "Not merged: the branch moved after the check; the next run looks again", me)
+                return 0
             if attempt < 3:
                 sleep(20)
-    say(n, repo, f"Release {tag} is published but the merge failed 4 times: {err}")
+    say(n, repo, f"Release {tag} is published but the merge failed 4 times: {err}", me)
     return 1
 
 
@@ -318,18 +365,19 @@ def ready(n: int, repo: str, app_login: str) -> int:
     except (Exception, SystemExit) as e:
         return print(f"wait: could not read #{n}: {e}") or 1
     print(f"#{n}: {decision}")
+    me = whoami(app_login) if decision.startswith("refuse") or decision in ("refresh", "merge") else None
     if decision.startswith("refuse"):
-        say(n, repo, f"Not merging: {decision.split(': ', 1)[1]}")
+        say(n, repo, f"Not merging: {decision.split(': ', 1)[1]}", me)
     elif decision == "refresh":
         if not app_login:
-            return say(n, repo, "Not merging: behind main, and PUBLISH_APP_LOGIN is not set to refresh it") or 0
+            return say(n, repo, "Not merging: behind main, and PUBLISH_APP_LOGIN is not set to refresh it", me) or 0
         try:
             print(refresh(repo, facts["branch"], facts["sha"], app_login))
         except SystemExit as e:
-            say(n, repo, f"Not merging: the refresh onto main failed: {e}")
+            say(n, repo, f"Not merging: the refresh onto main failed: {e}", me)
             return 1
     elif decision == "merge":
-        return release_then_merge(n, repo, f"{facts['slug']}-v{facts['version']}", facts["sha"])
+        return release_then_merge(n, repo, f"{facts['slug']}-v{facts['version']}", facts["sha"], me)
     return 0
 
 

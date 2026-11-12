@@ -9,8 +9,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import publish_merge  # noqa: E402
-from publish_merge import (catalog_problem, commits_after_label_ok, decide, files_ok, label_ok,  # noqa: E402
-                           parse_branch, publish_file_patterns, rebase_catalog)
+from publish_merge import (activity_complete, catalog_problem, decide, files_ok, label_ok,  # noqa: E402
+                           parse_branch, publish_file_patterns, pushes_after_label_ok, rebase_catalog)
 from publish_pack import asset_url  # noqa: E402
 
 REPO = "o/r"
@@ -22,10 +22,13 @@ def labeled(label, login, at=T_LABEL):
     return {"event": "labeled", "label": {"name": label}, "actor": {"login": login}, "created_at": at}
 
 
-def commit(date, login, committer=None):
-    """the REST shape of a PR commit: GitHub's login for the author and committer, and the git dates"""
-    return {"sha": "c", "author": {"login": login}, "committer": {"login": committer or login},
-            "commit": {"author": {"date": date}, "committer": {"date": date}}}
+def act(kind, login, at, after="h1", ref="refs/heads/publish/a-v1"):
+    """an entry of GitHub's activity log for a branch (GET repos/{repo}/activity): who pushed, when, to what"""
+    return {"activity_type": kind, "actor": {"login": login}, "timestamp": at, "after": after, "before": "b",
+            "ref": ref}
+
+
+CREATED = act("branch_creation", "drewkeriazes", "2026-11-12T09:00:00Z")
 
 
 def entry(slug, version, repo=REPO):
@@ -93,14 +96,25 @@ def test_only_the_latest_label_event_counts():
     assert not label_ok([], "automerge", {"drewkeriazes"}, APP, "", lambda i: None)
 
 
-def test_a_commit_after_the_label_blocks_unless_it_is_the_refresh():
-    t = "2026-11-12T10:00:00Z"
-    assert not commits_after_label_ok([commit("2026-11-12T11:00:00Z", "someone")], t, "pub[bot]")
-    assert commits_after_label_ok([commit("2026-11-12T11:00:00Z", "pub[bot]")], t, "pub[bot]")
-    assert commits_after_label_ok([commit("2026-11-12T09:00:00Z", "someone")], t, "pub[bot]")
-    assert not commits_after_label_ok([commit("2026-11-12T11:00:00Z", "pub[bot]", committer="someone")], t, APP)
-    assert not commits_after_label_ok([commit("2026-11-12T11:00:00Z", None)], t, ""), "no App login: nothing after"
-    assert not commits_after_label_ok([{"author": {"login": "x"}, "commit": {}}], t, APP), "no dates: fail closed"
+def test_a_push_after_the_label_blocks_unless_it_is_the_refresh():
+    t = T_LABEL
+    # a commit backdated to 09:00 still shows as a push at 11:00 by whoever pushed it
+    assert not pushes_after_label_ok([CREATED, act("push", "someone", "2026-11-12T11:00:00Z")], t, APP)
+    assert pushes_after_label_ok([CREATED, act("push", APP, "2026-11-12T11:00:00Z")], t, APP)
+    assert not pushes_after_label_ok([CREATED, act("force_push", "drewkeriazes", "2026-11-12T11:00:00Z")], t, APP)
+    assert not pushes_after_label_ok([CREATED, act("push", "drewkeriazes", T_LABEL)], t, APP), "at the label counts"
+    assert pushes_after_label_ok([act("branch_creation", "drewkeriazes", T_LABEL)], t, APP)
+    assert not pushes_after_label_ok([act("branch_deletion", "someone", "2026-11-12T11:00:00Z")], t, APP)
+    assert not pushes_after_label_ok([CREATED, act("push", APP, "2026-11-12T11:00:00Z")], t, ""), "no App login"
+    assert not pushes_after_label_ok([{"activity_type": "push", "actor": None}], t, APP), "no timestamp"
+
+
+def test_the_activity_log_must_reach_the_head_and_the_label():
+    assert activity_complete([CREATED], T_LABEL, "h1")
+    assert not activity_complete([], T_LABEL, "h1")
+    assert not activity_complete([CREATED], T_LABEL, "h2"), "the newest entry is not the head: stale"
+    assert not activity_complete([act("push", APP, "2026-11-12T11:00:00Z")], T_LABEL, "h1"), "cut short"
+    assert not activity_complete([{"after": "h1"}], T_LABEL, "h1")
 
 
 def test_rebase_catalog_keeps_both_resorts():
@@ -163,20 +177,19 @@ class FakeGitHub:
         p = {"merged": False, "state": "open", "headRefName": "publish/a-v1", "labels": ["publish", "automerge"],
              "body": "", "fork": False, **pr}
         files = over.pop("files", [{"filename": "catalog.json"}])
-        commits = over.pop("commits", [commit("2026-11-12T09:00:00Z", "drewkeriazes")])
         self.state = {
             "pr": {"number": 7, "state": p["state"], "merged": p["merged"], "body": p["body"],
                    "labels": [{"name": n} for n in p["labels"]], "base": {"ref": "main"},
                    "head": {"ref": p["headRefName"], "sha": "h1", "repo": {"full_name": "x/fork" if p["fork"] else REPO}},
-                   "merge_commit_sha": "m1", "changed_files": len(files), "commits": len(commits)},
-            "files": files, "commits": commits,
+                   "merge_commit_sha": "m1", "changed_files": len(files)},
+            "files": files, "activity": [CREATED],
             "timeline": [labeled("automerge", "drewkeriazes"), {"event": "committed"}],
             "compare": {"behind_by": 0, "base": "b0"},
             "checks": [{"name": "publish-check", "status": "completed", "conclusion": "success", "details_url": ""},
                        {"name": "pipeline-tests", "status": "completed", "conclusion": "skipped", "details_url": ""}],
             "catalogs": {"b0": {"resorts": []}, "h1": {"resorts": [entry("a", 1)]}, "m1": {"resorts": [entry("a", 1)]}},
             "release_draft": release_draft, "comments": [], "open_prs": [], "run_actor": "drewkeriazes",
-            "fail": [],
+            "fail": [], "merge_says_moved": False,
         }
         self.state.update(over)
         self.calls = Calls()
@@ -184,6 +197,8 @@ class FakeGitHub:
     def __call__(self, cmd, cwd=None, capture=True):
         self.calls.append(list(cmd))
         s = self.state
+        if cmd[:3] == ["gh", "pr", "merge"] and s["merge_says_moved"]:     # gh's error for --match-head-commit
+            raise SystemExit("GraphQL: Head branch was modified. Review and try the merge again.")
         if any(cmd[:len(f)] == f for f in s["fail"]):
             raise SystemExit(f"{' '.join(cmd)} failed")
         if cmd[:2] == ["gh", "api"]:
@@ -205,8 +220,8 @@ class FakeGitHub:
             return json.dumps(s["pr"])
         if path == "pulls/7/files":
             return json.dumps(s["files"])
-        if path == "pulls/7/commits":
-            return json.dumps(s["commits"])
+        if path == "activity?ref=refs/heads/publish/a-v1&per_page=100":
+            return json.dumps(s["activity"])
         if path == "issues/7/timeline":
             return json.dumps(s["timeline"][:1]) + "\n" + json.dumps(s["timeline"][1:])   # two pages
         if path == "issues/7/comments":
@@ -299,20 +314,25 @@ def test_ready_releases_the_draft_then_merges_pinned_to_the_checked_head(monkeyp
     assert view and view[-1] < calls.index(released(calls)[0]), "the draft is re-checked right before publishing"
 
 
-ANOTHER = commit("2026-11-12T11:00:00Z", "someone")
-
-
 @pytest.mark.parametrize("why, pr, over", [
     ("label by a non-maintainer", {}, {"timeline": [labeled("automerge", "someone")]}),
     ("label by the App, no run", {}, {"timeline": [labeled("automerge", APP)]}),
     ("label by the App for a stranger's run", {"body": "Run: https://github.com/o/r/actions/runs/5\n"},
      {"timeline": [labeled("automerge", APP)], "run_actor": "someone"}),
     ("timeline unreadable", {}, {"fail": [["gh", "api", f"repos/{REPO}/issues/7/timeline"]]}),
-    ("a commit after the label", {}, {"commits": [commit("2026-11-12T09:00:00Z", "drewkeriazes"), ANOTHER]}),
+    ("a backdated commit pushed after the label", {}, {"activity": [act("branch_creation", "drewkeriazes",
+     "2026-11-12T09:00:00Z", after="h0"), act("push", "someone", "2026-11-12T11:00:00Z")]}),
+    ("a force push after the label", {}, {"activity": [act("branch_creation", "drewkeriazes", "2026-11-12T09:00:00Z",
+     after="h0"), act("force_push", "drewkeriazes", "2026-11-12T11:00:00Z")]}),
+    ("activity unreadable", {}, {"fail": [["gh", "api",
+                                           f"repos/{REPO}/activity?ref=refs/heads/publish/a-v1&per_page=100"]]}),
+    ("activity stale", {}, {"activity": [act("branch_creation", "drewkeriazes", "2026-11-12T09:00:00Z", after="h0")]}),
+    ("activity cut short", {}, {"activity": [act("push", APP, "2026-11-12T11:00:00Z")]}),
+    ("activity of another branch", {}, {"activity": [act("branch_creation", "drewkeriazes", "2026-11-12T09:00:00Z",
+                                                         ref="refs/heads/main")]}),
     ("a code file", {}, {"files": [{"filename": "catalog.json"}, {"filename": "pipeline/build_pack.py"}]}),
     ("a file moved out of the code", {}, {"files": [{"filename": "resorts/a/x.py", "previous_filename": "pipeline/x.py"}]}),
     ("more files than listed", {}, {"pr": None}),
-    ("more commits than listed", {}, {"pr": "commits"}),
     ("a failing check", {}, {"checks": [{"name": "publish-check", "status": "completed", "conclusion": "failure"}]}),
     ("a running check", {}, {"checks": [{"name": "publish-check", "status": "completed", "conclusion": "success"},
                                         {"name": "x", "status": "in_progress", "conclusion": None}]}),
@@ -331,14 +351,22 @@ ANOTHER = commit("2026-11-12T11:00:00Z", "someone")
 ])
 def test_ready_never_releases_or_merges_without_every_precondition(monkeypatch, why, pr, over):
     over = {"release_draft": True, **over}
-    if "pr" in over:                  # the PR counts one more file (or commit) than the API lists
+    if "pr" in over:                  # the PR counts one more file than the API lists
         calls = fake_gh(monkeypatch, pr=pr, release_draft=True)
-        calls.state["pr"]["commits" if over["pr"] == "commits" else "changed_files"] += 1
+        calls.state["pr"]["changed_files"] += 1
     else:
         calls = fake_gh(monkeypatch, pr=pr, **over)
     publish_merge.main(["ready", "7"])
     assert not released(calls), why
     assert not merged(calls), why
+
+
+def test_the_apps_refresh_push_after_the_label_still_merges(monkeypatch):
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, activity=[
+        act("branch_creation", "drewkeriazes", "2026-11-12T09:00:00Z", after="h0"),
+        act("push", APP, "2026-11-12T11:00:00Z")])
+    assert publish_merge.main(["ready", "7"]) == 0
+    assert merged(calls)
 
 
 def test_the_publish_merge_job_does_not_count_itself(monkeypatch):
@@ -358,9 +386,20 @@ def test_a_refusal_comments_once(monkeypatch):
     publish_merge.main(["ready", "7"])
     said = comments(calls)
     assert len(said) == 1 and said[0].startswith("[publish-merge]") and "someone" in said[0]
-    calls = fake_gh(monkeypatch, pr={}, release_draft=True, comments=[{"body": said[0]}], **over)
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, comments=[{"body": said[0], "user": {"login": APP}}], **over)
     publish_merge.main(["ready", "7"])
     assert not comments(calls)
+
+
+def test_someone_elses_prefixed_comment_does_not_silence_a_refusal(monkeypatch):
+    over = {"timeline": [labeled("automerge", "someone")]}
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, **over)
+    publish_merge.main(["ready", "7"])
+    said = comments(calls)[0]
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, comments=[{"body": said, "user": {"login": "someone"}}],
+                    **over)
+    publish_merge.main(["ready", "7"])
+    assert comments(calls) == [said]
 
 
 def test_a_failed_release_edit_stops_before_the_merge(monkeypatch):
@@ -374,6 +413,26 @@ def test_a_failed_merge_after_the_release_retries_then_comments(monkeypatch):
     assert publish_merge.main(["ready", "7"]) == 1
     assert len(merged(calls)) == 4
     assert any("merge failed" in c for c in comments(calls))
+
+
+def test_a_branch_that_moved_before_the_merge_stops_without_retrying(monkeypatch):
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, merge_says_moved=True)
+    assert publish_merge.main(["ready", "7"]) == 0
+    assert len(merged(calls)) == 1
+    assert [c for c in comments(calls) if "moved" in c] and not [c for c in comments(calls) if "4 times" in c]
+
+
+def test_a_moved_head_found_by_rereading_the_pr_stops_too(monkeypatch):
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, fail=[["gh", "pr", "merge"]])
+    real = publish_merge.run
+
+    def moved(cmd, cwd=None, capture=True):
+        if cmd[:3] == ["gh", "pr", "merge"]:
+            calls.state["pr"]["head"]["sha"] = "h2"
+        return real(cmd, cwd, capture)
+    monkeypatch.setattr(publish_merge, "run", moved)
+    assert publish_merge.main(["ready", "7"]) == 0
+    assert len(merged(calls)) == 1 and any("moved" in c for c in comments(calls))
 
 
 def test_behind_main_refreshes_instead_of_merging(monkeypatch):
@@ -434,3 +493,23 @@ def test_refresh_stops_when_the_branch_moved(tmp_path, monkeypatch):
     monkeypatch.setattr(publish_merge, "run", fake)
     assert "moved" in publish_merge.refresh_branch("publish/a-v1", "h1", APP, "e", str(tmp_path))
     assert not any(c[:2] == ["git", "push"] for c in seen)
+
+
+def test_refresh_pushes_nothing_when_the_merge_did_not_start(tmp_path, monkeypatch):
+    seen = []
+
+    def fake(cmd, cwd=None, capture=True):
+        seen.append(cmd)
+        if cmd[:2] == ["git", "rev-parse"]:
+            if "MERGE_HEAD" in cmd:
+                raise SystemExit("no MERGE_HEAD")
+            return "h1"
+        if cmd[:2] == ["git", "show"]:
+            return json.dumps({"resorts": []})
+        if "merge" in cmd and "--no-commit" in cmd:
+            raise SystemExit("fatal: refusing to merge unrelated histories")
+        return ""
+    monkeypatch.setattr(publish_merge, "run", fake)
+    with pytest.raises(SystemExit, match="did not start"):
+        publish_merge.refresh_branch("publish/a-v1", "h1", APP, "e", str(tmp_path))
+    assert not any(c[:2] in (["git", "commit"], ["git", "push"]) or "commit" in c for c in seen)
