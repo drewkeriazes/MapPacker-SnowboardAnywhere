@@ -326,7 +326,12 @@ del has_pts, crown, grown
 # put Big Sky's bare upper bowls in forest); cfg["treeline_m"] overrides, None when the box never leaves the forest
 import treeline as _tl
 treeline_m = cfg.get("treeline_m") or _tl.derive_treeline(dem2, canopy, have2)
-if treeline_m is None:
+# FEAT-234: forest from the bottom of the box to the top is a measured "no treeline" (meta treeline: null), so the
+# client draws no snow-ghost band and opens the forest by slope and land cover only
+treeline_none = treeline_m is None and _tl.forested_to_top(dem2, canopy, have2)
+if treeline_none:
+    log("  treeline none: forested to the top of the box (meta treeline null, no snow-ghost band)")
+elif treeline_m is None:
     log("  treeline none found (no forest belt in the box); the client uses its 3,480 m default")
 else:
     log(f"  treeline {treeline_m} m ({'config' if cfg.get('treeline_m') else 'from the canopy by elevation'})")
@@ -1183,9 +1188,12 @@ if lf_tifs and LANDFIRE_ATTRIBUTION not in meta["attribution"]:   # FEAT-175: pa
     meta["attribution"] = meta["attribution"] + [LANDFIRE_ATTRIBUTION]
 if treeline_m:
     meta["treeline"] = round(float(treeline_m))
+elif treeline_none:
+    meta["treeline"] = None   # FEAT-234: measured, none; absent still means an older pack (or no forest to measure)
 # FEAT-175: the values this build derived for the resort instead of copying Vail's (pack_report.py line 20)
 meta["derived"] = {**{k: round(v, 4) for k, v in NT.items()},
-                   **({"treeline": round(float(treeline_m))} if treeline_m and not cfg.get("treeline_m") else {})}
+                   **({"treeline": round(float(treeline_m))} if treeline_m and not cfg.get("treeline_m") else {}),
+                   **({"treeline": None} if treeline_none else {})}
 if REL:
     # FEAT-249: what was moved, and a credit line saying so (the terrain, trees and runs are the area's own; where
     # it sits is not)

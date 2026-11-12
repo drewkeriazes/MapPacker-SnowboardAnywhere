@@ -256,7 +256,8 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "stands": { "res": 4, "size": 250, "zBase", "zScale": 32, "hStep": 0.25,  // optional, FEAT-074
               "cells": ["cx_cy", ...], "stems" },          // cells with an image; stems over the pack at full density
   "start": { "x", "y", "heading" },                       // default drop-in
-  "treeline": 2700,                                       // optional, m (DATA-021): measured from the canopy; absent = 3,480 (Colorado)
+  "treeline": 2700,                                       // optional, m (DATA-021): measured from the canopy; absent = 3,480 (Colorado);
+                                                           // null = measured none (FEAT-234), see below
   "derived": { "rock.grey_sat": 0.093, "treeline": 2700, ... }, // optional (FEAT-175): values the build derived for this resort instead of
                                                            // copying Vail's (naip_calib.py thresholds, treeline); a log, the client ignores it.
                                                            // "relocated": [{ "name", "from", "to", "turnDeg", "featherM", "dzM" }] lists
@@ -265,6 +266,14 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "attribution": ["..."]
 }
 ```
+
+`treeline` (DATA-021, FEAT-234) has three states. A number is the elevation where the canopy share by 25 m band falls
+under half its peak (`pipeline/treeline.py`); the game puts its procedural treeline, its open valley floor (1,030 to
+830 m under it) and the snow-ghost band (30 m under to 80 m over it) there. `null` means the build measured no
+treeline: the box is forest from the bottom to the top (Boston Mills, 192 to 311 m; `treeline.forested_to_top`), so
+the game draws no snow-ghost band and its procedural forest opens by slope and land cover only, not by elevation.
+Absent means an older pack, or a box with no forest belt to measure; the game uses Colorado's 3,480 m. A game from
+before FEAT-234 reads `null` as absent (`meta.treeline ?? 3480`), so `null` needed no format bump.
 
 ## formatVersion
 
@@ -279,7 +288,7 @@ FEAT-222. `meta.json` `formatVersion` is the pack format a build wrote: `FORMAT_
 | formatVersion | Since | What |
 |---|---|---|
 | 0 | | Packs without the field (built before FEAT-222), whatever layers they have |
-| 1 | FEAT-222, 2026-11-11 | The format at FEAT-222: `stands/` (FEAT-074), `treeSpecies` 2 (DATA-020), `cover` levels (FEAT-153), `treeline` when measured (DATA-021), `build` (FEAT-177) |
+| 1 | FEAT-222, 2026-11-11 | The format at FEAT-222: `stands/` (FEAT-074), `treeSpecies` 2 (DATA-020), `cover` levels (FEAT-153), `treeline` when measured (DATA-021; `null` for a measured none since FEAT-234, read as absent by older games), `build` (FEAT-177) |
 
 ## Contract
 
@@ -293,7 +302,7 @@ Lines are as of 2026-11-11 (the game at `51efba2`); search for the name if they 
 | Species ids 0..7 (`treeSpecies` 2) | `pipeline/species.py:18` (ids), `:23` `TREE_SPECIES_VERSION` | `game/src/world/trees/species.ts:45` `SPECIES` (one row per id, in order), `:71` `speciesFor` (packs without `treeSpecies`: ids 0..2); `game/src/pack/types.ts:106` | `tests/test_contract.py` (the ids are the rows of the crown radius table) |
 | Drawn crown radius / height per id | `pipeline/cover.py:67` and `pipeline/stands.py:31` `CROWN_RATIO` (the crowns the game will draw, for the cover and the stem chance) | `game/src/world/trees/species.ts:46`-`53` `SPECIES[].radius` | `tests/test_contract.py`: must be equal |
 | Record crown radius / height per id | `pipeline/species.py:25` `CROWN_K` (field 4 of `trees/*.bin`, the table under Instances) | `game/src/world/trees/species.ts:86` `crownRadius`: the drawn radius nudged by record / natural, clamped to 0.85..1.25 | not checked: it need not equal `SPECIES[].radius` |
-| Default treeline (no measured `treeline`) | `pipeline/species.py:21` `COLORADO_TREELINE` (3,480 m, what the species bands were tuned for) | `game/src/pack/treeline.ts:4` `DEFAULT_TREELINE`; `game/src/pack/types.ts:111` | `tests/test_contract.py`: must be equal |
+| Default treeline (`treeline` absent; `null` is none, FEAT-234) | `pipeline/species.py:21` `COLORADO_TREELINE` (3,480 m, what the species bands were tuned for) | `game/src/pack/treeline.ts:4` `DEFAULT_TREELINE`; `game/src/pack/types.ts:111` | `tests/test_contract.py`: must be equal |
 | `packs/index.json` `{"packs", "names"}` | `pipeline/packwriter.py:100` `index_packs` | `game/tools/get_pack.mjs:59` `writePackIndex` (rewrites it after an install); `game/src/resorts.ts:14` `PackIndex` | `tests/test_publish_pack.py` round trip through `get_pack.mjs` (needs the game checkout and node) |
 | `catalog.json` | `pipeline/publish_pack.py:94` `catalog_entry`, `:109` `update_catalog` | `game/tools/get_pack.mjs:19` `CATALOG_URL`, `:75` `getPack`; `game/src/ui/ResortPicker.ts:42` | `tests/test_publish_pack.py` round trip |
 | Terrarium heights | `pipeline/packwriter.py:17` `encode_terrarium` | `game/src/pack/HeightSet.ts:88` | not checked across repos |
