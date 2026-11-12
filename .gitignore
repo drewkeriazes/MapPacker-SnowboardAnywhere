@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Data: raw downloads and built packs stay off GitHub (packs go out as release assets: publish_pack.py)
+raw/
+packs/*
+!packs/.gitkeep
+*.laz
+*.las
+*.tif
+*.tiff
+*.pbf
+*.zip
+
+# Secrets and credentials (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+id_rsa*
+id_ed25519*
+credentials*.json
+secrets*.json
+*.secret
+.netrc
+.npmrc
+
+# Per-user Claude Code settings
+.claude/settings.local.json
+
+# Editor and OS clutter
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
