@@ -4,7 +4,7 @@
 
 For each entry in head that is new or whose pack differs from base: refuses a slug that is not `[a-z0-9][a-z0-9-]*`
 or a version that is not a positive integer (before any gh call or path), flags a `pack.url` that is not this repo's
-release url for it, downloads release `<slug>-v<version>`'s `<slug>.zip` (drafts included, with a write token),
+release url for it, downloads release `<slug>/v<version>`'s `<slug>.zip` (drafts included, with a write token),
 checks its size and sha256 against the entry, then lints it (pack_lint.py). Prints the problems per slug, exit 1 if there are any. CI runs this from main's copy of pipeline/."""
 import argparse
 import hashlib
@@ -19,6 +19,7 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pack_lint import lint_zip  # noqa: E402
 from publish_pack import all_entries, asset_url  # noqa: E402
+from releases import release_tag  # noqa: E402
 
 SLUG = re.compile(r"[a-z0-9][a-z0-9-]*")
 
@@ -52,7 +53,7 @@ def zip_problems(entry: dict, zip_path: str) -> list:
 def download(entry: dict, repo: str, dest: str) -> str:
     """gh release download of the entry's zip into dest; returns its path (a draft needs a write token)"""
     slug, version = entry["slug"], entry["pack"]["version"]
-    subprocess.run(["gh", "release", "download", f"{slug}-v{version}", "-p", f"{slug}.zip", "-D", dest,
+    subprocess.run(["gh", "release", "download", release_tag(slug, version), "-p", f"{slug}.zip", "-D", dest,
                     "-R", repo, "--clobber"], check=True)
     return os.path.join(dest, f"{slug}.zip")
 

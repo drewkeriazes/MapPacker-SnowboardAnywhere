@@ -14,7 +14,7 @@ was dropped from the queue, or that waited on the activity log or a check still 
 the App (PUBLISH_APP_LOGIN) on a PR whose `Run:` line names a run a maintainer started; with no push to the branch
 after that label (GitHub's activity log) except the App's own refresh; changing only the publish file set and in
 catalog.json only <slug> v<N>, at this repo's release url; with every check run on the head success or skipped and
-`publish-check` success. Then it re-checks the release, publishes it if it is still a draft (a rollback's release
+`publish-check` success. Then it re-checks the release `<slug>/v<N>` (FEAT-271; the branch keeps `-v<N>`), publishes it if it is still a draft (a rollback's release
 is already out), and squash-merges pinned to the head it checked (a branch that moved stops it, no retry). Any gh
 failure or missing data waits or refuses, never merges. A refusal comments on the PR once per reason (counting
 only the tool's own comments). Env: GITHUB_REPOSITORY, PUBLISH_APP_LOGIN, GITHUB_RUN_ID (this run's jobs don't count as
@@ -29,6 +29,7 @@ from urllib.parse import quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from publish_check import changed_entries  # noqa: E402
 from publish_pack import REPO, RESORTS_REPO, all_entries, asset_url, maintainers, run, update_catalog  # noqa: E402
+from releases import INDEX, list_releases, release_tag, write_index  # noqa: E402
 
 SLUG = r"[a-z0-9][a-z0-9-]*"
 BRANCH = re.compile(rf"^publish/({SLUG})-v([1-9][0-9]*)$")
@@ -277,8 +278,10 @@ def assess(n: int, repo: str, pr: dict, app_login: str) -> tuple[str, dict]:
     return decision, {"slug": parsed and parsed[0], "version": parsed and parsed[1], "sha": sha, "branch": branch}
 
 
-def refresh_branch(branch: str, sha: str, name: str, email: str, src: str = REPO) -> str:
-    """merge origin/main into `branch` at `sha` with catalog.json rebuilt by rebase_catalog, committed as
+def refresh_branch(branch: str, sha: str, name: str, email: str, src: str = REPO, releases: list | None = None,
+                   repo: str = RESORTS_REPO) -> str:
+    """merge origin/main into `branch` at `sha` with catalog.json rebuilt by rebase_catalog and RELEASES.md rewritten
+    from it and `releases` (list_releases records, read here when None; the PR's own draft counts as out), committed as
     `name <email>`, pushed to that branch (only a publish/ one); stops when the branch is no longer at `sha` and
     raises, pushing nothing, when the merge did not start (no MERGE_HEAD) or conflicts in any other file"""
     if not parse_branch(branch):
@@ -295,7 +298,7 @@ def refresh_branch(branch: str, sha: str, name: str, email: str, src: str = REPO
                                 for ref in (base, sha, "origin/main"))
         try:
             run(["git", *who, "merge", "--no-commit", "--no-ff", "origin/main"], cwd=wt)
-        except SystemExit as e:       # a conflict (catalog.json is rewritten below) still leaves MERGE_HEAD
+        except SystemExit as e:       # a conflict (catalog.json and RELEASES.md are rewritten below) leaves MERGE_HEAD
             merge_error = e
         else:
             merge_error = None
@@ -304,11 +307,14 @@ def refresh_branch(branch: str, sha: str, name: str, email: str, src: str = REPO
         except SystemExit:
             raise SystemExit(f"git merge of main did not start, nothing pushed: {merge_error}")
         with open(os.path.join(wt, "catalog.json"), "w", encoding="utf-8", newline="\n") as f:
-            json.dump(rebase_catalog(base_c, pr_c, main_c), f, indent=1)
+            json.dump(catalog := rebase_catalog(base_c, pr_c, main_c), f, indent=1)
             f.write("\n")
-        run(["git", "add", "catalog.json"], cwd=wt)
+        slug, version = parse_branch(branch)
+        write_index(os.path.join(wt, INDEX), list_releases(repo, run) if releases is None else releases, catalog,
+                    repo, own=release_tag(slug, version))
+        run(["git", "add", "catalog.json", INDEX], cwd=wt)
         if left := run(["git", "diff", "--name-only", "--diff-filter=U"], cwd=wt):
-            raise SystemExit(f"conflicts with main outside catalog.json: {left.split()}")
+            raise SystemExit(f"conflicts with main outside catalog.json and {INDEX}: {left.split()}")
         run(["git", *who, "commit", "-q", "-m", f"{branch[8:]}: catalog refreshed onto main (FEAT-272)"], cwd=wt)
         run(["git", "push", "origin", f"HEAD:refs/heads/{branch}"], cwd=wt)
         return f"refreshed {branch} onto main: checks run again"
@@ -320,7 +326,7 @@ def refresh_branch(branch: str, sha: str, name: str, email: str, src: str = REPO
 
 def refresh(repo: str, branch: str, sha: str, app_login: str) -> str:
     uid = api(f"users/{quote(app_login)}")["id"]
-    return refresh_branch(branch, sha, app_login, f"{uid}+{app_login}@users.noreply.github.com")
+    return refresh_branch(branch, sha, app_login, f"{uid}+{app_login}@users.noreply.github.com", repo=repo)
 
 
 def head_moved(n: int, repo: str, sha: str, err: SystemExit) -> bool:
@@ -405,7 +411,7 @@ def ready(n: int, repo: str, app_login: str, sweep_closed: bool = True) -> int:
             say(n, repo, f"Not merging: the refresh onto main failed: {e}", me)
             return 1
     elif decision == "merge":
-        return release_then_merge(n, repo, f"{facts['slug']}-v{facts['version']}", facts["sha"], me)
+        return release_then_merge(n, repo, release_tag(facts["slug"], facts["version"]), facts["sha"], me)
     return 0
 
 
@@ -427,7 +433,7 @@ def closed(n: int, repo: str) -> int:
     same_repo = (pr["head"].get("repo") or {}).get("full_name", "").lower() == repo.lower()
     if not parsed or not same_repo or pr["base"]["ref"] != "main":
         return print(f"#{n} is not a publish PR of this repo") or 0
-    tag, branch = f"{parsed[0]}-v{parsed[1]}", pr["head"]["ref"]
+    tag, branch = release_tag(*parsed), pr["head"]["ref"]
     if pr.get("merged"):
         draft = release_draft(tag)
         if not draft:

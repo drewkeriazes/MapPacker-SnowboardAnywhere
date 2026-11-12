@@ -43,6 +43,9 @@ def fake_gh_and_git(monkeypatch, maintainer=True, catalog=None, fail=None):
         line = " ".join(cmd)
         if fail and line.startswith(fail):
             raise SystemExit(f"{line} failed (1):\nboom")
+        if line.startswith("gh api repos/") and "/releases?" in line:     # releases.list_releases
+            return json.dumps({"tag_name": "vail/v4", "name": "Vail v4", "draft": False,
+                               "published_at": "2026-11-11T00:00:00Z", "assets": [{"name": "vail.zip", "size": 9e6}]})
         if line.startswith("gh release list"):
             return json.dumps([{"tagName": "other-v1"}])
         if line.startswith("gh release create"):
@@ -102,7 +105,7 @@ def test_publish_opens_a_pr_and_never_pushes_main(tmp_path, monkeypatch):
     calls = fake_gh_and_git(monkeypatch, maintainer=True)       # records every run() argv, answers gh queries
     publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview"])
     flat = [" ".join(c) for c in calls]
-    assert any(c.startswith("gh release create demo-v1") and "--draft" in c for c in flat)
+    assert any(c.startswith("gh release create demo/v1") and "--draft" in c for c in flat)
     assert any(c.startswith("git push -u origin publish/demo-v1") for c in flat)
     assert any("gh pr create" in c and "--label publish" in c and "--label automerge" in c for c in flat)
     assert not any(c.startswith("git push") and "main" in c.split()[-1] for c in flat)
@@ -135,6 +138,7 @@ def test_the_pr_branch_carries_the_new_entry_on_origin_mains_catalog(tmp_path, m
         if cmd[:2] == ["git", "commit"]:
             seen["catalog"] = json.load(open(os.path.join(cwd, "catalog.json"), encoding="utf-8"))
             seen["report"] = open(os.path.join(cwd, "reports", "demo.md")).read()
+            seen["index"] = open(os.path.join(cwd, "RELEASES.md")).read()
             seen["message"] = cmd[-1]
         return fake_run(cmd, cwd, capture)
     monkeypatch.setattr(publish_pack, "run", run)
@@ -142,8 +146,10 @@ def test_the_pr_branch_carries_the_new_entry_on_origin_mains_catalog(tmp_path, m
     assert [r["slug"] for r in seen["catalog"]["resorts"]] == ["demo", "vail"]
     assert seen["catalog"]["resorts"][0]["pack"]["pipeline"] == "abc1234"
     assert seen["catalog"]["resorts"][0]["report"] == "reports/demo.md"
-    assert sorted(seen["added"]) == ["catalog.json", "reports/demo.md", "resorts/demo/demo.json"]
+    assert sorted(seen["added"]) == ["RELEASES.md", "catalog.json", "reports/demo.md", "resorts/demo/demo.json"]
     assert seen["report"] == "this build's report"
+    assert "## Demo Mountain" in seen["index"] and "releases/tag/demo/v1) (latest)" in seen["index"]  # its own draft
+    assert "releases/tag/vail/v4) (latest) 9 MB, 2026-11-11" in seen["index"]
     assert (checkout / "reports" / "demo.md").read_text() == "older report"     # the checkout is left alone
     assert sorted(p.name for p in (checkout / "reports").iterdir()) == ["demo.md"]
     assert seen["message"] == "demo v1: preview, 0 MB, pipeline abc1234"
@@ -163,7 +169,7 @@ def test_a_failed_pr_names_the_draft_and_the_pushed_branch_and_cleans_up(tmp_pat
     with pytest.raises(SystemExit) as e:
         publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview"])
     msg = str(e.value)
-    assert "draft release demo-v1" in msg and "origin/publish/demo-v1" in msg
+    assert "draft release demo/v1" in msg and "origin/publish/demo-v1" in msg
     assert ["git", "branch", "-D", "publish/demo-v1"] in calls
     assert calls.index(["git", "branch", "-D", "publish/demo-v1"]) > \
         next(i for i, c in enumerate(calls) if c[:3] == ["git", "worktree", "remove"])
@@ -173,7 +179,7 @@ def test_a_failure_before_the_push_does_not_mention_a_pushed_branch(tmp_path, mo
     calls = fake_gh_and_git(monkeypatch, fail="git commit")
     with pytest.raises(SystemExit) as e:
         publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview"])
-    assert "draft release demo-v1" in str(e.value) and "is pushed" not in str(e.value)
+    assert "draft release demo/v1" in str(e.value) and "is pushed" not in str(e.value)
     assert ["git", "branch", "-D", "publish/demo-v1"] in calls
 
 
@@ -218,7 +224,7 @@ def test_the_printed_next_step_says_the_app_is_needed_and_names_the_safe_manual_
     publish_pack.main([str(tiny_pack_with_stamp(tmp_path)), "--status", "preview"])
     out = capsys.readouterr().out
     assert "when the publish App is set up" in out
-    assert out.index("gh release edit demo-v1") < out.index("then merge the PR")
+    assert out.index("gh release edit demo/v1") < out.index("then merge the PR")
 
 
 def make_pack(root, slug="demo", fmt=FORMAT_VERSION):
@@ -253,7 +259,7 @@ def test_catalog_replaces_the_resort_and_sorts_by_name():
     meta = {"slug": "vail", "name": "Vail", "formatVersion": FORMAT_VERSION, "build": "b1", "lonlat": [-106.35, 39.6]}
     e = catalog_entry(meta, {"region": "Colorado", "country": "US"}, version=2, size=10, sha256="ab", pipeline="abc1234",
                       tier="gold", status="preview", report=None)
-    assert e["pack"]["url"].endswith("/releases/download/vail-v2/vail.zip")
+    assert e["pack"]["url"].endswith("/releases/download/vail/v2/vail.zip")
     cat = {"resorts": [{"slug": "vail", "name": "Vail", "pack": {"version": 1, "formatVersion": 0}},
                        {"slug": "bigsky", "name": "Big Sky", "pack": {"version": 1, "formatVersion": FORMAT_VERSION}}]}
     out = update_catalog(cat, e)

@@ -276,7 +276,7 @@ def comments(calls):
 def test_merged_pr_with_a_draft_publishes_it(monkeypatch):
     calls = fake_gh(monkeypatch, pr={"merged": True, "headRefName": "publish/a-v1"}, release_draft=True)
     publish_merge.main(["closed", "7"])
-    assert ["gh", "release", "edit", "a-v1", "--draft=false"] in calls
+    assert ["gh", "release", "edit", "a/v1", "--draft=false"] in calls
 
 
 def test_merged_pr_whose_catalog_does_not_name_the_draft_leaves_it(monkeypatch):
@@ -315,7 +315,7 @@ def test_closed_unmerged_keeps_the_draft_when_in_doubt(monkeypatch, pr, over):
 def test_ready_releases_the_draft_then_merges_pinned_to_the_checked_head(monkeypatch):
     calls = fake_gh(monkeypatch, pr={}, release_draft=True)
     assert publish_merge.main(["ready", "7"]) == 0
-    assert released(calls) == [["gh", "release", "edit", "a-v1", "--draft=false"]]
+    assert released(calls) == [["gh", "release", "edit", "a/v1", "--draft=false"]]
     assert merged(calls) == [["gh", "pr", "merge", "7", "--squash", "--match-head-commit", "h1"]]
     assert calls.index(released(calls)[0]) < calls.index(merged(calls)[0])
     view = [i for i, c in enumerate(calls) if c[:3] == ["gh", "release", "view"]]
@@ -473,19 +473,28 @@ def test_refresh_merges_main_into_the_branch_with_both_entries(tmp_path):
     git(work, "add", "."); git(work, "commit", "-qm", "base"); git(work, "push", "-q", "origin", "HEAD:main")
     git(work, "switch", "-qc", "publish/a-v1")
     write_catalog(work, {"resorts": [entry("a", 1)]})
+    (work / "RELEASES.md").write_text("a v1 only\n")         # both sides change it: a conflict the refresh rewrites
     os.makedirs(work / "reports"); (work / "reports" / "a.md").write_text("a\n")
     git(work, "add", "."); git(work, "commit", "-qm", "a v1"); git(work, "push", "-q", "origin", "publish/a-v1")
     head = git(work, "rev-parse", "HEAD")
     git(work, "switch", "-q", "main")
     write_catalog(work, {"resorts": [entry("b", 1)]})
+    (work / "RELEASES.md").write_text("b v1 only\n")
     git(work, "add", "."); git(work, "commit", "-qm", "b v1"); git(work, "push", "-q", "origin", "HEAD:main")
+    rels = [{"tag_name": "a/v1", "name": "a v1", "draft": True, "created_at": "2026-11-12T00:00:00Z", "assets": []},
+            {"tag_name": "b/v1", "name": "b v1", "draft": False, "published_at": "2026-11-11T00:00:00Z", "assets": []},
+            {"tag_name": "c/v1", "name": "c v1", "draft": True, "created_at": "2026-11-12T00:00:00Z", "assets": []}]
 
-    publish_merge.refresh_branch("publish/a-v1", head, APP, "1+pub[bot]@users.noreply.github.com", str(work))
+    publish_merge.refresh_branch("publish/a-v1", head, APP, "1+pub[bot]@users.noreply.github.com", str(work),
+                                 releases=rels, repo=REPO)
 
     git(work, "fetch", "-q", "origin")
     tip = "origin/publish/a-v1"
     cat = json.loads(git(work, "show", f"{tip}:catalog.json"))
     assert sorted(r["slug"] for r in cat["resorts"]) == ["a", "b"]
+    index = git(work, "show", f"{tip}:RELEASES.md")
+    assert "releases/tag/a/v1) (latest)" in index and "releases/tag/b/v1) (latest)" in index
+    assert "c/v1" not in index, "another publish's draft is not out yet"
     assert git(work, "merge-base", "--is-ancestor", "origin/main", tip) == ""
     assert git(work, "log", "-1", "--format=%an <%ae>|%cn", tip) == f"{APP} <1+pub[bot]@users.noreply.github.com>|{APP}"
     assert git(work, "show", f"{tip}:reports/a.md") == "a"
@@ -529,7 +538,7 @@ def test_ready_first_publishes_the_draft_of_a_recently_merged_publish_pr(monkeyp
              {"number": 9, "merged_at": "2026-11-12T10:00:00Z", "head": {"ref": "feature/x"}}]
     calls = fake_gh(monkeypatch, pr={"merged": True, "state": "closed"}, release_draft=True, closed_prs=other)
     publish_merge.sweep(REPO)
-    assert released(calls) == [["gh", "release", "edit", "a-v1", "--draft=false"]]
+    assert released(calls) == [["gh", "release", "edit", "a/v1", "--draft=false"]]
     assert not any(c[:3] == ["gh", "release", "delete"] for c in calls)
 
 
@@ -591,8 +600,8 @@ def test_a_run_for_pr_a_also_releases_and_merges_pr_b(monkeypatch):
     calls = fake_gh(monkeypatch, pr={}, release_draft=True, others={6: a}, open_list=[listed_pr(7)])
     calls.state["catalogs"]["m1"] = {"resorts": [entry("a", 1), entry("c", 1)]}
     assert publish_merge.main(["closed", "6"]) == 0
-    assert ["gh", "release", "edit", "c-v1", "--draft=false"] in calls          # A's own job
-    assert ["gh", "release", "edit", "a-v1", "--draft=false"] in calls          # B, advanced
+    assert ["gh", "release", "edit", "c/v1", "--draft=false"] in calls          # A's own job
+    assert ["gh", "release", "edit", "a/v1", "--draft=false"] in calls          # B, advanced
     assert merged(calls) == [["gh", "pr", "merge", "7", "--squash", "--match-head-commit", "h1"]]
 
 
