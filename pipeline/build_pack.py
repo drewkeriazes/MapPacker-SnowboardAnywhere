@@ -620,6 +620,22 @@ for el in natural["elements"]:
 # streams and rivers (DATA-020): fir and willow sit near water; not written to features.json
 streams = [way_points(el) for el in natural["elements"]
            if el.get("type") == "way" and el.get("tags", {}).get("waterway") in ("stream", "river", "brook", "canal", "ditch")]
+def height_at(xl, yl, top=False):
+    """ground height at local coords from the finest set that holds them (1 m DEM, 16 m mid ring, 128 m far ring);
+    `top`: the highest ground near the point instead (a summit with no ele tag: within 30 m on the 1 m DEM, one
+    cell on the coarser sets). NaN off every set."""
+    c = int(xl + OX - X0); r = int(Y1 - (yl + OY))
+    k = 30 if top else 0
+    if k <= c < W - k and k <= r < H - k:
+        return float(np.nanmax(dem[r - k:r + k + 1, c - k:c + k + 1]))
+    k = 1 if top else 0
+    for arr, gx0, gy1, res in ((m16, mx0, my1, 16.0), (far, fx0, fy0 + nf * FR, FR)):
+        gc = int((xl + OX - gx0) / res); gr = int((gy1 - (yl + OY)) / res)
+        if k <= gc < arr.shape[1] - k and k <= gr < arr.shape[0] - k:
+            w = arr[gr - k:gr + k + 1, gc - k:gc + k + 1]
+            if np.isfinite(w).any():
+                return float(np.nanmax(w))
+    return float("nan")
 peaks = []
 for el in peaks_far["elements"] + natural["elements"]:
     if el.get("type") == "node" and el.get("tags", {}).get("natural") == "peak" and el["tags"].get("name"):
@@ -629,18 +645,42 @@ for el in peaks_far["elements"] + natural["elements"]:
         except ValueError:
             z = float("nan")
         if not math.isfinite(z):
-            z = ground(x, y)
-        peaks.append({"name": el["tags"]["name"], "x": x, "y": y, "z": z})
+            z = height_at(x, y, top=True)      # FEAT-235: was ground(), the resort's base height off the mid ring
+        if math.isfinite(z):
+            peaks.append({"name": el["tags"]["name"], "x": x, "y": y, "z": z})
 seen = set(); uniq = []
 for p in peaks:
     k = (p["name"], round(p["x"] / 50), round(p["y"] / 50))
     if k not in seen:
         seen.add(k); uniq.append(p)
 peaks = uniq
+# FEAT-235: place names from USGS GNIS (every state the far ring touches) and the Census (towns), in names/
+import placenames
+far_ll = placenames.far_box_ll(cfg)
+NAMES_ATTRIBUTION = "Place names: USGS GNIS; towns: US Census Bureau Gazetteer and population estimates, public domain"
+gnis_summits, gnis_states = placenames.load_gnis(raw, far_ll)
+census_towns = False
+gnis_peaks = []
+for f in gnis_summits:
+    x, y = to_local(f["lon"], f["lat"])
+    z = height_at(x, y, top=True)
+    if math.isfinite(z):
+        gnis_peaks.append({"name": f["name"], "x": x, "y": y, "z": z})
+added = placenames.merge_peaks(peaks, gnis_peaks)
+peaks += added
+log(f"  GNIS ({', '.join(gnis_states) or 'no names/ files'}): {len(gnis_summits)} summits in the far ring, {len(added)} not in OSM")
 labels = [{"name": el["tags"]["name"], "kind": el["tags"].get("place", "place"), "x": to_local(el["lon"], el["lat"])[0], "y": to_local(el["lon"], el["lat"])[1], "z": 0}
           for el in places_far["elements"] if el.get("type") == "node" and el.get("tags", {}).get("place") and el["tags"].get("name")]
+if not labels:      # no Overpass places_far (dropped from the manifest): the Census towns
+    towns = placenames.load_towns(raw, far_ll)
+    census_towns = bool(towns)
+    labels = [{"name": t["name"], "kind": t["kind"], "x": to_local(t["lon"], t["lat"])[0], "y": to_local(t["lon"], t["lat"])[1], "z": 0}
+              for t in towns]
+    log(f"  Census towns: {len(labels)} ({sum(1 for t in towns if t['kind'] == 'city')} cities, "
+        f"{sum(1 for t in towns if t['kind'] == 'town')} towns)")
 for l in labels:
-    l["z"] = ground(l["x"], l["y"])
+    z = height_at(l["x"], l["y"])
+    l["z"] = z if math.isfinite(z) else 0.0       # 0: the game samples the ground itself
 log(f"  buildings {len(buildings)} roads {len(roads)} water {len(water)} peaks {len(peaks)} labels {len(labels)}")
 def line_cells(pts):
     """distinct 2 m grid cells along a polyline, as (rows, cols) index arrays, clipped to the grid"""
@@ -1058,6 +1098,8 @@ meta = {"version": 1, "formatVersion": FORMAT_VERSION, "slug": slug, "name": cfg
         "zRange": [float(np.floor(Z_MIN / 100) * 100 - 100), float(np.ceil(Z_MAX / 100) * 100 + 100)],
         "terrain": {"fine": fine_meta, "mid": mid_meta, "far": far_meta}, "mask": mask_meta, "ao": ao_meta, "dir": dir_meta, "moguls": mog_meta, "instances": inst, "stands": stand_meta, "treeSpecies": spc.TREE_SPECIES_VERSION,
         "start": start, "sun": {"azimuth": 160, "elevation": 30}, "attribution": cfg["attribution"]}
+if (gnis_states or census_towns) and NAMES_ATTRIBUTION not in meta["attribution"]:   # FEAT-235
+    meta["attribution"] = meta["attribution"] + [NAMES_ATTRIBUTION]
 if lf_tifs and LANDFIRE_ATTRIBUTION not in meta["attribution"]:   # FEAT-175: pack_report.py line 13 checks every credit
     meta["attribution"] = meta["attribution"] + [LANDFIRE_ATTRIBUTION]
 if treeline_m:

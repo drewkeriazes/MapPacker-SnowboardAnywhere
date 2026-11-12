@@ -224,8 +224,8 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "buildings": [{ "name", "points": [[x,y],...], "zBase", "zMax", "height", "heightDefault", "kind" }],  // zMax: highest ground under the footprint, absent in packs before BUG-024; heightDefault: true when OSM had no height or levels and the pipeline used its 5.5 / 9 m fallback (absent in older packs, where the client guesses from those values)
   "roads":     [{ "name", "kind", "points": [[x,y,z],...], "width" }],
   "water":     [{ "name", "points": [[x,y],...], "z" }],
-  "peaks":     [{ "name", "x", "y", "z" }],
-  "labels":    [{ "name", "kind", "x", "y", "z" }]
+  "peaks":     [{ "name", "x", "y", "z" }],                 // OSM peaks, plus USGS GNIS summits OSM lacks (FEAT-235; z: the highest ground near it)
+  "labels":    [{ "name", "kind", "x", "y", "z" }]          // towns: OSM places_far, else US Census places (FEAT-235); kind city (100,000 people), town (10,000) or village
 }
 ```
 
