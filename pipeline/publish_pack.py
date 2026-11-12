@@ -235,6 +235,8 @@ def main(argv=None) -> None:
         a.status, why = report_status(pack_dir, meta, a.status)
         cfg_path = paths.config_path(slug)
         cfg = json.load(open(cfg_path, encoding="utf-8")) if os.path.isfile(cfg_path) else {}
+        if cfg.get("source_only"):
+            raise SystemExit(f"{slug} is a relocate source (source_only, FEAT-268), not a pack: it is not published")
         report = a.report or (os.path.join(pack_dir, "report.md") if os.path.isfile(os.path.join(pack_dir, "report.md")) else None)
     print(f"status {a.status} ({why})")
     pipeline = run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO)

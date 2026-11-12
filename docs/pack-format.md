@@ -260,7 +260,8 @@ Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/min
   "derived": { "rock.grey_sat": 0.093, "treeline": 2700, ... }, // optional (FEAT-175): values the build derived for this resort instead of
                                                            // copying Vail's (naip_calib.py thresholds, treeline); a log, the client ignores it.
                                                            // "relocated": [{ "name", "from", "to", "turnDeg", "featherM", "dzM" }] lists
-                                                           // the areas moved next to the rest (FEAT-249, relocate.py), UTM metres
+                                                           // the areas moved next to the rest (FEAT-249, relocate.py), UTM metres;
+                                                           // "source": "<slug>" on one cut from another place's raw data (FEAT-268)
   "sun": { "azimuth": 160, "elevation": 32 },             // degrees, default lighting
   "attribution": ["..."]
 }
