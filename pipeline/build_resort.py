@@ -6,7 +6,7 @@
 
 `raw_dir` is the resort's raw folder (default <raw root>/<slug>, the raw root being SBA_RAW_ROOT or raw/ in the main
 checkout; its last folder must be the slug, as fetch.ps1 writes <RawDir>/<slug>), `out_dir` the pack (default
-packs/<slug>). The config is resorts/<slug>.json, the manifest manifests/<slug>.json (pipeline/paths.py). Stages:
+packs/<slug>). The config is resorts/<slug>/<slug>.json, the manifest manifests/<slug>.json (pipeline/paths.py). Stages:
 
   nodes     ept_select.py: the EPT node lists (resort.py plan writes them too)
   manifest  gen_manifest.py: the download list
@@ -104,9 +104,12 @@ def default_raw_root(repo=REPO) -> str:
 # fingerprint has the game's pipeline code and the game checkout's packs/<slug>) still counts here, so the packs
 # built before the move are not built again: only while this checkout's build code is still the moved code
 # (`code`, pipeline_code() right after the move; any later change to the build code builds again, as it should).
+# `same`: later build code that differs from the moved code only in where it reads files, so it builds the same
+# packs (FEAT-244, a folder per resort). build_resort.py is not build code, so listing one here does not change it.
 MOVED = {"from": "SnowboardAnywhere 2a0b12f",
          "game_code": "80d9391a499fed00",
-         "code": "1df239f500ce0922"}
+         "code": "1df239f500ce0922",
+         "same": ("1cdddd3bff92c566",)}
 MOVED_WHY = "built before the move to MapPacker (FEAT-238), inputs unchanged"
 
 
@@ -123,7 +126,7 @@ class Resort:
         self.slug, self.raw, self.out = slug, os.path.abspath(raw_dir), os.path.abspath(out_dir)
         self.resorts = resorts_dir or paths.RESORTS
         self.manifests = manifests_dir or paths.MANIFESTS
-        self.cfg_path = os.path.join(self.resorts, f"{slug}.json")
+        self.cfg_path = paths.config_path(slug, self.resorts)
         self.man_path = os.path.join(self.manifests, f"{slug}.json")
         with open(self.cfg_path, encoding="utf-8") as f:
             self.cfg = json.load(f)
@@ -145,7 +148,7 @@ class Resort:
         files = [s["nodes_file"] for s in [L] + list(L.get("extra", [])) if s.get("nodes_file")]
         if L.get("far"):
             files.append(L["far"]["nodes_file"])
-        return [os.path.join(self.resorts, f) for f in files]
+        return [os.path.join(paths.resort_dir(self.slug, self.resorts), f) for f in files]
 
 
 # ------------------------------------------------------------------------------------------------ stages
@@ -309,7 +312,7 @@ def built_before_move(r, seen):
     """FEAT-238: True when the recorded build fingerprint `seen` is this build's inputs as SnowboardAnywhere saw
     them (the game's pipeline code at the move, the pack in the game checkout's packs/), this checkout's build code
     is still the moved code, and the pack here is that build (the same build id as the game checkout's copy)"""
-    if pipeline_code() != MOVED["code"]:
+    if pipeline_code() not in (MOVED["code"], *MOVED.get("same", ())):
         return False
     old_out = os.path.join(paths.game_repo(), "packs", r.slug)
     if seen != build_inputs(r, MOVED["game_code"], old_out):
@@ -465,8 +468,8 @@ def main(argv=None):
     ap.add_argument("--gate", action="store_true", help="fail unless every DATA-022 MVP line passes")
     ap.add_argument("--dry-run", action="store_true", help="print what would run and why")
     a = ap.parse_args(argv)
-    if not os.path.isfile(os.path.join(paths.RESORTS, f"{a.slug}.json")):
-        print(f"no resorts/{a.slug}.json: `python pipeline/resort.py resolve \"<name>\"` and `plan` make one")
+    if not os.path.isfile(paths.config_path(a.slug)):
+        print(f"no resorts/{a.slug}/{a.slug}.json: `python pipeline/resort.py resolve \"<name>\"` and `plan` make one")
         return 2
     if a.first and a.last and STAGES.index(a.first) > STAGES.index(a.last):
         print("--from comes after --stop-after")
