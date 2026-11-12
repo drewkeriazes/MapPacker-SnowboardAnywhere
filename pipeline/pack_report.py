@@ -1,6 +1,6 @@
 """FEAT-175 step 1: a scorecard per pack, line by line on the DATA-022 new-resort checklist (#439).
 
-    python pipeline/pack_report.py packs/<slug> [--raw <raw_dir>] [--config <resorts/slug.json>] [--gate]
+    python pipeline/pack_report.py packs/<slug> [--raw <raw_dir>] [--config <resorts/slug/slug.json>] [--gate]
 
 Writes `report.json` and `report.md` into the pack and prints the markdown. Each checklist line gets a status:
 pass, warn (works, but worth a look), fail, or skip (cannot tell from what it was given; pass --raw for the
@@ -468,7 +468,7 @@ class Report:
 
         # 1 config
         if not cfg:
-            self.line("1", "Resort config", FAIL, f"no resorts/{self.slug}.json")
+            self.line("1", "Resort config", FAIL, f"no resorts/{self.slug}/{self.slug}.json")
         else:
             need = ["crs", "utm_zone", "utm_bbox", "origin", "elevation_range_m", "naip", "lidar", "attribution"]
             missing = [k for k in need if k not in cfg]
@@ -785,7 +785,7 @@ class Report:
 
 
 def find_config(slug, repo=REPO):
-    p = os.path.join(repo, "resorts", f"{slug}.json")
+    p = os.path.join(repo, "resorts", slug, f"{slug}.json")
     return p if os.path.isfile(p) else None
 
 
@@ -807,7 +807,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("pack_dir")
     ap.add_argument("--raw", help="the resort's raw folder (the one holding dem1m/, ept/, osm/), for lines 2 to 4 and 16")
-    ap.add_argument("--config", help="resort config (default resorts/<slug>.json)")
+    ap.add_argument("--config", help="resort config (default resorts/<slug>/<slug>.json)")
     ap.add_argument("--game-repo", help="the SnowboardAnywhere checkout for the game-side lines (default "
                     "../SnowboardAnywhere, or SBA_GAME_REPO)")
     ap.add_argument("--against", help="another pack's report.json to compare with, instead of the built-in Vail numbers")

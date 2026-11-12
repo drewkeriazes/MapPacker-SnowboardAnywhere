@@ -26,15 +26,15 @@ class World:
     def __init__(self, tmp, monkeypatch, hand=False):
         self.tmp, self.calls = tmp, []
         self.resorts = tmp / "resorts"
-        self.resorts.mkdir()
+        (self.resorts / "demo").mkdir(parents=True)   # FEAT-244: a folder per resort
         self.out = tmp / "packs" / "demo"
         if hand:
-            json.dump({"slug": "demo", "name": "Demo", "crs": "EPSG:26913"}, open(self.resorts / "demo.json", "w"))
+            json.dump({"slug": "demo", "name": "Demo", "crs": "EPSG:26913"}, open(self.resorts / "demo" / "demo.json", "w"))
         world = self
 
         def resolve_and_write(a, hosts, keep_planned=False):
             world.calls.append(("resolve", keep_planned))
-            p = world.resorts / "demo.json"
+            p = world.resorts / "demo" / "demo.json"
             if p.exists() and (json.load(open(p)).get("openskidata") is None) and not a.force:
                 return 4, None
             if not (keep_planned and p.exists() and "crs" in json.load(open(p))):
@@ -43,8 +43,8 @@ class World:
 
         def cmd_plan(a, hosts):
             world.calls.append(("plan", a.slug))
-            json.dump(PLANNED, open(world.resorts / "demo.json", "w"))
-            (world.resorts / "demo-plan.md").write_text("# plan")
+            json.dump(PLANNED, open(world.resorts / "demo" / "demo.json", "w"))
+            (world.resorts / "demo" / "demo-plan.md").write_text("# plan")
             return 0
 
         def ride(slug, raw, out, runner=None, log=print, game_repo=None):

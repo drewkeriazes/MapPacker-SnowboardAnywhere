@@ -268,7 +268,7 @@ def test_geofabrik_terrain_status_attribution_tier():
 
 
 def test_compare_lists_differences():
-    hand = json.load(open(os.path.join(RESORTS, "vail.json"), encoding="utf-8"))
+    hand = json.load(open(os.path.join(RESORTS, "vail", "vail.json"), encoding="utf-8"))
     assert R.compare(hand, hand) == []
     d = json.loads(json.dumps(hand))
     d["crs"] = "EPSG:26912"
@@ -386,6 +386,28 @@ def test_plan_against_fake_hosts(tmp_path):
     assert sum(1 for i in items if i["path"].startswith("ept_far/")) == 2
 
 
+
+def test_plan_writes_the_resorts_own_folder(tmp_path):
+    """FEAT-244: resort.py plan writes the config, node lists and plan into resorts/<slug>/, nothing flat"""
+    import argparse
+    stub = {"slug": "boston-mills", "name": "Boston Mills / Brandywine", "country": "US", "region": "Ohio",
+            "osm_ski_area_way": 452323654, "lonlat_bbox": [-81.5696, 41.2609, -81.5482, 41.2881],
+            "openskidata": {"ids": ["bm", "bw"], "iso3166_2": "US-OH", "websites": ["https://www.bmbw.com/"]}}
+    res = tmp_path / "resorts"
+    R.write_json(str(res / "boston-mills" / "boston-mills.json"), stub)     # what resolve writes; makes the folder
+    hosts = tmp_path / "hosts"
+    hosts.mkdir()
+    a = argparse.Namespace(slug="boston-mills", resorts_dir=str(res), no_nodes=False, force=False)
+    assert R.cmd_plan(a, FakeHosts(str(hosts))) == 0
+    assert os.listdir(res) == ["boston-mills"]
+    assert sorted(os.listdir(res / "boston-mills")) == ["boston-mills-plan.md", "boston-mills.json",
+                                                        "boston-mills_ept_far_nodes.txt", "boston-mills_ept_nodes.txt"]
+    import gen_manifest
+    cfg = json.load(open(res / "boston-mills" / "boston-mills.json", encoding="utf-8"))
+    items = gen_manifest.manifest_items(cfg, str(res / "boston-mills"))
+    assert sum(1 for i in items if i["path"].startswith("ept_far/")) == 2
+
+
 def test_plan_without_lidar_is_silver(tmp_path):
     h = FakeHosts(str(tmp_path))
     h.files["entwine_resources.geojson"]["features"] = []
@@ -409,7 +431,7 @@ def hosts():
 @pytest.mark.skipif(not NETWORK, reason="needs the data hosts (Drew's PC): SBA_NETWORK=1")
 @pytest.mark.parametrize("slug", ["vail", "breckenridge", "bigsky"])
 def test_plan_reproduces_the_hand_configs(slug, hosts):
-    hand = json.load(open(os.path.join(RESORTS, f"{slug}.json"), encoding="utf-8"))
+    hand = json.load(open(os.path.join(RESORTS, slug, f"{slug}.json"), encoding="utf-8"))
     stub = R.resolve_hand(hand, hosts, log=lambda *a: None)
     cfg, facts, _ = R.plan(stub, hosts, walk_nodes=False, log=lambda *a: None)
     print(f"\n{slug}:", *R.compare(cfg, hand), sep="\n  ")

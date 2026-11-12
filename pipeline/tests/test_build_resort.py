@@ -66,8 +66,8 @@ class Fake:
 @pytest.fixture
 def resort(tmp_path, monkeypatch):
     res, man = tmp_path / "resorts", tmp_path / "manifests"
-    res.mkdir(); man.mkdir()
-    json.dump(CFG, open(res / "demo.json", "w"))
+    (res / "demo").mkdir(parents=True); man.mkdir()
+    json.dump(CFG, open(res / "demo" / "demo.json", "w"))   # FEAT-244: a folder per resort
     monkeypatch.setattr(B, "pipeline_code", lambda repo=B.REPO: "code1")
     monkeypatch.setattr(B, "same_code", lambda commit, repo=B.REPO: commit == "abc1234")
     r = B.Resort("demo", str(tmp_path / "raw" / "demo"), str(tmp_path / "packs" / "demo"), str(res), str(man))
@@ -263,6 +263,18 @@ def moved_state(resort, tmp_path, monkeypatch, old_build="b1"):
     r.state["build"] = B.build_inputs(r, "gamecode", str(game / "packs" / "demo"))
     r.save()
     return B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests)
+
+
+
+def test_a_build_from_before_the_move_still_counts_after_a_path_only_change(resort, tmp_path, monkeypatch):
+    """FEAT-244: build code listed in MOVED["same"] (it only reads files from new places) keeps the moved packs"""
+    r = moved_state(resort, tmp_path, monkeypatch)
+    monkeypatch.setattr(B, "MOVED", {**B.MOVED, "code": "older", "same": ()})
+    assert not B.built_before_move(r, r.state["build"])            # other build code: built again
+    monkeypatch.setattr(B, "MOVED", {**B.MOVED, "code": "older", "same": ("code1",)})
+    assert B.built_before_move(r, r.state["build"])
+    f = Fake(r)
+    assert f"[build] skip: {B.MOVED_WHY}" in go(r, f) and "build_pack.py" not in f.calls
 
 
 def test_a_build_recorded_before_the_move_is_not_built_again(resort, tmp_path, monkeypatch):

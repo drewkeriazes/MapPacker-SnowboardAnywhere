@@ -613,7 +613,7 @@ def build_cover(pack_dir, raw_dir, cfg=None, log=print):
 
 if __name__ == "__main__":
     slug, raw, pack = sys.argv[1], sys.argv[2], sys.argv[3]
-    cfg = json.load(open(os.path.join(paths.RESORTS, f"{slug}.json"), encoding="utf-8"))
+    cfg = json.load(open(paths.config_path(slug), encoding="utf-8"))
     entry = build_cover(pack, raw, cfg)
     mp = os.path.join(pack, "meta.json")
     meta = json.load(open(mp, encoding="utf-8"))

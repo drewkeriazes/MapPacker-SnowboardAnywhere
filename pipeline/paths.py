@@ -1,6 +1,8 @@
 """FEAT-238: where the pipeline reads and writes, now that it lives in MapPacker-SnowboardAnywhere.
 
-    resorts/<slug>.json, node lists, <slug>-plan.md   configs (resort.py writes them, every stage reads them)
+    resorts/<slug>/                                   a folder per resort (FEAT-244): <slug>.json (the config), the
+                                                      EPT node lists it names and <slug>-plan.md; resort.py
+                                                      writes them, every stage reads them
     manifests/<slug>.json                             download lists (gen_manifest.py)
     packs/<slug>/                                     built packs (this checkout's; gitignored)
     raw/<slug>/                                       raw data: SBA_RAW_ROOT, else raw/ in the main checkout,
@@ -18,6 +20,17 @@ MANIFESTS = os.path.join(REPO, "manifests")
 PACKS = os.path.join(REPO, "packs")
 GAME_NAME = "SnowboardAnywhere"
 GAME_REPO_URL = "https://github.com/drewkeriazes/SnowboardAnywhere"
+
+
+def resort_dir(slug, resorts=RESORTS) -> str:
+    """resorts/<slug>/, the resort's folder: its config, the EPT node lists the config names (`nodes_file`, resolved
+    in this folder) and its data plan. `resorts` is the folder that holds every resort's (tests pass a temp one)"""
+    return os.path.join(resorts, slug)
+
+
+def config_path(slug, resorts=RESORTS) -> str:
+    """resorts/<slug>/<slug>.json"""
+    return os.path.join(resort_dir(slug, resorts), f"{slug}.json")
 
 
 def main_checkout(repo=REPO) -> str:
