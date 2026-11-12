@@ -1,6 +1,6 @@
 # Pack report: Vail (`vail`)
 
-Build `20261112T050238Z-bffc74`, pipeline `c9f246c`, format 1. Report 2026-11-12T05:02:55Z by `pipeline/pack_report.py` (FEAT-175).
+Build `20261112T061112Z-4b325d`, pipeline `4dd05fc`, format 1. Report 2026-11-12T06:11:23Z by `pipeline/pack_report.py` (FEAT-175).
 
 **Playable**: every DATA-022 MVP line passes.
 
@@ -99,7 +99,7 @@ Build `20261112T050238Z-bffc74`, pipeline `c9f246c`, format 1. Report 2026-11-12
 | AO | yes | 144 | 9.3 | 2026-11-12 |
 | piste directions | yes | 144 | 0.4 | 2026-11-12 |
 | moguls | yes | 144 | 0.3 | 2026-11-12 |
-| cover | yes | 4 | 22.0 | 2026-11-12 |
+| cover | yes | 4 | 23.3 | 2026-11-12 |
 | trees (crowns) | yes | 144 | 12.5 | 2026-11-12 |
 | stands (stems) | yes | 144 | 19.8 | 2026-11-12 |
 | far tree ring | yes | 363 | 31.4 | 2026-11-12 |

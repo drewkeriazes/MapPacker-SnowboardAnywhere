@@ -82,14 +82,14 @@
    "tier": "gold",
    "status": "playable",
    "pack": {
-    "version": 2,
+    "version": 3,
     "formatVersion": 1,
-    "build": "20261112T050238Z-bffc74",
+    "build": "20261112T061112Z-4b325d",
     "built": "2026-11-12",
-    "pipeline": "c9f246c",
-    "bytes": 270953262,
-    "sha256": "a8849d8085582fc06435af4f82c4689a15e71235738dfaa2b6b7566b34718b7d",
-    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/vail-v2/vail.zip"
+    "pipeline": "4dd05fc",
+    "bytes": 272234739,
+    "sha256": "5a40ef13fde9e210ba5043e2f8079312b842c1b104093e9b9f35fc6048071d07",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/vail-v3/vail.zip"
    },
    "report": "reports/vail.md"
   }
