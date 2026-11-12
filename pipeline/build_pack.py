@@ -35,7 +35,12 @@ slug = sys.argv[1]
 raw = sys.argv[2]
 out = sys.argv[3]
 cfg = json.load(open(paths.config_path(slug), encoding="utf-8"))
-manifest = json.load(open(os.path.join(paths.MANIFESTS, f"{slug}.json"), encoding="utf-8"))
+if cfg.get("source_only"):
+    sys.exit(f"{slug} is a relocate source (source_only): it is fetched for another pack, not built")
+# FEAT-268: `raw_from` names the resort whose raw data and manifest this config builds on (Ohio Hills is Boston
+# Mills' data with Mad River moved in); `raw` is then that resort's raw folder
+DATA = cfg.get("raw_from") or slug
+manifest = json.load(open(os.path.join(paths.MANIFESTS, f"{DATA}.json"), encoding="utf-8"))
 os.makedirs(out, exist_ok=True)
 T0 = time.time()
 def log(*a):
@@ -46,7 +51,24 @@ OX, OY = cfg["origin"]
 # to the same box. The config's `relocate` moves (relocate.py) paste far areas into it. The DEM, lidar returns,
 # NAIP, LANDFIRE and OSM are composed first; everything after is built from them as for any resort.
 import relocate
-REL = relocate.Relocation(cfg)
+try:
+    # FEAT-268: a move with a `source` cuts from that place's own raw folder <raw root>/<source> and manifest
+    SRC_CFG = relocate.source_configs(cfg)
+except ValueError as e:
+    sys.exit(str(e))
+REL = relocate.Relocation(cfg, {s: c["utm_bbox"] for s, c in SRC_CFG.items()})
+SRC_RAW = {s: os.path.join(os.path.dirname(os.path.normpath(raw)), s) for s in SRC_CFG}
+SRC_MAN = {}
+for _s, _p in SRC_RAW.items():
+    _mp = os.path.join(paths.MANIFESTS, f"{_s}.json")
+    if not os.path.isfile(os.path.join(_p, "FETCH_COMPLETE.txt")) or not os.path.isfile(_mp):
+        sys.exit(f"relocate source {_s}: no fetched raw data in {_p} or no {_mp} "
+                 f"(python pipeline/build_resort.py {_s} --stop-after landfire)")
+    SRC_MAN[_s] = json.load(open(_mp, encoding="utf-8"))
+if DATA != slug:
+    _own = json.load(open(paths.config_path(DATA), encoding="utf-8"))
+    if _own.get("origin") != cfg.get("origin") or _own.get("utm_bbox") != cfg.get("utm_bbox"):
+        sys.exit(f"raw_from {DATA}: origin and utm_bbox must be {DATA}'s (the rings and the frame are its data)")
 FRAME = [float(v) for v in cfg["utm_bbox"]]
 X0, Y0, X1, Y1 = cfg.get("pack_bbox") or cfg["utm_bbox"]           # UTM metres
 COMPOSED = bool(REL) or [X0, Y0, X1, Y1] != FRAME
@@ -65,39 +87,54 @@ def read_tiff(path):
 # ------------------------------------------------------------------ 1. fine DEM (1 m)
 log("DEM mosaic")
 FX0, FY0, FX1, FY1 = FRAME
-dem = np.full((int(FY1 - FY0), int(FX1 - FX0)), np.nan, np.float32)   # the fetched frame, row 0 = north
-for it in manifest["items"]:
-    if not it["path"].startswith("dem1m/"):
-        continue
-    p = os.path.join(raw, it["path"])
-    if not os.path.exists(p):
-        log("  missing", it["path"]); continue
-    a = read_tiff(p).astype(np.float32)
-    if a.ndim == 3: a = a[..., 0]
-    a[a <= -9000] = np.nan
-    bx0, by0, bx1, by1 = it["meta"]["bbox"]
-    w, h = it["meta"]["size"]
-    if a.shape != (h, w):
-        log("  unexpected shape", it["path"], a.shape, (h, w))
-        a = np.array(Image.fromarray(a).resize((w, h), Image.BILINEAR))
-    c0 = int(bx0 - FX0); r0 = int(FY1 - by1)
-    dem[r0:r0 + h, c0:c0 + w] = a
-void = np.isnan(dem)
-log(f"  dem {dem.shape}, void {void.mean()*100:.2f}%, range {np.nanmin(dem):.0f}..{np.nanmax(dem):.0f}")
-if void.any():
-    # fill small voids by nearest neighbour
-    idx = ndimage.distance_transform_edt(void, return_distances=False, return_indices=True)
-    dem = dem[tuple(idx)]
+
+
+def mosaic_dem(raw, manifest, frame):
+    """the 1 m DEM chunks of a raw folder on its fetched frame (row 0 = north), small voids filled"""
+    FX0, FY0, FX1, FY1 = frame
+    dem = np.full((int(FY1 - FY0), int(FX1 - FX0)), np.nan, np.float32)
+    for it in manifest["items"]:
+        if not it["path"].startswith("dem1m/"):
+            continue
+        p = os.path.join(raw, it["path"])
+        if not os.path.exists(p):
+            log("  missing", it["path"]); continue
+        a = read_tiff(p).astype(np.float32)
+        if a.ndim == 3: a = a[..., 0]
+        a[a <= -9000] = np.nan
+        bx0, by0, bx1, by1 = it["meta"]["bbox"]
+        w, h = it["meta"]["size"]
+        if a.shape != (h, w):
+            log("  unexpected shape", it["path"], a.shape, (h, w))
+            a = np.array(Image.fromarray(a).resize((w, h), Image.BILINEAR))
+        c0 = int(bx0 - FX0); r0 = int(FY1 - by1)
+        dem[r0:r0 + h, c0:c0 + w] = a
+    void = np.isnan(dem)
+    log(f"  dem {dem.shape}, void {void.mean()*100:.2f}%, range {np.nanmin(dem):.0f}..{np.nanmax(dem):.0f}")
+    if void.any():
+        # fill small voids by nearest neighbour
+        idx = ndimage.distance_transform_edt(void, return_distances=False, return_indices=True)
+        dem = dem[tuple(idx)]
+    return dem
+
+
+dem = mosaic_dem(raw, manifest, FRAME)
+# FEAT-268: {move index: (DEM, frame)} for the moves cut from another place's raw data
+SRC_DEM = {}
+for _s in REL.source_slugs():
+    log(f"  relocate source {_s}")
+    _g = (mosaic_dem(SRC_RAW[_s], SRC_MAN[_s], SRC_CFG[_s]["utm_bbox"]), [float(v) for v in SRC_CFG[_s]["utm_bbox"]])
+    SRC_DEM.update({k: _g for k, m in enumerate(REL.moves) if m.source == _s})
 dem_f = None    # the frame's DEM, kept while the lidar returns are set on the composed ground
 REL_DZ = []
 if COMPOSED:
     dem_f = dem
-    REL_DZ = [relocate.rim_dz(dem_f, FRAME, 1.0, m) for m in REL.moves]
+    REL_DZ = [relocate.rim_dz(dem_f, FRAME, 1.0, m, SRC_DEM.get(k)) for k, m in enumerate(REL.moves)]
     for m, dz in zip(REL.moves, REL_DZ):
         m.dz = dz
-        log(f"  relocate {m.name}: {m.src} -> centre {m.to}, turned {m.turn:+.0f} deg, seam {m.feather:.0f} m, "
-            f"height shift {dz:+.1f} m")
-    dem = relocate.compose_heights(dem_f, FRAME, 1.0, [X0, Y0, X1, Y1], REL, REL_DZ)
+        log(f"  relocate {m.name}: {m.src}{f' of {m.source}' if m.source else ''} -> centre {m.to}, turned "
+            f"{m.turn:+.0f} deg, seam {m.feather:.0f} m, height shift {dz:+.1f} m")
+    dem = relocate.compose_heights(dem_f, FRAME, 1.0, [X0, Y0, X1, Y1], REL, REL_DZ, SRC_DEM)
     log(f"  pack box {X1 - X0:.0f} x {Y1 - Y0:.0f} m of the fetched {FX1 - FX0:.0f} x {FY1 - FY0:.0f} m, "
         f"range {dem.min():.0f}..{dem.max():.0f}")
 fine_meta = write_height_set(out, "fine", dem, 1.0, X0 - OX, Y0 - OY)
@@ -178,14 +215,15 @@ scale = None
 PACK_BOX = [X0, Y0, X1, Y1]
 
 
-def place_returns(ux, uy, zz, cls):
+def place_returns(ux, uy, zz, cls, src=None):
     """FEAT-249: the returns of one node for the pack: at their own place where the ground there is drawn, at their
     moved place inside a pasted patch (relocate.Relocation.select decides, as for every other layer). A return keeps
-    its height above the ground it was flown over, set on the composed ground."""
+    its height above the ground it was flown over, set on the composed ground. `src` (FEAT-268): the node is from
+    that relocate source's lidar, so only its moves take returns and the rest of the node is dropped."""
     def inb(x, y):
         return (x >= X0) & (x < X1) & (y >= Y0) & (y < Y1)
     xs, ys, zs, cs = [], [], [], []
-    k = inb(ux, uy)
+    k = inb(ux, uy) if src is None else np.zeros(ux.shape, bool)
     if k.any():
         k[k] = REL.select(ux[k], uy[k]) == -1
     if k.any():
@@ -193,6 +231,9 @@ def place_returns(ux, uy, zz, cls):
         xs.append(x); ys.append(y); cs.append(cls[k])
         zs.append(zz[k] - relocate.sample(dem_f, FRAME, 1.0, x, y) + relocate.sample(dem, PACK_BOX, 1.0, x, y))
     for i, m in enumerate(REL.moves):
+        if m.source != src:
+            continue
+        g, gf = SRC_DEM.get(i, (dem_f, FRAME))
         sx0, sy0, sx1, sy1 = m.src
         k = (ux >= sx0) & (ux < sx1) & (uy >= sy0) & (uy < sy1)
         if not k.any():
@@ -204,25 +245,26 @@ def place_returns(ux, uy, zz, cls):
         if not ok.any():
             continue
         xs.append(dx[ok]); ys.append(dy[ok]); cs.append(sc[ok])
-        zs.append(sz[ok] - relocate.sample(dem_f, FRAME, 1.0, sx[ok], sy[ok]) + relocate.sample(dem, PACK_BOX, 1.0, dx[ok], dy[ok]))
+        zs.append(sz[ok] - relocate.sample(g, gf, 1.0, sx[ok], sy[ok]) + relocate.sample(dem, PACK_BOX, 1.0, dx[ok], dy[ok]))
     if not xs:
         return ux[:0], uy[:0], zz[:0], cls[:0]
     return np.concatenate(xs), np.concatenate(ys), np.concatenate(zs), np.concatenate(cs)
 
 
 
-# ept/*.laz is the main dataset, ept/<dataset>/*.laz any extra one (cfg["lidar"]["extra"]); all EPSG:3857
-for p in sorted(glob.glob(os.path.join(raw, "ept", "*.laz")) + glob.glob(os.path.join(raw, "ept", "*", "*.laz"))):
+def add_laz(p, src=None):
+    """one EPT node's returns into the 2 m DSM (`src`: a relocate source's node, FEAT-268)"""
+    global n_pts
     try:
         las = laspy.read(p)
     except Exception as e:
-        log("  bad laz", p, e); continue
+        log("  bad laz", p, e); return
     x = np.asarray(las.x); y = np.asarray(las.y); zz = np.asarray(las.z)
     cls = np.asarray(las.classification)
     # EPT is in EPSG:3857; convert to UTM
     ux, uy = merc_to_utm.transform(x, y)
     if COMPOSED:
-        ux, uy, zz, cls = place_returns(np.asarray(ux), np.asarray(uy), zz, cls)
+        ux, uy, zz, cls = place_returns(np.asarray(ux), np.asarray(uy), zz, cls, src)
     col = ((ux - X0) / R2).astype(int); row = ((Y1 - uy) / R2).astype(int)
     ok = (col >= 0) & (col < W2) & (row >= 0) & (row < H2) & (cls != 7) & (cls != 18)  # drop noise classes
     col, row, zz, cls = col[ok], row[ok], zz[ok], cls[ok]
@@ -233,8 +275,22 @@ for p in sorted(glob.glob(os.path.join(raw, "ept", "*.laz")) + glob.glob(os.path
     g = cls == 2
     if g.any():
         np.minimum.at(dtm_l.ravel(), flat[g], zz[g].astype(np.float32))
+
+
+def laz_files(raw):
+    """ept/*.laz is the main dataset, ept/<dataset>/*.laz any extra one (cfg["lidar"]["extra"]); all EPSG:3857"""
+    return sorted(glob.glob(os.path.join(raw, "ept", "*.laz")) + glob.glob(os.path.join(raw, "ept", "*", "*.laz")))
+
+
+for p in laz_files(raw):
+    add_laz(p)
+for _s in REL.source_slugs():
+    _n0 = n_pts
+    for p in laz_files(SRC_RAW[_s]):
+        add_laz(p, _s)
+    log(f"  relocate source {_s}: {(n_pts - _n0) / 1e6:.1f} M points")
 log(f"  {n_pts/1e6:.1f} M points, cells with data {np.mean(cnt>0)*100:.1f}%")
-del dem_f
+del dem_f, SRC_DEM
 dsm[cnt == 0] = np.nan
 # cells with a lidar return (dilated by one cell): canopy is only believed where the lidar actually saw something
 has_pts = ndimage.binary_dilation(cnt > 0, iterations=1)
@@ -253,35 +309,50 @@ log(f"  CHM: {np.mean(chm>2)*100:.1f}% of cells > 2 m, p99 {np.percentile(chm, 9
 log("NAIP")
 # The Planetary Computer crop endpoint capped every crop at 2048 px, so the crops are ~2 m.
 # Work at the 2 m grid directly: resample each crop onto its bbox.
-FH2, FW2 = int(FY1 - FY0) // 2, int(FX1 - FX0) // 2      # the fetched frame at 2 m (FEAT-249)
-naip2 = np.zeros((4, FH2, FW2), np.uint8)
-have2 = np.zeros((FH2, FW2), bool)
-for it in manifest["items"]:
-    if not it["path"].startswith("naip1m/"):
-        continue
-    p = os.path.join(raw, it["path"])
-    if not os.path.exists(p):
-        continue
-    a = read_tiff(p)
-    if a.ndim == 3 and a.shape[0] in (4, 5) and a.shape[0] < a.shape[2]:
-        a = np.moveaxis(a, 0, -1)
-    bx0, by0, bx1, by1 = it["meta"]["bbox"]
-    w2 = int(round((bx1 - bx0) / R2)); h2 = int(round((by1 - by0) / R2))
-    bands = np.stack([np.array(Image.fromarray(a[..., b]).resize((w2, h2), Image.BILINEAR)) for b in range(4)], axis=-1)
-    c0 = int(round((bx0 - FX0) / R2)); r0 = int(round((FY1 - by1) / R2))
-    c0c, r0c = max(c0, 0), max(r0, 0)
-    c1c, r1c = min(c0 + w2, FW2), min(r0 + h2, FH2)
-    if c1c <= c0c or r1c <= r0c:
-        continue
-    sub = bands[r0c - r0:r1c - r0, c0c - c0:c1c - c0]
-    valid = sub.sum(axis=-1) > 0
-    dst = naip2[:, r0c:r1c, c0c:c1c]
-    for b in range(4):
-        dst[b][valid] = sub[..., b][valid]
-    have2[r0c:r1c, c0c:c1c] |= valid
+def mosaic_naip(raw, manifest, frame):
+    """the NAIP crops of a raw folder on its fetched frame at 2 m (FEAT-249): (bands, covered)"""
+    FX0, FY0, FX1, FY1 = frame
+    FH2, FW2 = int(FY1 - FY0) // 2, int(FX1 - FX0) // 2
+    naip2 = np.zeros((4, FH2, FW2), np.uint8)
+    have2 = np.zeros((FH2, FW2), bool)
+    for it in manifest["items"]:
+        if not it["path"].startswith("naip1m/"):
+            continue
+        p = os.path.join(raw, it["path"])
+        if not os.path.exists(p):
+            continue
+        a = read_tiff(p)
+        if a.ndim == 3 and a.shape[0] in (4, 5) and a.shape[0] < a.shape[2]:
+            a = np.moveaxis(a, 0, -1)
+        bx0, by0, bx1, by1 = it["meta"]["bbox"]
+        w2 = int(round((bx1 - bx0) / R2)); h2 = int(round((by1 - by0) / R2))
+        bands = np.stack([np.array(Image.fromarray(a[..., b]).resize((w2, h2), Image.BILINEAR)) for b in range(4)], axis=-1)
+        c0 = int(round((bx0 - FX0) / R2)); r0 = int(round((FY1 - by1) / R2))
+        c0c, r0c = max(c0, 0), max(r0, 0)
+        c1c, r1c = min(c0 + w2, FW2), min(r0 + h2, FH2)
+        if c1c <= c0c or r1c <= r0c:
+            continue
+        sub = bands[r0c - r0:r1c - r0, c0c - c0:c1c - c0]
+        valid = sub.sum(axis=-1) > 0
+        dst = naip2[:, r0c:r1c, c0c:c1c]
+        for b in range(4):
+            dst[b][valid] = sub[..., b][valid]
+        have2[r0c:r1c, c0c:c1c] |= valid
+    return naip2, have2
+
+
+naip2, have2 = mosaic_naip(raw, manifest, FRAME)
 if COMPOSED:
-    naip2 = relocate.compose_classes(naip2, FRAME, R2, PACK_BOX, REL)
-    have2 = relocate.compose_classes(have2, FRAME, R2, PACK_BOX, REL)
+    SRC_NAIP, SRC_HAVE = {}, {}     # FEAT-268: {move index: (grid, frame)} for the sourced moves
+    for _s in REL.source_slugs():
+        _f = [float(v) for v in SRC_CFG[_s]["utm_bbox"]]
+        _n, _h = mosaic_naip(SRC_RAW[_s], SRC_MAN[_s], _f)
+        for k, m in enumerate(REL.moves):
+            if m.source == _s:
+                SRC_NAIP[k], SRC_HAVE[k] = (_n, _f), (_h, _f)
+    naip2 = relocate.compose_classes(naip2, FRAME, R2, PACK_BOX, REL, SRC_NAIP)
+    have2 = relocate.compose_classes(have2, FRAME, R2, PACK_BOX, REL, SRC_HAVE)
+    del SRC_NAIP, SRC_HAVE
 log(f"  NAIP coverage {have2.mean()*100:.1f}%")
 red2 = naip2[0].astype(np.float32); grn2 = naip2[1].astype(np.float32); blu2 = naip2[2].astype(np.float32); nir2 = naip2[3].astype(np.float32)
 del naip2
@@ -400,6 +471,24 @@ class LfRaster:
         self.name = os.path.basename(path)
         self.data = img if fn is None else spc.lf_value_lut(self.table, int(img.max()) + 1, fn)[np.clip(img, 0, None)]
         self.x0, self.y0, self.px = tfw[4], tfw[5], tfw[0]   # top-left pixel centre and pixel size (m)
+        h, w = self.data.shape
+        self.box = [self.x0 - self.px / 2, self.y0 - (h - 0.5) * self.px, self.x0 + (w - 0.5) * self.px,
+                    self.y0 + self.px / 2]
+
+    def paste(self, k, other):
+        """FEAT-268: relocate move k's patch, cut from `other` (the source's clip of the same product), pasted into
+        this raster on its own 30 m grid, so everything derived from it (natural classes, the fit cores) sees the
+        patch as it is drawn; its class table is merged in"""
+        d = REL.moves[k].dest_box()
+        if not (d[0] >= self.box[0] and d[1] >= self.box[1] and d[2] <= self.box[2] and d[3] <= self.box[3]):
+            sys.exit(f"LANDFIRE {self.name} does not cover {REL.moves[k].name}'s pasted patch {d}")
+        if self.table or other.table:
+            try:
+                self.table = relocate.merge_class_tables(self.table, other.table)
+            except ValueError as e:
+                sys.exit(f"relocate {REL.moves[k].name}: {e}")
+        self.data = relocate.compose_classes(self.data, self.box, self.px, self.box, REL,
+                                             {k: (other.data.astype(self.data.dtype), other.box, other.px)}, [k])
 
     def _col(self, x_utm):
         return np.clip(np.round((x_utm - self.x0) / self.px).astype(np.int64), 0, self.data.shape[1] - 1)
@@ -422,8 +511,8 @@ class LfRaster:
 
     def at_data(self, data, x_utm, y_utm):
         """`data` (a raster on the same 30 m grid) at the points (of the pack: a pasted patch reads its own place)"""
-        if REL:
-            x_utm, y_utm = REL.source_xy(x_utm, y_utm)
+        if REL:      # FEAT-268: a sourced patch is pasted into the raster (paste), so it reads where it is
+            x_utm, y_utm = REL.source_xy(x_utm, y_utm, REL.in_frame(REL.select(x_utm, y_utm)) if REL.sourced else None)
         return data[self._row(y_utm), self._col(x_utm)]
 
     def window(self):
@@ -438,8 +527,22 @@ class LfRaster:
 evt = None
 lf_tifs = sorted(glob.glob(os.path.join(raw, "landfire", "*.tif")))
 LANDFIRE_ATTRIBUTION = "Vegetation type: LANDFIRE, USGS and U.S. Forest Service (public domain)"
+def paste_sources(lyr, sub, fn=None):
+    """FEAT-268: every sourced move's patch of a LANDFIRE product (landfire/<sub>/ of its raw folder) into `lyr`"""
+    for k, m in enumerate(REL.moves):
+        if not m.source:
+            continue
+        tifs = sorted(glob.glob(os.path.join(SRC_RAW[m.source], "landfire", sub, "*.tif")))
+        if not tifs:
+            sys.exit(f"relocate {m.name}: no LANDFIRE {sub or 'EVT'} in {SRC_RAW[m.source]} "
+                     f"(python pipeline/build_resort.py {m.source} --stop-after landfire)")
+        lyr.paste(k, LfRaster(tifs[-1], fn))
+        log(f"  LANDFIRE {sub or 'EVT'}: {m.name}'s patch from {m.source}/{os.path.basename(tifs[-1])}")
+    return lyr
+
+
 if lf_tifs:
-    evt_lf = LfRaster(lf_tifs[-1])
+    evt_lf = paste_sources(LfRaster(lf_tifs[-1]), "")
     evt_img, table = evt_lf.data, evt_lf.table
     # per class (species.classify_evt, DATA-020): tree group, aspen fraction, forest (Tree life form, not
     # urban), alpine (turf, dwarf-shrubland, bedrock and scree, wet meadow), riparian, sagebrush, Gambel oak
@@ -518,7 +621,7 @@ elif evt is not None:
 # canopy rules (BUG-028) read them with LfRaster (stage 5b) per 2 m cell (.on2()) or per point (.at()).
 def load_lf_layer(sub, fn):
     tifs = sorted(glob.glob(os.path.join(raw, "landfire", sub, "*.tif")))
-    return LfRaster(tifs[-1], fn) if tifs else None
+    return paste_sources(LfRaster(tifs[-1], fn), sub, fn) if tifs else None
 
 lf_cover = load_lf_layer("evc", spc.lf_tree_cover)
 lf_height = load_lf_layer("evh", spc.lf_tree_height)
@@ -532,7 +635,7 @@ for lyr, what, unit, k in ((lf_cover, "EVC tree cover", "%", 100), (lf_height, "
 
 # ------------------------------------------------------------------ 6. OSM features
 log("OSM")
-def load_osm(name):
+def load_osm(name, raw=raw):
     p = os.path.join(raw, "osm", f"{name}.json")
     if not os.path.exists(p):
         log("  missing osm", name); return {"elements": []}
@@ -549,6 +652,20 @@ if REL:
     ski, _mv = REL.osm(ski, to_utm, to_ll, whole=True)
     built, _mb = REL.osm(built, to_utm, to_ll)
     natural, _mn = REL.osm(natural, to_utm, to_ll)
+    for _s in REL.source_slugs():
+        # FEAT-268: a sourced move's runs, lifts, buildings and streams are in its own raw folder: only what its
+        # patch takes is kept, moved, and added to the docs
+        _sk = load_osm("ski", SRC_RAW[_s])
+        _sk, _d = osm_filter.filter_ski(_sk, osm_filter.exclude_areas(SRC_CFG[_s].get("exclude"), _sk, lambda m: log("  " + m)))
+        _parts = [(REL.osm(_sk, to_utm, to_ll, whole=True, source=_s), "ski"),
+                  (REL.osm(load_osm("built", SRC_RAW[_s]), to_utm, to_ll, source=_s), "built"),
+                  (REL.osm(load_osm("natural", SRC_RAW[_s]), to_utm, to_ll, source=_s), "natural")]
+        for (_doc, _cnt), _which in _parts:
+            _into = {"ski": ski, "built": built, "natural": natural}[_which]
+            _into["elements"] = _into["elements"] + _doc["elements"]
+            _tot = {"ski": _mv, "built": _mb, "natural": _mn}[_which]
+            for _k, _v in _cnt.items():
+                _tot[_k] = _tot.get(_k, 0) + _v
     for m in REL.moves:
         log(f"  relocate {m.name}: {_mv[m.name]} ski, {_mb[m.name]} built and {_mn[m.name]} natural elements moved")
 
@@ -1231,6 +1348,10 @@ if REL:
         dist = math.hypot(m.to[0] - m.c[0], m.to[1] - m.c[1]) / 1000
         note = (f"{m.name} is moved {dist:.1f} km{f' and turned {abs(m.turn):.0f} degrees' if m.turn else ''} from its real "
                 "position to sit next to the rest of the resort; its terrain, trees, imagery and runs are its own")
+        if m.source:     # FEAT-268: another resort, moved in for a custom map
+            note = (f"{m.name} is moved {dist:.0f} km{f' and turned {abs(m.turn):.0f} degrees' if m.turn else ''} from "
+                    "its real position to sit next to the other hills on this custom map; its terrain, trees, imagery "
+                    "and runs are its own")
         if note not in meta["attribution"]:
             meta["attribution"] = meta["attribution"] + [note]
 write_meta(out, meta)

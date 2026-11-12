@@ -213,3 +213,171 @@ def test_boston_mills_config():
     assert (pb[2] - pb[0]) * (pb[3] - pb[1]) < 0.2 * (fb[2] - fb[0]) * (fb[3] - fb[1])
     ox, oy = cfg["origin"]
     assert pb[0] <= ox <= pb[2] and pb[1] <= oy <= pb[3]
+
+
+# ------------------------------------------------------------------------------------------------ FEAT-268
+# A sourced move cuts its area out of another place's raw data, its own frame far from this one's.
+
+SRC_FRAME = [10000.0, 0.0, 11000.0, 1000.0]       # the source's fetched box, 8 km east of FRAME
+FAR_SRC = [10300.0, 300.0, 10700.0, 700.0]
+SOURCED = {"name": "Other hill", "source": "other", "from": FAR_SRC, "to": [1500.0, 500.0], "turn_deg": 0,
+           "feather_m": 50}
+
+
+def two(**kw):
+    """an in-frame move (MOVE, pasted at 500, 500) and a sourced one (pasted at 1500, 500)"""
+    return rl.Relocation({"relocate": [MOVE, dict(SOURCED, **kw)]}, {"other": SRC_FRAME})
+
+
+def source_dem():
+    """1 m source frame: flat 300 m ground with a 50 m cone at the source square's centre"""
+    X, Y = np.meshgrid(SRC_FRAME[0] + np.arange(1000) + 0.5, 1000 - (np.arange(1000) + 0.5))
+    d = np.hypot(X - 10500, Y - 500)
+    return np.where(d < 150, 300 + 50 * (1 - d / 150), 300.0).astype(np.float32)
+
+
+def test_a_sourced_move_is_checked_against_its_own_frame():
+    r = two()
+    assert r.moves[1].frame == SRC_FRAME and r.sourced == [1] and r.source_slugs() == ["other"]
+    assert r.check_inside(FRAME, FRAME) == []                     # its from box is far outside FRAME: fine
+    bad = two(**{"from": [10800.0, 300.0, 11200.0, 700.0]}).check_inside(FRAME, FRAME)
+    assert len(bad) == 1 and "other's utm_bbox" in bad[0]
+    unknown = rl.Relocation({"relocate": [SOURCED]})              # no frames given: not known, so refused
+    assert "not known" in unknown.check_inside(FRAME, FRAME)[0]
+    with pytest.raises(ValueError, match="has no config"):
+        rl.Relocation({"relocate": [SOURCED]}, {})
+    # an in-frame move outside FRAME is still refused as before
+    assert any("utm_bbox" in s for s in rel(**{"from": [1800.0, 300.0, 2200.0, 700.0]}).check_inside(FRAME, FRAME))
+
+
+def test_compose_heights_pastes_a_hill_from_the_source_dem():
+    dem = frame_dem()
+    r = two()
+    srcs = {1: (source_dem(), SRC_FRAME)}
+    dz = rl.rim_dz(dem, FRAME, 1.0, r.moves[1], srcs[1])
+    assert dz == pytest.approx(-196.0)             # the source ground at 300 m onto this frame's 104 m east side
+    dzs = [rl.rim_dz(dem, FRAME, 1.0, r.moves[0]), dz]
+    out = rl.compose_heights(dem, FRAME, 1.0, FRAME, r, dzs, srcs)
+    assert out[500, 1500] == pytest.approx(350 - 196, abs=1.0)    # the source cone's top, set on the ground here
+    assert out[500, 500] == pytest.approx(160.0, abs=1.0)          # the in-frame patch reads this frame as before
+    assert out[100, 1950] == 104.0                                 # ground outside both patches untouched
+    assert np.abs(out[480:520, 1290:1310] - 104).max() < 0.5       # the seam meets the ground
+    # no sources: the same heights as the in-frame move alone
+    one = rl.Relocation({"relocate": [MOVE]})
+    assert (rl.compose_heights(dem, FRAME, 1.0, FRAME, one, dzs[:1], {}) ==
+            rl.compose_heights(dem, FRAME, 1.0, FRAME, one, dzs[:1])).all()
+
+
+def test_compose_classes_from_a_source_grid_and_only_the_moves_asked():
+    cls = np.zeros((500, 1000), np.uint8)
+    cls[200:300, 750:850] = 7                        # the in-frame source square's middle
+    other = np.full((500, 500), 9, np.uint8)         # the source grid, all class 9, at 2 m
+    r = two()
+    out = rl.compose_classes(cls, FRAME, 2.0, FRAME, r, {1: (other, SRC_FRAME)})
+    assert (out[200:300, 200:300] == 7).all()        # in-frame patch at 400..600
+    assert (out[200:300, 700:800] == 9).all()        # sourced patch at 1400..1600
+    only = rl.compose_classes(cls, FRAME, 2.0, FRAME, r, {1: (other, SRC_FRAME)}, moves=[1])
+    assert (only[200:300, 200:300] == 0).all() and (only[200:300, 700:800] == 9).all()
+    # a source grid at another resolution (LANDFIRE clips each have their own 30 m grid)
+    coarse = np.full((100, 100), 5, np.uint8)        # 10 m
+    out10 = rl.compose_classes(cls, FRAME, 2.0, FRAME, r, {1: (coarse, SRC_FRAME, 10.0)}, moves=[1])
+    assert (out10[200:300, 700:800] == 5).all()
+
+
+def test_in_frame_drops_only_the_sourced_patches():
+    r = two()
+    x = np.array([500.0, 1500.0, 100.0]); y = np.array([500.0, 500.0, 900.0])
+    sel = r.select(x, y)
+    assert list(sel) == [0, 1, -1] and list(r.in_frame(sel)) == [0, -1, -1]
+    sx, sy = r.source_xy(x, y, r.in_frame(sel))
+    assert np.allclose(sx, [1600, 1500, 100])         # the sourced patch reads where it is drawn
+    one = rel()
+    s1 = one.select(x, y)
+    assert one.in_frame(s1) is s1                     # no sourced move: unchanged
+    assert np.allclose(one.source_xy(x, y, one.in_frame(s1)), one.source_xy(x, y))
+
+
+def test_osm_source_doc_keeps_only_what_its_move_takes():
+    src_doc = {"elements": [
+        {"type": "node", "id": 1, "lat": 0.5, "lon": 10.5, "tags": {"natural": "peak"}},                   # in the patch
+        {"type": "node", "id": 2, "lat": 0.9, "lon": 10.1, "tags": {"amenity": "bench"}},                  # outside it
+        {"type": "way", "id": 10, "tags": {"highway": "tertiary"}, "nodes": [1, 2, 3, 4],                  # a road through
+         "geometry": [ll(10100, 500), ll(10400, 500), ll(10600, 500), ll(10900, 500)]},
+        {"type": "way", "id": 20, "tags": {"piste:type": "downhill"}, "nodes": [5, 6],
+         "geometry": [ll(10450, 600), ll(10550, 400)]},
+        {"type": "relation", "id": 30, "members": [{"geometry": [ll(10900, 900), ll(10950, 950)]}]},       # outside
+        {"type": "relation", "id": 31, "members": []},
+    ]}
+    r = two()
+    out, moved = r.osm(src_doc, TO_UTM, TO_LL, whole=False, source="other")
+    ids = [e["id"] for e in out["elements"]]
+    assert sorted(ids) == [1, 10, 20]
+    peak = next(e for e in out["elements"] if e["id"] == 1)
+    assert peak["lon"] == pytest.approx(1.5) and peak["lat"] == pytest.approx(0.5)
+    (road,) = [e for e in out["elements"] if e["id"] == 10]   # only the piece inside the patch, moved
+    assert [p["lon"] for p in road["geometry"]] == pytest.approx([1.4, 1.6]) and road["nodes"] == [2, 3]
+    assert moved == {"Far": 0, "Other hill": 3}
+    # this frame's doc: an element at the sourced patch's from coordinates is not moved (that is another place),
+    # and the ground under the sourced patch is cleared
+    main = {"elements": [{"type": "node", "id": 7, "lat": 0.5, "lon": 10.5},
+                         {"type": "node", "id": 8, "lat": 0.5, "lon": 1.33},     # under the sourced patch only
+                         {"type": "node", "id": 9, "lat": 0.9, "lon": 1.9}]}
+    out2, moved2 = r.osm(main, TO_UTM, TO_LL)
+    assert [e["id"] for e in out2["elements"]] == [7, 9] and out2["elements"][0]["lon"] == 10.5
+    assert moved2 == {"Far": 0, "Other hill": 0}
+
+
+def test_record_names_the_source_only_for_a_sourced_move():
+    r = two()
+    assert "source" not in r.moves[0].record()
+    assert r.moves[1].record()["source"] == "other"
+
+
+def test_merge_class_tables():
+    a = [{"VALUE": "7", "EVT_NAME": "Oak"}, {"VALUE": "8", "EVT_NAME": "Maple"}]
+    b = [{"VALUE": "8", "EVT_NAME": "Maple"}, {"VALUE": "9", "EVT_NAME": "Beech"}]
+    assert [r["VALUE"] for r in rl.merge_class_tables(a, b)] == ["7", "8", "9"]
+    with pytest.raises(ValueError, match="two LANDFIRE versions"):
+        rl.merge_class_tables(a, [{"VALUE": "7", "EVT_NAME": "Pine"}])
+
+
+def test_overlapping_patches_are_refused():
+    assert two().overlaps() == []
+    msgs = two(to=[700.0, 500.0]).check_inside(FRAME, FRAME)
+    assert any("overlap" in s for s in msgs)
+
+
+def test_source_configs_reads_each_source_once(tmp_path):
+    for slug, crs in (("other", "EPSG:26917"), ("elsewhere", "EPSG:32613")):
+        (tmp_path / slug).mkdir()
+        (tmp_path / slug / f"{slug}.json").write_text(json.dumps({"slug": slug, "crs": crs, "utm_bbox": SRC_FRAME}))
+    cfg = {"crs": "EPSG:26917", "relocate": [MOVE, SOURCED, dict(SOURCED, name="Again")]}
+    assert list(rl.source_configs(cfg, str(tmp_path))) == ["other"]
+    assert rl.source_configs({"relocate": [MOVE]}, str(tmp_path)) == {}
+    with pytest.raises(ValueError, match="is in EPSG:32613"):
+        rl.source_configs(dict(cfg, relocate=[dict(SOURCED, source="elsewhere")]), str(tmp_path))
+    with pytest.raises(ValueError, match="no config"):
+        rl.source_configs(dict(cfg, relocate=[dict(SOURCED, source="nowhere")]), str(tmp_path))
+
+
+def test_ohio_hills_config():
+    """FEAT-268: Mad River pasted north of Boston Mills, beside Brandywine, on boston-mills' raw data"""
+    cfg = json.load(open(paths.config_path("ohio-hills"), encoding="utf-8"))
+    bm = json.load(open(paths.config_path("boston-mills"), encoding="utf-8"))
+    assert cfg["raw_from"] == "boston-mills"
+    for k in ("origin", "utm_bbox", "crs", "lidar", "mid_ring", "far_ring"):
+        assert cfg[k] == bm[k], k
+    assert cfg["relocate"][0] == bm["relocate"][0]            # Brandywine as in the standalone pack
+    srcs = rl.source_configs(cfg)
+    assert list(srcs) == ["mad-river-mountain"]
+    mr = srcs["mad-river-mountain"]
+    assert mr["source_only"] is True and "far" not in mr["lidar"] and mr["landcover"] == {"enabled": False}
+    r = rl.Relocation(cfg, {s: c["utm_bbox"] for s, c in srcs.items()})
+    assert [m.name for m in r.moves] == ["Brandywine", "Mad River Mountain"]
+    assert r.check_inside(cfg["utm_bbox"], cfg["pack_bbox"]) == []    # inside the frames, no overlap
+    ox, oy = cfg["origin"]
+    pb = cfg["pack_bbox"]
+    assert pb[0] <= ox <= pb[2] and pb[1] <= oy <= pb[3]
+    # Mad River's runs fall to the north-west (about 325 deg); turned -90 they fall south-west, to the valley floor
+    # it shares with Boston Mills' base
+    assert r.moves[1].facing(325) == pytest.approx(235)

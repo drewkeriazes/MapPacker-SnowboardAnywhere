@@ -145,7 +145,8 @@ def manifest_items(cfg, resorts_dir=None):
     pk = lc.get("pistes_km", 140) * 500.0
     wide = [to_ll.transform(ox - pk, oy - pk), to_ll.transform(ox + pk, oy + pk)]
     wbb = f"{wide[0][1]},{wide[0][0]},{wide[1][1]},{wide[1][0]}"
-    queries["pistes_wide"] = ov(f'(way["piste:type"="downhill"]({wbb});relation["piste:type"="downhill"]({wbb}););')
+    if lc.get("enabled", True):     # FEAT-268: only the far land cover reads it (build_resort.check_raw agrees)
+        queries["pistes_wide"] = ov(f'(way["piste:type"="downhill"]({wbb});relation["piste:type"="downhill"]({wbb}););')
     for name, q in queries.items():
         # GET rather than POST: .NET's POST sends "Expect: 100-continue", which Overpass rejects
         enc = quote(q, safe="")
@@ -156,8 +157,9 @@ def manifest_items(cfg, resorts_dir=None):
     # ---------------------------------------------------------------- place names (FEAT-235)
     # GNIS domestic names for each state the far ring touches (summits), the Census Gazetteer and population
     # estimates (towns): plain files on S3 and www2.census.gov. None outside the US.
+    # FEAT-268: not for a relocate source (source_only): the pack's names are its own surroundings'
     import placenames
-    for it in placenames.manifest_items(cfg):
+    for it in ([] if cfg.get("source_only") else placenames.manifest_items(cfg)):
         add(it["url"], it["path"])
 
     # ---------------------------------------------------------------- land cover for the far terrain (DATA-019)

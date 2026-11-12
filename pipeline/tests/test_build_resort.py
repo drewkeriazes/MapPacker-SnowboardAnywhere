@@ -317,3 +317,79 @@ def test_pipeline_code_ignores_tests_and_configs():
     if code is None:
         pytest.skip("not a git checkout")
     assert len(code.split("+")[0]) == 16
+
+
+# ------------------------------------------------------------------------------------------------ FEAT-268
+
+def other(resort, slug, **cfg):
+    """another config beside the demo one, as a Resort (its raw folder beside demo's unless raw_from says)"""
+    res = os.path.dirname(os.path.dirname(resort.cfg_path))
+    os.makedirs(os.path.join(res, slug), exist_ok=True)
+    c = dict(CFG, slug=slug, **cfg)
+    json.dump(c, open(os.path.join(res, slug, f"{slug}.json"), "w"))
+    raw_root = os.path.dirname(resort.raw)
+    return B.Resort(slug, os.path.join(raw_root, c.get("raw_from") or slug), os.path.join(os.path.dirname(resort.out), slug),
+                    res, resort.manifests)
+
+
+def test_a_source_only_config_fetches_and_stops(resort):
+    src = other(resort, "src", source_only=True)
+    f = Fake(src)
+    lines = go(src, f)
+    assert "build_pack.py" not in f.calls and "pack_report.py" not in f.calls
+    assert f.calls[:3] == ["ept_select.py", "gen_manifest.py", "fetch.ps1"]
+    assert any(B.SOURCE_WHY in s for s in lines) and not os.path.exists(os.path.join(src.out, "..", "index.json"))
+    assert "build" not in src.state and "report" not in src.state
+
+
+def test_raw_from_builds_on_the_other_resorts_data_with_its_own_state(resort):
+    go(resort, Fake(resort))
+    before = open(resort.state_path).read()
+    mash = other(resort, "mash", raw_from="demo")
+    assert mash.raw == resort.raw and mash.man_path == resort.man_path
+    assert mash.state_path == os.path.join(os.path.dirname(resort.raw), "mash", B.STATE)
+    assert mash.node_files() == resort.node_files()          # the lists are demo's
+    f = Fake(mash)
+    lines = go(mash, f)
+    assert f.calls == ["build_pack.py", "pack_report.py"]
+    assert any("the raw data is from demo" in s for s in lines if s.startswith("[fetch]"))
+    assert os.path.isfile(mash.state_path) and open(resort.state_path).read() == before
+    assert any(s.startswith("[fetch] skip") for s in lines)
+    f2 = Fake(mash)
+    go(mash, f2, force=["fetch"])                             # never fetches into demo's folder, even forced
+    assert "fetch.ps1" not in f2.calls and "build_pack.py" not in f2.calls
+
+
+def test_a_pack_with_a_sourced_move_checks_and_fingerprints_the_source(resort):
+    go(resort, Fake(resort))
+    move = {"name": "Hill", "source": "src", "from": [0, 0, 400, 400], "to": [500, 500]}
+    mash = other(resort, "mash", raw_from="demo", relocate=[move])
+    with pytest.raises(B.Failed, match="has no config"):
+        go(mash, Fake(mash))
+    other(resort, "src", source_only=True)
+    with pytest.raises(B.Failed, match="not fetched"):
+        go(mash, Fake(mash))
+    src = other(resort, "src")
+    go(src, Fake(src), last="landfire")
+    with pytest.raises(B.Failed, match='not marked "source_only"'):
+        go(mash, Fake(mash))
+    src = other(resort, "src", source_only=True)
+    go(src, Fake(src))
+    f = Fake(mash)
+    go(mash, f)
+    assert f.calls == ["build_pack.py", "pack_report.py"]
+    f = Fake(mash)
+    go(mash, f)
+    assert "build_pack.py" not in f.calls                     # nothing changed
+    json.dump(dict(json.load(open(src.cfg_path)), name="Moved"), open(src.cfg_path, "w"))
+    f = Fake(mash)
+    go(mash, f)
+    assert "build_pack.py" in f.calls                         # the source's config is an input of the pack
+
+
+def test_build_inputs_without_sources_are_the_formula_from_before(resort):
+    go(resort, Fake(resort))
+    r = resort
+    groom = sorted(os.path.basename(p) for p in B.glob.glob(os.path.join(r.raw, "grooming", "*.json")))
+    assert B.build_inputs(r) == B.sha(B.file_sha(r.cfg_path), B.manifest_items_sha(r), r.state.get("fetch"),
+                                      r.state.get("landfire"), groom, B.pipeline_code(), r.out)

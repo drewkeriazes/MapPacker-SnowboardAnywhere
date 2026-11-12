@@ -14,6 +14,12 @@ lidar returns) switches from one side to the other along a ragged line through i
 height shift; without it the build takes the median step between the ground there and the patch over the band's
 outer half, so the patch's rim meets the ground and its own relief is kept whole.
 
+FEAT-268: a move with `"source": "<slug>"` cuts its area out of another place's raw data: that slug's config
+(`resorts/<slug>/<slug>.json`, marked `"source_only": true`: fetched, never built or published) and its raw folder
+`<raw root>/<slug>/`. Its `from` box is in that config's utm_bbox, not this one's; same CRS. Ohio Hills pastes Mad
+River Mountain (200 km away) next to Boston Mills this way. Every new path is taken only by a sourced move, so a
+config without one builds as before.
+
 `pack_bbox` (UTM) is the box the pack is built on; `utm_bbox` stays the box the raw data was fetched for (DEM
 chunks, NAIP crops, EPT nodes, the far tree ring), so moving an area needs no new download as long as the pack box
 and every source box are inside it. `python pipeline/relocate.py <slug>` prints the moves and the pack box: the runs
@@ -60,6 +66,8 @@ class Move:
         if not 0 < self.feather * 2 < min(x1 - x0, y1 - y0):
             raise ValueError(f"relocate {self.name}: feather_m {self.feather} does not fit in the from box")
         self.dz = spec.get("dz_m")
+        self.source = spec.get("source")      # FEAT-268: another place's slug, or None for this config's own data
+        self.frame = None                     # that place's utm_bbox (Relocation(cfg, sources))
         self.c = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
         t = math.radians(self.turn)
         self.cos, self.sin = math.cos(t), math.sin(t)
@@ -98,8 +106,11 @@ class Move:
         return (az_deg + self.turn) % 360.0
 
     def record(self):
-        return {"name": self.name, "from": self.src, "to": list(self.to), "turnDeg": self.turn,
-                "featherM": self.feather, "dzM": None if self.dz is None else round(float(self.dz), 2)}
+        r = {"name": self.name, "from": self.src, "to": list(self.to), "turnDeg": self.turn,
+             "featherM": self.feather, "dzM": None if self.dz is None else round(float(self.dz), 2)}
+        if self.source:
+            r["source"] = self.source
+        return r
 
 
 def _hash01(ix, iy):
@@ -119,12 +130,32 @@ def value_noise(x, y, cell=NOISE_CELL_M):
 
 
 class Relocation:
-    """the config's moves; falsy when there are none"""
+    """the config's moves; falsy when there are none. `sources` (FEAT-268): {slug: utm_bbox} of the places sourced
+    moves cut from; given, every sourced move must name one of them"""
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, sources=None):
         self.moves = [Move(s) for s in cfg.get("relocate") or []]
         if len({m.name for m in self.moves}) != len(self.moves):
             raise ValueError("relocate: two moves share a name")
+        for m in self.moves:
+            if m.source and sources is not None:
+                if m.source not in sources:
+                    raise ValueError(f"relocate {m.name}: source {m.source} has no config")
+                m.frame = [float(v) for v in sources[m.source]]
+        self.sourced = [k for k, m in enumerate(self.moves) if m.source]
+
+    def source_slugs(self):
+        """the places sourced moves cut from, each once, in order"""
+        return list(dict.fromkeys(m.source for m in self.moves if m.source))
+
+    def in_frame(self, sel):
+        """`sel` (select()) with the sourced moves' patches as -1: for a layer whose sourced patches are already
+        pasted into it (LANDFIRE), so those cells read where they are"""
+        if not self.sourced:
+            return sel
+        sel = np.array(sel, copy=True)
+        sel[np.isin(sel, self.sourced)] = -1
+        return sel
 
     def __bool__(self):
         return bool(self.moves)
@@ -167,35 +198,59 @@ class Relocation:
         if not within(box, frame):
             out.append(f"pack_bbox {box} is not inside utm_bbox {frame} (the raw data covers utm_bbox only)")
         for m in self.moves:
-            if not within(m.src, frame):
+            if m.source:     # FEAT-268: cut from the source's own fetched box
+                if m.frame is None:
+                    out.append(f"relocate {m.name}: source {m.source}'s utm_bbox is not known")
+                elif not within(m.src, m.frame):
+                    out.append(f"relocate {m.name}: from box {m.src} is not inside {m.source}'s utm_bbox {m.frame}")
+            elif not within(m.src, frame):
                 out.append(f"relocate {m.name}: from box {m.src} is not inside utm_bbox {frame}")
             d = [round(v) for v in m.dest_box()]
             if not within(d, box):
                 out.append(f"relocate {m.name}: the pasted patch {d} is not inside the pack box {box}")
+        out += self.overlaps()
+        return out
+
+    def overlaps(self, step=10.0):
+        """FEAT-268: two pasted patches, seams included, on the same ground (checked on a `step` m lattice)"""
+        out = []
+        for i, a in enumerate(self.moves):
+            for b in self.moves[i + 1:]:
+                da, db = a.dest_box(), b.dest_box()
+                x0, y0 = max(da[0], db[0]), max(da[1], db[1]); x1, y1 = min(da[2], db[2]), min(da[3], db[3])
+                if x1 <= x0 or y1 <= y0:
+                    continue
+                X, Y = np.meshgrid(np.arange(x0 + step / 2, x1, step), np.arange(y0 + step / 2, y1, step))
+                if ((a.weight(X, Y) > 0) & (b.weight(X, Y) > 0)).any():
+                    out.append(f"relocate {a.name} and {b.name}: the pasted patches overlap")
         return out
 
     # ------------------------------------------------------------------------------------ OSM
-    def _labels(self, xs, ys):
-        """per source point: move index when it rides along with a patch, -1 to stay, -2 when a patch covers it"""
+    def _labels(self, xs, ys, source=None):
+        """per source point: move index when it rides along with a patch, -1 to stay, -2 when a patch covers it.
+        `source`: the points are from that place's doc (FEAT-268), so only its moves take them and nothing covers"""
         xs = np.asarray(xs, np.float64); ys = np.asarray(ys, np.float64)
         lab = np.full(xs.shape, -1, np.int16)
         for k, m in enumerate(self.moves):
-            lab[(lab == -1) & (m.weight_src(xs, ys) > 0.5)] = k
+            if m.source == source:
+                lab[(lab == -1) & (m.weight_src(xs, ys) > 0.5)] = k
         stay = lab == -1
-        if stay.any():
+        if stay.any() and source is None:
             for m in self.moves:
                 cover = stay & (m.weight(xs, ys) > 0.5)
                 lab[cover] = -2
                 stay &= ~cover
         return lab
 
-    def osm(self, doc, to_utm, to_ll, whole=False):
+    def osm(self, doc, to_utm, to_ll, whole=False, source=None):
         """an Overpass JSON doc with every element inside a source box moved with it (lon/lat rewritten) and the
         ground a patch covers cleared. Ways that cross a seam are split there (roads, streams); closed ways
         (buildings, water) and, with `whole`, every way (runs and lifts, whose nodes list must stay whole) go
-        where most of their points are. Returns (doc, {move name: elements moved})."""
+        where most of their points are. With `source` (FEAT-268) the doc is that place's: only what its moves take
+        is kept (moved), the rest of it stays out. Returns (doc, {move name: elements moved})."""
         if not self.moves:
             return doc, {}
+        keep_stay = source is None
         moved = {m.name: 0 for m in self.moves}
         out = []
 
@@ -219,8 +274,8 @@ class Relocation:
             t = el.get("type")
             if t == "node" and "lat" in el:
                 xs, ys = geo([el])
-                k = int(self._labels(xs, ys)[0])
-                if k == -2:
+                k = int(self._labels(xs, ys, source)[0])
+                if k == -2 or (k == -1 and not keep_stay):
                     continue
                 if k >= 0:
                     p = put([{"lon": el["lon"], "lat": el["lat"]}], xs, ys, k)[0]
@@ -230,11 +285,11 @@ class Relocation:
             elif t == "way" and el.get("geometry"):
                 g = el["geometry"]
                 xs, ys = geo(g)
-                lab = self._labels(xs, ys)
+                lab = self._labels(xs, ys, source)
                 closed = len(g) > 3 and g[0] == g[-1]
                 if whole or closed or (lab == lab[0]).all():
                     k = majority(lab)
-                    if k == -2:
+                    if k == -2 or (k == -1 and not keep_stay):
                         continue
                     e = {k_: v for k_, v in el.items() if k_ != "bounds"}
                     e["geometry"] = put(g, xs, ys, k)
@@ -250,7 +305,7 @@ class Relocation:
                     while j + 1 < len(g) and lab[j + 1] == lab[i]:
                         j += 1
                     k = int(lab[i])
-                    if k != -2 and j > i:
+                    if k != -2 and (k >= 0 or keep_stay) and j > i:
                         e = {k_: v for k_, v in el.items() if k_ not in ("bounds", "geometry", "nodes")}
                         e["geometry"] = put(g[i:j + 1], xs[i:j + 1], ys[i:j + 1], k)
                         if nodes and len(nodes) == len(g):
@@ -262,11 +317,13 @@ class Relocation:
             elif t == "relation" and el.get("members"):
                 mem = [mm for mm in el["members"] if mm.get("geometry")]
                 if not mem:
-                    out.append(el); continue
+                    if keep_stay:
+                        out.append(el)
+                    continue
                 allg = [p for mm in mem for p in mm["geometry"]]
                 xs, ys = geo(allg)
-                k = majority(self._labels(xs, ys))
-                if k == -2:
+                k = majority(self._labels(xs, ys, source))
+                if k == -2 or (k == -1 and not keep_stay):
                     continue
                 if k >= 0:
                     members = []
@@ -279,7 +336,7 @@ class Relocation:
                     el["members"] = members
                     moved[self.moves[k].name] += 1
                 out.append(el)
-            else:
+            elif keep_stay:
                 out.append(el)
         return {**doc, "elements": out}, moved
 
@@ -328,41 +385,68 @@ def _windows(rel, box, res):
         yield k, slice(r0, r1), slice(c0, c1), X, Y
 
 
-def rim_dz(dem, frame, res, move):
+def rim_dz(dem, frame, res, move, src=None):
     """the height shift that sets a patch on the ground there: the median step between the ground and the patch
-    over the outer half of the seam (relief inside the patch is kept whole)"""
+    over the outer half of the seam (relief inside the patch is kept whole). `src`: (grid, frame) the patch is cut
+    from when it is not `dem` (a sourced move, FEAT-268); the ground there is always `dem`"""
     if move.dz is not None:
         return float(move.dz)
+    sg, sf = src or (dem, frame)
     d = move.dest_box()
     X, Y = np.meshgrid(np.arange(d[0] + res / 2, d[2], res), np.arange(d[3] - res / 2, d[1], -res))
     w = move.weight(X, Y)
     band = (w > 0) & (w < 0.5)
     sx, sy = move.src_of(X[band], Y[band])
-    return float(np.median(sample(dem, frame, res, X[band], Y[band], 1) - sample(dem, frame, res, sx, sy, 1)))
+    return float(np.median(sample(dem, frame, res, X[band], Y[band], 1) - sample(sg, sf, res, sx, sy, 1)))
 
 
-def compose_heights(dem, frame, res, box, rel, dzs):
-    """the pack's heights: the ground in the pack box, each patch pasted with its shift, eased in over the seam"""
+def compose_heights(dem, frame, res, box, rel, dzs, srcs=None):
+    """the pack's heights: the ground in the pack box, each patch pasted with its shift, eased in over the seam.
+    `srcs`: {move index: (grid, frame)} for patches cut from another place's DEM (FEAT-268)"""
     out = np.array(crop(dem, frame, res, box), dtype=dem.dtype)
     for k, rs, cs, X, Y in _windows(rel, box, res):
         m = rel.moves[k]
+        sg, sf = (srcs or {}).get(k, (dem, frame))
         w = m.weight(X, Y); on = w > 0
         sx, sy = m.src_of(X[on], Y[on])
         win = out[rs, cs]
-        win[on] = (w[on] * (sample(dem, frame, res, sx, sy, 1) + dzs[k]) + (1 - w[on]) * win[on]).astype(dem.dtype)
+        win[on] = (w[on] * (sample(sg, sf, res, sx, sy, 1) + dzs[k]) + (1 - w[on]) * win[on]).astype(dem.dtype)
     return out
 
 
-def compose_classes(src, frame, res, box, rel):
-    """a class or imagery grid (leading axes are bands) for the pack: each cell from its source, nearest cell"""
+def compose_classes(src, frame, res, box, rel, srcs=None, moves=None):
+    """a class or imagery grid (leading axes are bands) for the pack: each cell from its source, nearest cell.
+    `srcs`: {move index: (grid, frame[, res])} for patches cut from another place's grid (FEAT-268); `moves`: paste
+    only these patches (the rest of the box is `src` as it is)"""
     out = np.array(crop(src, frame, res, box))
     for k, rs, cs, X, Y in _windows(rel, box, res):
+        if moves is not None and k not in moves:
+            continue
         on = rel.select(X, Y) == k
         if not on.any():
             continue
+        s = (srcs or {}).get(k)
+        sg, sf, sr = (src, frame, res) if s is None else (s[0], s[1], s[2] if len(s) > 2 else res)
         sx, sy = rel.moves[k].src_of(X[on], Y[on])
         win = out[..., rs, cs]
-        win[..., on] = sample(src, frame, res, sx, sy, 0)
+        win[..., on] = sample(sg, sf, sr, sx, sy, 0)
+    return out
+
+
+def merge_class_tables(main, other, key="VALUE", name="EVT_NAME"):
+    """FEAT-268: two LANDFIRE class tables (.vat.dbf rows) as one, so a patch's classes keep their names in the
+    pack's raster; a value named differently in the two is two LANDFIRE versions, refused"""
+    by = {str(r.get(key)).strip(): r for r in main}
+    out = list(main)
+    for r in other:
+        v = str(r.get(key)).strip()
+        if v in by:
+            if (by[v].get(name) or "").strip() != (r.get(name) or "").strip():
+                raise ValueError(f"LANDFIRE class {v} is {by[v].get(name)!r} here and {r.get(name)!r} in the source "
+                                 "(two LANDFIRE versions)")
+            continue
+        by[v] = r
+        out.append(r)
     return out
 
 
@@ -416,6 +500,27 @@ def grow_to_patches(box, rel):
     return box
 
 
+def source_configs(cfg, resorts=None):
+    """FEAT-268: {slug: config} of the places the config's sourced moves cut from, each a source-only config in the
+    same CRS"""
+    import paths
+    out = {}
+    for spec in cfg.get("relocate") or []:
+        s = spec.get("source")
+        if not s or s in out:
+            continue
+        p = paths.config_path(s, resorts) if resorts else paths.config_path(s)
+        if not os.path.isfile(p):
+            raise ValueError(f"relocate {spec.get('name')}: no config for source {s} ({p})")
+        with open(p, encoding="utf-8") as f:
+            c = json.load(f)
+        if c.get("crs") != cfg.get("crs"):
+            raise ValueError(f"relocate {spec.get('name')}: source {s} is in {c.get('crs')}, this config in "
+                             f"{cfg.get('crs')}")
+        out[s] = c
+    return out
+
+
 # ------------------------------------------------------------------------------------------------ CLI
 
 def main(argv):
@@ -429,13 +534,20 @@ def main(argv):
     a = ap.parse_args(argv)
     cfg_p = paths.config_path(a.slug)
     cfg = json.load(open(cfg_p, encoding="utf-8"))
-    raw = a.raw or os.path.join(paths.raw_root(), a.slug)
-    rel = Relocation(cfg)
+    raw = a.raw or os.path.join(paths.raw_root(), cfg.get("raw_from") or a.slug)
+    srcs = source_configs(cfg)
+    rel = Relocation(cfg, {s: c["utm_bbox"] for s, c in srcs.items()})
     to_utm = Transformer.from_crs("EPSG:4326", cfg["crs"], always_xy=True)
     to_ll = Transformer.from_crs(cfg["crs"], "EPSG:4326", always_xy=True)
     ski = json.load(open(os.path.join(raw, "osm", "ski.json"), encoding="utf-8"))
     ski, _ = osm_filter.filter_ski(ski, osm_filter.exclude_areas(cfg.get("exclude"), ski))
     ski, moved = rel.osm(ski, to_utm, to_ll, whole=True)
+    for s, sc in srcs.items():      # FEAT-268: a sourced move's runs and lifts come from its own raw folder
+        sski = json.load(open(os.path.join(paths.raw_root(), s, "osm", "ski.json"), encoding="utf-8"))
+        sski, _ = osm_filter.filter_ski(sski, osm_filter.exclude_areas(sc.get("exclude"), sski))
+        sski, smoved = rel.osm(sski, to_utm, to_ll, whole=True, source=s)
+        ski = {**ski, "elements": ski["elements"] + sski["elements"]}
+        moved = {k: moved.get(k, 0) + smoved.get(k, 0) for k in set(moved) | set(smoved)}
     for m in rel.moves:
         print(f"{m.name}: from {m.src} to {m.to}, turned {m.turn:+.0f} deg, seam {m.feather:.0f} m; "
               f"{moved.get(m.name, 0)} ski elements move")
