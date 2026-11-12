@@ -132,7 +132,7 @@
     "Mad River Mountain elevation: USGS 3DEP 1 m lidar DEM (OH_Statewide_Phase3_2021_B21), public domain",
     "Mad River Mountain canopy: USGS 3DEP lidar point cloud OH_StatewideP3_4_B21 via AWS usgs-lidar-public, public domain"
   ],
-  "start_run": null,
+  "start_run": "Outer Limits",
   "osm": {
     "geofabrik": "us/ohio",
     "pbf": "https://download.geofabrik.de/north-america/us/ohio-latest.osm.pbf"

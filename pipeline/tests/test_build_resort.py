@@ -351,7 +351,7 @@ def test_raw_from_builds_on_the_other_resorts_data_with_its_own_state(resort):
     f = Fake(mash)
     lines = go(mash, f)
     assert f.calls == ["build_pack.py", "pack_report.py"]
-    assert any("the raw data is demo's" in s for s in lines if s.startswith("[fetch]"))
+    assert any("the raw data is from demo" in s for s in lines if s.startswith("[fetch]"))
     assert os.path.isfile(mash.state_path) and open(resort.state_path).read() == before
     assert any(s.startswith("[fetch] skip") for s in lines)
     f2 = Fake(mash)

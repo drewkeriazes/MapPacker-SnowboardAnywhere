@@ -451,7 +451,7 @@ SOURCE_WHY = "source only (a relocate source for another pack, not a pack)"
 
 
 def raw_from_why(r):
-    return f"the raw data is {r.data}'s (python pipeline/build_resort.py {r.data} fetches it)"
+    return f"the raw data is from {r.data} (python pipeline/build_resort.py {r.data} fetches it)"
 
 
 def decide(r, stage, ctx):
