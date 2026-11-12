@@ -259,7 +259,8 @@ def check_raw(r):
     if (r.cfg.get("lidar") or {}).get("far"):
         need["far ring lidar (ept_far)"] = ("ept_far", None)
     import placenames
-    if placenames.states_of(r.cfg):           # FEAT-235: GNIS summits and Census towns (US only)
+    if placenames.states_of(r.cfg) and not r.cfg.get("source_only"):   # FEAT-235: GNIS and Census towns (US only;
+        # FEAT-268: a relocate source's names are never read)
         need["place names (GNIS)"] = ("names", None)
     for name, (d, f) in need.items():
         p = os.path.join(r.raw, d)

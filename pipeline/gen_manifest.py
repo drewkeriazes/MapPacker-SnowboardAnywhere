@@ -157,8 +157,9 @@ def manifest_items(cfg, resorts_dir=None):
     # ---------------------------------------------------------------- place names (FEAT-235)
     # GNIS domestic names for each state the far ring touches (summits), the Census Gazetteer and population
     # estimates (towns): plain files on S3 and www2.census.gov. None outside the US.
+    # FEAT-268: not for a relocate source (source_only): the pack's names are its own surroundings'
     import placenames
-    for it in placenames.manifest_items(cfg):
+    for it in ([] if cfg.get("source_only") else placenames.manifest_items(cfg)):
         add(it["url"], it["path"])
 
     # ---------------------------------------------------------------- land cover for the far terrain (DATA-019)
