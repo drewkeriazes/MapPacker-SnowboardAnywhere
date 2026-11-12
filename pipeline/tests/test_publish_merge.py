@@ -189,7 +189,7 @@ class FakeGitHub:
                        {"name": "pipeline-tests", "status": "completed", "conclusion": "skipped", "details_url": ""}],
             "catalogs": {"b0": {"resorts": []}, "h1": {"resorts": [entry("a", 1)]}, "m1": {"resorts": [entry("a", 1)]}},
             "release_draft": release_draft, "comments": [], "open_prs": [], "run_actor": "drewkeriazes",
-            "fail": [], "merge_says_moved": False, "closed_prs": [],
+            "fail": [], "merge_says_moved": False, "closed_prs": [], "open_list": [], "others": {},
         }
         self.state.update(over)
         self.calls = Calls()
@@ -201,6 +201,8 @@ class FakeGitHub:
             raise SystemExit("GraphQL: Head branch was modified. Review and try the merge again.")
         if any(cmd[:len(f)] == f for f in s["fail"]):
             raise SystemExit(f"{' '.join(cmd)} failed")
+        if cmd[:4] == ["gh", "api", "-X", "DELETE"]:
+            return ""
         if cmd[:2] == ["gh", "api"]:
             return self.api(cmd[2])
         if cmd[:3] == ["gh", "release", "view"]:
@@ -218,6 +220,8 @@ class FakeGitHub:
         path = path[len(base):]
         if path == "pulls/7":
             return json.dumps(s["pr"])
+        if path.startswith("pulls/") and path[6:].isdigit() and int(path[6:]) in s["others"]:
+            return json.dumps(s["others"][int(path[6:])])
         if path == "pulls/7/files":
             return json.dumps(s["files"])
         if path == "activity?ref=refs/heads/publish/a-v1&per_page=100":
@@ -236,6 +240,8 @@ class FakeGitHub:
             return s["run_actor"]
         if path.startswith("pulls?state=closed"):
             return json.dumps(s["closed_prs"])
+        if path.startswith("pulls?state=open&base=main"):          # advance_open's listing
+            return json.dumps(s["open_list"])
         if path.startswith("pulls?state=open"):
             return json.dumps(s["open_prs"])
         raise AssertionError(f"unexpected api path {path}")
@@ -564,3 +570,126 @@ def test_sweep_leaves_a_merged_fork_or_non_main_pr_alone(monkeypatch, pr, base):
     calls.state["pr"]["base"]["ref"] = base
     publish_merge.sweep(REPO)
     assert not released(calls)
+
+
+# --- every run also advances the other open publish PRs (advance_open) ---------------------------------------------
+
+def listed_pr(n, ref="publish/a-v1", labels=("publish", "automerge"), repo=REPO, base="main"):
+    """a PR as GET pulls?state=open lists it"""
+    return {"number": n, "head": {"ref": ref, "repo": {"full_name": repo}}, "base": {"ref": base},
+            "labels": [{"name": x} for x in labels]}
+
+
+def deleted_branches(calls):
+    return [c for c in calls if c[:4] == ["gh", "api", "-X", "DELETE"]]
+
+
+def test_a_run_for_pr_a_also_releases_and_merges_pr_b(monkeypatch):
+    # A (#6) merged; its `closed` run is the only run left in the queue (B's `ready` was dropped). B (#7) is green.
+    a = {"number": 6, "state": "closed", "merged": True, "merge_commit_sha": "m1", "labels": [{"name": "publish"}],
+         "base": {"ref": "main"}, "head": {"ref": "publish/c-v1", "sha": "c1", "repo": {"full_name": REPO}}}
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, others={6: a}, open_list=[listed_pr(7)])
+    calls.state["catalogs"]["m1"] = {"resorts": [entry("a", 1), entry("c", 1)]}
+    assert publish_merge.main(["closed", "6"]) == 0
+    assert ["gh", "release", "edit", "c-v1", "--draft=false"] in calls          # A's own job
+    assert ["gh", "release", "edit", "a-v1", "--draft=false"] in calls          # B, advanced
+    assert merged(calls) == [["gh", "pr", "merge", "7", "--squash", "--match-head-commit", "h1"]]
+
+
+def test_a_run_for_pr_a_refreshes_pr_b_left_behind_main(monkeypatch):
+    a = {"number": 6, "state": "closed", "merged": True, "merge_commit_sha": "m1", "labels": [{"name": "publish"}],
+         "base": {"ref": "main"}, "head": {"ref": "publish/c-v1", "sha": "c1", "repo": {"full_name": REPO}}}
+    calls = fake_gh(monkeypatch, pr={}, release_draft=False, others={6: a}, open_list=[listed_pr(7)],
+                    compare={"behind_by": 1, "base": "b0"})
+    seen = []
+    monkeypatch.setattr(publish_merge, "refresh", lambda repo, branch, sha, app: seen.append(branch) or "refreshed")
+    assert publish_merge.main(["closed", "6"]) == 0
+    assert seen == ["publish/a-v1"] and not merged(calls)
+
+
+def test_the_schedule_with_no_pr_advances_the_open_publish_prs(monkeypatch):
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, open_list=[listed_pr(7)])
+    assert publish_merge.main(["sweep"]) == 0
+    assert any(len(c) > 2 and "pulls?state=closed" in c[2] for c in calls), "the merged-draft sweep runs too"
+    assert merged(calls) == [["gh", "pr", "merge", "7", "--squash", "--match-head-commit", "h1"]]
+
+
+def test_the_schedule_with_nothing_open_does_nothing(monkeypatch):
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True)
+    assert publish_merge.main(["sweep"]) == 0
+    assert not released(calls) and not merged(calls) and not comments(calls)
+
+
+def test_sweep_takes_no_pr_and_the_others_need_one(monkeypatch):
+    fake_gh(monkeypatch, pr={}, release_draft=True)
+    for argv in (["sweep", "7"], ["ready"], ["closed"]):
+        with pytest.raises(SystemExit):
+            publish_merge.main(argv)
+
+
+def test_advance_picks_only_open_same_repo_main_automerge_publish_prs_and_skips_this_runs(monkeypatch):
+    seen = []
+    fake_gh(monkeypatch, pr={}, release_draft=True, open_list=[
+        listed_pr(7), listed_pr(8, ref="feature/x"), listed_pr(9, labels=("publish",)),
+        listed_pr(10, repo="x/fork"), listed_pr(11, base="dev"), listed_pr(12, ref="publish/b-v2"), listed_pr(13)])
+    monkeypatch.setattr(publish_merge, "ready", lambda n, repo, app, sweep_closed=True: seen.append((n, sweep_closed)))
+    publish_merge.advance_open(REPO, APP, skip=13)
+    assert seen == [(7, False), (12, False)]
+
+
+def test_advance_reads_one_page_and_a_failure_in_one_pr_does_not_stop_the_next(monkeypatch):
+    seen = []
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, open_list=[listed_pr(n) for n in range(1, 30)])
+
+    def ready(n, repo, app, sweep_closed=True):
+        seen.append(n)
+        raise SystemExit("gh failed") if n == 1 else RuntimeError("odd data") if n == 2 else None
+    monkeypatch.setattr(publish_merge, "ready", ready)
+    publish_merge.advance_open(REPO, APP)
+    assert seen == list(range(1, 21))
+    listing = [c for c in calls if len(c) > 2 and "pulls?state=open&base=main" in c[2]]
+    assert len(listing) == 1 and "--paginate" not in listing[0] and "per_page=20" in listing[0][2]
+
+
+def test_advance_never_changes_the_runs_own_exit_code(monkeypatch):
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, fail=[["gh", "release", "edit"]],
+                    open_list=[listed_pr(8)])
+    assert publish_merge.main(["ready", "7"]) == 1           # its own release edit failed
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True,
+                    fail=[["gh", "api", f"repos/{REPO}/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20"]])
+    assert publish_merge.main(["ready", "7"]) == 0 and merged(calls)   # the listing failed: still 0
+    calls = fake_gh(monkeypatch, pr={}, release_draft=True, open_list=[listed_pr(8)])
+    monkeypatch.setattr(publish_merge, "ready", lambda *a, **k: (_ for _ in ()).throw(SystemExit("boom")))
+    assert publish_merge.main(["closed", "7"]) == 0        # #8 blew up in advance; closed's own result stands
+
+
+# --- a closed, unmerged publish PR also loses its branch ------------------------------------------------------------
+
+def test_closed_unmerged_deletes_the_branch_after_the_draft(monkeypatch):
+    calls = fake_gh(monkeypatch, pr={"merged": False}, release_draft=True)
+    assert publish_merge.main(["closed", "7"]) == 0
+    dele = ["gh", "api", "-X", "DELETE", f"repos/{REPO}/git/refs/heads/publish/a-v1"]
+    assert dele in calls
+    assert calls.index(dele) > next(i for i, c in enumerate(calls) if c[:3] == ["gh", "release", "delete"])
+    calls = fake_gh(monkeypatch, pr={"merged": False}, release_draft=False)   # a rollback's: no draft, still goes
+    publish_merge.main(["closed", "7"])
+    assert deleted_branches(calls) == [dele]
+
+
+@pytest.mark.parametrize("pr, over", [
+    ({"merged": True}, {}),                                   # merged: GitHub deletes it (delete_branch_on_merge)
+    ({"fork": True}, {}),
+    ({"headRefName": "feature/x"}, {}),
+    ({}, {"open_prs": [{"number": 8}]}),                      # another open PR uses the branch
+    ({}, {"fail": [["gh", "api", f"repos/{REPO}/pulls?state=open&head=o:publish/a-v1"]]}),
+])
+def test_the_branch_is_deleted_only_for_an_unmerged_same_repo_publish_pr(monkeypatch, pr, over):
+    calls = fake_gh(monkeypatch, pr=pr, release_draft=True, **over)
+    publish_merge.closed(7, REPO)
+    assert not deleted_branches(calls)
+
+
+def test_a_failed_branch_delete_only_warns(monkeypatch, capsys):
+    fake_gh(monkeypatch, pr={"merged": False}, release_draft=True, fail=[["gh", "api", "-X", "DELETE"]])
+    assert publish_merge.closed(7, REPO) == 0
+    assert "could not delete the branch publish/a-v1" in capsys.readouterr().out

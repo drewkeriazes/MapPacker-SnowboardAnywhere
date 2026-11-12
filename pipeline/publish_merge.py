@@ -3,6 +3,11 @@
     python pipeline/publish_merge.py ready <pr>     refresh onto main, release the draft then merge, wait, or refuse
     python pipeline/publish_merge.py pure <pr>      print true when it is a publish PR changing only the publish file set
     python pipeline/publish_merge.py closed <pr>    merged: publish a draft still unpublished; unmerged: delete it
+                                                    and the publish/ branch
+    python pipeline/publish_merge.py sweep          the schedule and a manual run: no PR of its own
+
+Every run then does `ready` for each open `publish/` PR labelled `automerge` (advance_open), so a PR whose own run
+was dropped from the queue, or that waited on the activity log or a check still running, is picked up again.
 
 `ready` merges only a `publish/<slug>-v<N>` PR from this repo (not a fork) into main, labelled `publish` and
 `automerge`, whose latest `automerge` label came from a maintainer (.github/maintainers.txt, main's copy) or from
@@ -256,7 +261,7 @@ def assess(n: int, repo: str, pr: dict, app_login: str) -> tuple[str, dict]:
             who = ((ev or {}).get("actor") or {}).get("login")
             return f"{UNTRUSTED}: added by {who}, not a maintainer (nor by the App on a maintainer's run)", {}
         if not activity_complete(activity, ev["created_at"], sha):
-            print(f"the activity log of {branch} does not reach {sha[:7]} or back to the label yet")
+            print(f"the activity log of {branch} does not reach {sha[:7]} or back to the label yet: next run")
             return "wait", {}
         if not pushes_after_label_ok(activity, ev["created_at"], app_login):
             return f"{UNTRUSTED}: someone other than the App pushed to {branch} after it", {}
@@ -374,14 +379,15 @@ def sweep(repo: str, skip: int | None = None) -> None:
             print(f"sweep: #{p.get('number')}: {e}")
 
 
-def ready(n: int, repo: str, app_login: str) -> int:
+def ready(n: int, repo: str, app_login: str, sweep_closed: bool = True) -> int:
     pr = api(f"repos/{repo}/pulls/{n}")
     labels = [lb["name"] for lb in pr.get("labels", [])]
     if not parse_branch(pr["head"]["ref"]) and "publish" not in labels:
         return print(f"#{n} is not a publish PR") or 0
     if pr.get("state") != "open":
         return print(f"#{n} is {pr.get('state')}") or 0
-    sweep(repo, skip=n)
+    if sweep_closed:
+        sweep(repo, skip=n)
     try:
         decision, facts = assess(n, repo, pr, app_login)
     except (Exception, SystemExit) as e:
@@ -403,31 +409,80 @@ def ready(n: int, repo: str, app_login: str) -> int:
     return 0
 
 
+def delete_branch(repo: str, branch: str) -> None:
+    """delete the remote publish/ branch of a closed, unmerged PR, so the next publish of the slug can push it again
+    (deleting the draft frees its version number); only warns on failure"""
+    if not parse_branch(branch):
+        return print(f"not deleting {branch}: not a publish branch") or None
+    try:
+        gh("api", "-X", "DELETE", f"repos/{repo}/git/refs/heads/{branch}")
+        print(f"deleted the branch {branch}")
+    except SystemExit as e:
+        print(f"warning: could not delete the branch {branch}: {e}")
+
+
 def closed(n: int, repo: str) -> int:
     pr = api(f"repos/{repo}/pulls/{n}")
     parsed = parse_branch(pr["head"]["ref"])
-    if not parsed or (pr["head"].get("repo") or {}).get("full_name", "").lower() != repo.lower() \
-            or pr["base"]["ref"] != "main":
+    same_repo = (pr["head"].get("repo") or {}).get("full_name", "").lower() == repo.lower()
+    if not parsed or not same_repo or pr["base"]["ref"] != "main":
         return print(f"#{n} is not a publish PR of this repo") or 0
-    tag = f"{parsed[0]}-v{parsed[1]}"
-    draft = release_draft(tag)
-    if not draft:
-        return print(f"{tag}: {'no draft release' if draft is False else 'release not readable'}") or 0
-    try:
-        if pr.get("merged"):
+    tag, branch = f"{parsed[0]}-v{parsed[1]}", pr["head"]["ref"]
+    if pr.get("merged"):
+        draft = release_draft(tag)
+        if not draft:
+            return print(f"{tag}: {'no draft release' if draft is False else 'release not readable'}") or 0
+        try:
             cat = catalog_at(repo, pr["merge_commit_sha"])
             if not any(e.get("slug") == parsed[0] and (e.get("pack") or {}).get("version") == parsed[1]
                        for e in all_entries(cat)):
                 return print(f"main's catalog does not name {tag}: leaving the draft") or 1
             gh("release", "edit", tag, "--draft=false")
-        else:
-            owner = repo.split("/")[0]
-            if api_pages(f"repos/{repo}/pulls?state=open&head={owner}:{pr['head']['ref']}"):
-                return print(f"another open PR uses {pr['head']['ref']}: keeping {tag}") or 0
-            gh("release", "delete", tag, "--yes")
+        except SystemExit as e:
+            return print(f"{tag}: {e}") or 1
+        return 0
+    owner = repo.split("/")[0]
+    try:
+        if api_pages(f"repos/{repo}/pulls?state=open&head={owner}:{branch}"):
+            return print(f"another open PR uses {branch}: keeping {tag} and the branch") or 0
     except SystemExit as e:
-        return print(f"{tag}: {e}") or 1
-    return 0
+        return print(f"{tag}: can't tell whether another open PR uses {branch}, keeping both: {e}") or 1
+    rc, draft = 0, release_draft(tag)
+    if draft:
+        try:
+            gh("release", "delete", tag, "--yes")
+        except SystemExit as e:
+            rc = print(f"{tag}: {e}") or 1
+    else:
+        print(f"{tag}: {'no draft release' if draft is False else 'release not readable'}")
+    delete_branch(repo, branch)
+    return rc
+
+
+ADVANCE = 20   # how many open publish PRs each run looks at (one page, most recently updated first)
+
+
+def advance_open(repo: str, app_login: str, skip: int | None = None) -> None:
+    """`ready` for each open, same-repo, base-main publish/ PR labelled `automerge`, other than `skip` (the one this
+    run already handled): GitHub keeps one pending run per concurrency group, so a PR's own run can be dropped, and a
+    `wait` (activity log behind, a check still running) has no event of its own to come back on. One page of
+    ADVANCE; each PR in its own try (a failure is printed and the next one runs); never raises."""
+    try:
+        listed = api(f"repos/{repo}/pulls?state=open&base=main&sort=updated&direction=desc&per_page={ADVANCE}")
+    except (Exception, SystemExit) as e:
+        return print(f"advance: could not list open PRs: {e}") or None
+    for p in listed[:ADVANCE]:
+        try:
+            n, head = p.get("number"), p.get("head") or {}
+            same_repo = (head.get("repo") or {}).get("full_name", "").lower() == repo.lower()
+            labels = [lb.get("name") for lb in p.get("labels") or []]
+            if n == skip or not parse_branch(head.get("ref", "")) or not same_repo \
+                    or (p.get("base") or {}).get("ref") != "main" or "automerge" not in labels:
+                continue
+            print(f"advance: #{n}")
+            ready(n, repo, app_login, sweep_closed=False)
+        except (Exception, SystemExit) as e:
+            print(f"advance: #{p.get('number') if isinstance(p, dict) else p}: {e}")
 
 
 def pure(n: int, repo: str) -> bool:
@@ -451,16 +506,29 @@ def pure(n: int, repo: str) -> bool:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("action", choices=["ready", "closed", "pure"])
-    ap.add_argument("pr", type=int)
+    ap.add_argument("action", choices=["ready", "closed", "pure", "sweep"])
+    ap.add_argument("pr", type=int, nargs="?")
     a = ap.parse_args(argv)
+    if (a.pr is None) != (a.action == "sweep"):
+        ap.error("ready, closed and pure take a PR number; sweep takes none")
     repo = os.environ.get("GITHUB_REPOSITORY") or RESORTS_REPO
     if a.action == "pure":
         print("true" if pure(a.pr, repo) else "false")
         return 0
-    if a.action == "closed":
-        return closed(a.pr, repo)
-    return ready(a.pr, repo, os.environ.get("PUBLISH_APP_LOGIN", ""))
+    app_login = os.environ.get("PUBLISH_APP_LOGIN", "")
+    try:              # the run's own PR first; its exit code is the run's
+        if a.action == "closed":
+            rc = closed(a.pr, repo)
+        elif a.action == "ready":
+            rc = ready(a.pr, repo, app_login)
+        else:
+            sweep(repo)
+            rc = 0
+    except (Exception, SystemExit) as e:
+        print(f"#{a.pr}: {e}")
+        rc = 1
+    advance_open(repo, app_login, skip=a.pr)
+    return rc
 
 
 if __name__ == "__main__":

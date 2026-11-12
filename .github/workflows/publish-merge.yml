@@ -3,30 +3,41 @@
 #   ready <pr>   once the Checks have finished (or `automerge` was just added): refresh the branch onto main when
 #                main moved, then release the draft and squash-merge, only for a trusted publish PR; otherwise
 #                wait, or refuse with one comment
-#   closed <pr>  merged: publish a draft still unpublished; closed unmerged: delete the draft
+#   closed <pr>  merged: publish a draft still unpublished; closed unmerged: delete the draft and the branch
+#   sweep        (every 15 minutes, and Run workflow) no PR of its own: publish merged PRs' leftover drafts
+# Every run then does `ready` for each open publish/ PR labelled automerge (up to 20), so a PR is never stranded:
+# GitHub keeps one pending run per concurrency group and drops the older pending one, and a `wait` (the activity
+# log not caught up yet, a check such as `review` still running) has no event of its own to come back on.
 #
 # Security: this runs on workflow_run / pull_request_target, so it holds a write token. It checks out main and
 # nothing else; no step checks out or runs the PR's code. The tool reads the PR through the API only.
 #
 # One-time setup (Drew, by hand): a GitHub App "MapPacker publisher", no webhook, repository permissions
-# Contents: write, Pull requests: write, Issues: read, Actions: read, Metadata: read, installed on this repo only.
+# Contents: write, Pull requests: write, Issues: read, Actions: read, Checks: read, Metadata: read, installed on
+# this repo only. Until the App, both secrets and the variable exist, nothing merges itself (the scheduled run
+# skips quietly; other runs fail on the first step): publish by hand with `gh release edit <tag> --draft=false`
+# first, then merge the PR, never the merge button while the release is still a draft.
 #   secrets   PUBLISH_APP_ID, PUBLISH_APP_KEY (the App's id and a generated private key, PEM)
 #   variable  PUBLISH_APP_LOGIN (the App's bot login, e.g. mappacker-publisher[bot])
 # The refresh commit's author is that login with its noreply address; publish_merge.py looks up the App's user id
 # itself (gh api users/<login>), so there is no PUBLISH_APP_USER_ID.
 # The App does not get the `workflows` permission: when main changed a file under .github/workflows since a PR
 # branched, the refresh push is refused (safely, nothing merges); that PR needs a hand refresh (merge main into the
-# branch locally and push).
-# Remaining risk: a `closed` run for a hand-merged PR is published by the next `ready` run, so it can wait until then.
+# branch locally and push, then remove and re-add the `automerge` label: a push after the label by anyone but the
+# App is refused as untrusted).
+# Remaining risk: a dropped `closed` run for a hand-merged PR is made up by the next run (at most 15 minutes).
 
 name: Publish merge
 
 on:
   workflow_run:
-    workflows: [Checks]
+    workflows: [Checks, Claude PR review]   # the reviewer's `review` check can finish after Checks
     types: [completed]
   pull_request_target:
     types: [labeled, closed]
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -41,9 +52,11 @@ jobs:
       (github.event_name == 'pull_request_target' &&
        startsWith(github.event.pull_request.head.ref, 'publish/') &&
        github.event.pull_request.head.repo.full_name == github.repository &&
-       (github.event.action == 'closed' || github.event.label.name == 'automerge'))
+       (github.event.action == 'closed' || github.event.label.name == 'automerge')) ||
+      (github.event_name == 'schedule' && vars.PUBLISH_APP_LOGIN != '') ||
+      github.event_name == 'workflow_dispatch'
     # Per job, so a run the `if` skips never queues: GitHub keeps one pending run per group and cancels an older
-    # pending one. A dropped `closed` run is made up by the next `ready` run (it sweeps the last merged publish PRs).
+    # pending one. Whatever run is left does every open publish PR too, and the schedule comes back every 15 min.
     concurrency:
       group: publish-merge
       cancel-in-progress: false
@@ -51,7 +64,10 @@ jobs:
     timeout-minutes: 30   # a branch refresh, then the draft zip is waited for
     env:
       PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
-      ACTION: ${{ github.event.action == 'closed' && 'closed' || 'ready' }}
+      # schedule and workflow_dispatch have no PR: `sweep`
+      ACTION: >-
+        ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'sweep' ||
+        github.event.action == 'closed' && 'closed' || 'ready' }}
     steps:
       - name: The App is set up
         env:
@@ -77,6 +93,7 @@ jobs:
           permission-pull-requests: write
           permission-issues: read
           permission-actions: read
+          permission-checks: read
 
       - uses: actions/setup-python@v5
         with:
@@ -97,4 +114,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PUBLISH_APP_LOGIN: ${{ vars.PUBLISH_APP_LOGIN }}
-        run: python pipeline/publish_merge.py "$ACTION" "$PR_NUMBER"
+        run: |
+          if [ "$ACTION" = sweep ]; then
+            python pipeline/publish_merge.py sweep
+          else
+            python pipeline/publish_merge.py "$ACTION" "$PR_NUMBER"
+          fi

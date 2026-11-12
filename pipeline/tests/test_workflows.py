@@ -46,9 +46,27 @@ def test_publish_merge_uses_the_app_token_and_one_at_a_time():
 def test_publish_merge_triggers_and_branch_gate():
     wf = load(".github/workflows/publish-merge.yml")
     on = triggers(wf)
-    assert on["workflow_run"] == {"workflows": ["Checks"], "types": ["completed"]}
+    assert on["workflow_run"] == {"workflows": ["Checks", "Claude PR review"], "types": ["completed"]}
     assert on["pull_request_target"]["types"] == ["labeled", "closed"]
     assert "publish/" in str(wf["jobs"]["publish-merge"]["if"])
+
+
+def test_the_review_workflow_name_is_the_one_publish_merge_waits_on():
+    waits_on = triggers(load(".github/workflows/publish-merge.yml"))["workflow_run"]["workflows"]
+    assert load(".github/workflows/pr-review.yml")["name"] in waits_on
+    assert load(".github/workflows/checks.yml")["name"] == "Checks"
+
+
+def test_publish_merge_also_runs_on_a_schedule_and_by_hand():
+    wf = load(".github/workflows/publish-merge.yml")
+    on, job = triggers(wf), wf["jobs"]["publish-merge"]
+    assert on["schedule"] == [{"cron": "*/15 * * * *"}] and "workflow_dispatch" in on
+    cond = " ".join(str(job["if"]).split())
+    assert "github.event_name == 'schedule' && vars.PUBLISH_APP_LOGIN != ''" in cond   # no App yet: no failing run
+    assert "github.event_name == 'workflow_dispatch'" in cond
+    assert "'sweep'" in job["env"]["ACTION"] and "schedule" in job["env"]["ACTION"]
+    tool = next(s for s in all_steps(wf) if "publish_merge.py" in s.get("run", ""))
+    assert "publish_merge.py sweep" in tool["run"] and 'publish_merge.py "$ACTION" "$PR_NUMBER"' in tool["run"]
 
 
 def test_publish_merge_narrows_the_app_token():
@@ -56,7 +74,7 @@ def test_publish_merge_narrows_the_app_token():
     app = next(s for s in all_steps(wf) if "create-github-app-token" in s.get("uses", ""))
     perms = {k: v for k, v in app["with"].items() if k.startswith("permission-")}
     assert perms == {"permission-contents": "write", "permission-pull-requests": "write",
-                     "permission-issues": "read", "permission-actions": "read"}
+                     "permission-issues": "read", "permission-actions": "read", "permission-checks": "read"}
 
 
 def test_publish_merge_runs_no_pr_code_and_keeps_the_token_for_the_tool():
