@@ -22,13 +22,14 @@ GAME_NAME = "SnowboardAnywhere"
 GAME_REPO_URL = "https://github.com/drewkeriazes/SnowboardAnywhere"
 
 
-def resort_dir(slug, resorts=RESORTS) -> str:
+def resort_dir(slug, resorts=None) -> str:
     """resorts/<slug>/, the resort's folder: its config, the EPT node lists the config names (`nodes_file`, resolved
-    in this folder) and its data plan. `resorts` is the folder that holds every resort's (tests pass a temp one)"""
-    return os.path.join(resorts, slug)
+    in this folder) and its data plan. `resorts` is the folder that holds every resort's (tests pass a temp one);
+    None is resorts/ (BUG-116: callers pass their own `resorts_dir=None` straight through)"""
+    return os.path.join(resorts or RESORTS, slug)
 
 
-def config_path(slug, resorts=RESORTS) -> str:
+def config_path(slug, resorts=None) -> str:
     """resorts/<slug>/<slug>.json"""
     return os.path.join(resort_dir(slug, resorts), f"{slug}.json")
 
