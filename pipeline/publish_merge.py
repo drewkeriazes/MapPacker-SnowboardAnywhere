@@ -35,6 +35,7 @@ SLUG = r"[a-z0-9][a-z0-9-]*"
 BRANCH = re.compile(rf"^publish/({SLUG})-v([1-9][0-9]*)$")
 RUN_LINE = re.compile(r"^Run: https://github\.com/([^/\s]+/[^/\s]+)/actions/runs/(\d+)\s*$", re.M)
 GOOD = ("success", "skipped")
+BUILD_WORKFLOW = ".github/workflows/build-pack.yml"   # FEAT-245: the only workflow whose publish PRs the App labels
 REQUIRED = "publish-check"            # the check that downloads the draft zip and lints it: must be success
 SELF_JOBS = {"publish-merge"}         # this workflow's job name: its own check run never counts
 PREFIX = "[publish-merge]"
@@ -94,6 +95,15 @@ def label_ok(events: list[dict], label: str, maintainers: set[str], app_login: s
         return _is(run_actor(int(run_id)), maintainers)
     except (Exception, SystemExit):
         return False
+
+
+def build_run_actor(run: dict) -> str | None:
+    """FEAT-245: who started `run` (the API's workflow run), only when it is the build-pack workflow dispatched on
+    main. A copy of the workflow changed on another branch can read the App's secrets, so a run from anywhere else
+    never vouches for a PR, even one a maintainer started."""
+    if run.get("path") != BUILD_WORKFLOW or run.get("head_branch") != "main" or run.get("event") != "workflow_dispatch":
+        return None
+    return (run.get("triggering_actor") or {}).get("login")
 
 
 def _time(s: str) -> datetime:
@@ -257,7 +267,7 @@ def assess(n: int, repo: str, pr: dict, app_login: str) -> tuple[str, dict]:
         activity = [a for a in api_pages(f"repos/{repo}/activity?ref={quote(ref)}&per_page=100")
                     if a.get("ref") in (ref, branch)]
         ev, maint = last_label(events, "automerge"), maintainers()
-        run_actor = lambda i: gh("api", f"repos/{repo}/actions/runs/{i}", "--jq", ".triggering_actor.login")
+        run_actor = lambda i: build_run_actor(json.loads(gh("api", f"repos/{repo}/actions/runs/{i}") or "{}"))
         if not ev or not label_ok(events, "automerge", maint, app_login, pr.get("body") or "", run_actor, repo):
             who = ((ev or {}).get("actor") or {}).get("login")
             return f"{UNTRUSTED}: added by {who}, not a maintainer (nor by the App on a maintainer's run)", {}

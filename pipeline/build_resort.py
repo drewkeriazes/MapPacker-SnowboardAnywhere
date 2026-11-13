@@ -255,10 +255,19 @@ def fetch_present(r):
     return os.path.isfile(os.path.join(r.raw, "FETCH_COMPLETE.txt"))
 
 
+def powershell():
+    """Windows PowerShell where there is one (Drew's PC), else PowerShell 7 (`pwsh`: the Linux build runner,
+    FEAT-245); fetch.ps1 runs on both"""
+    for exe in ("powershell", "pwsh"):
+        if shutil.which(exe):
+            return exe
+    raise Failed("fetch.ps1 needs PowerShell: neither powershell nor pwsh is on PATH (install PowerShell 7)")
+
+
 def fetch_run(r, ctx):
     if os.path.basename(os.path.normpath(r.raw)) != r.slug:
         raise Failed(f"fetch.ps1 writes <RawDir>\\{r.slug}; the raw folder {r.raw} is not named {r.slug}")
-    code = ctx.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(HERE, "fetch.ps1"),
+    code = ctx.run([powershell(), "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(HERE, "fetch.ps1"),
                     "-Slug", r.slug, "-RawDir", os.path.dirname(os.path.normpath(r.raw))])
     if code == 2:
         raise Failed(f"some downloads failed ({os.path.join(r.raw, 'fetch_log.txt')} lists them): run again, "

@@ -153,6 +153,25 @@ def osm_way(props):
     return None
 
 
+def osm_key(osm):
+    """FEAT-245: "123", "way/123" or "relation/123" -> "way/123" / "relation/123" (a bare number is a way); None
+    for anything else"""
+    m = re.fullmatch(r"(?:(way|relation)/)?(\d+)", str(osm).strip())
+    return f"{m.group(1) or 'way'}/{int(m.group(2))}" if m else None
+
+
+def osm_pick(features, osm):
+    """FEAT-245: the OpenSkiData ski area id built from OSM `osm` (that type and id exactly), or None"""
+    key = osm_key(osm)
+    for f in features:
+        p = f.get("properties") or {}
+        if p.get("type") != "skiArea":
+            continue
+        if any(s.get("type") == "openstreetmap" and str(s.get("id", "")) == key for s in p.get("sources") or []):
+            return p["id"]
+    return None
+
+
 def osm_ids(props):
     """OSM way ids a run or lift was built from"""
     return [int(s["id"].split("/")[1]) for s in props.get("sources") or []
@@ -1297,6 +1316,18 @@ def resolve_and_write(a, hosts, keep_planned=False):
     to pass."""
     feats = load_json(hosts.index("ski_areas.geojson"))["features"]
     pick_id, with_, alone = a.id, list(a.with_ or ()), a.alone
+    osm = getattr(a, "osm", None)
+    if osm:                                   # FEAT-245: the area the game picked, so no "which one" question
+        if a.id:
+            print("give --osm or --id, not both")
+            return 2, None
+        if not osm_key(osm):
+            print(f"--osm {osm!r} is not an OSM id (123, way/123 or relation/123)")
+            return 2, None
+        pick_id = osm_pick(feats, osm)
+        if not pick_id:
+            print(f"no ski area in OpenSkiData built from OSM {osm_key(osm)}")
+            return 1, None
     while True:
         st, r = resolve(a.name, feats, hosts.index("lifts.geojson"), hosts.index("runs.geojson"),
                         pick_id=pick_id, with_=with_, alone=alone)
@@ -1630,6 +1661,8 @@ def main(argv=None):
     r = sub.add_parser("resolve", help="name to OpenSkiData ski area(s) and resorts/<slug>/<slug>.json")
     r.add_argument("name")
     r.add_argument("--id", help="OpenSkiData ski area id, when several match")
+    r.add_argument("--osm", help="the OSM way or relation the ski area is built from (123, way/123 or relation/123), "
+                   "instead of a name search (FEAT-245)")
     r.add_argument("--with", dest="with_", action="append", help="a neighbour to build into the same pack")
     r.add_argument("--alone", action="store_true", help="leave the neighbours' runs and lifts out")
     r.add_argument("--slug", help="slug to write (default from the name)")
@@ -1644,6 +1677,8 @@ def main(argv=None):
     d = sub.add_parser("add", help="resolve, plan, fetch, build, report and publish; the ride with --ride (FEAT-224)")
     d.add_argument("name")
     d.add_argument("--id", help="OpenSkiData ski area id, when several match")
+    d.add_argument("--osm", help="the OSM way or relation the ski area is built from (123, way/123 or relation/123), "
+                   "instead of a name search (FEAT-245)")
     d.add_argument("--with", dest="with_", action="append", help="a neighbour to build into the same pack")
     d.add_argument("--alone", action="store_true", help="leave the neighbours' runs and lifts out")
     d.add_argument("--slug", help="slug (default from the name)")

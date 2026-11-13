@@ -197,6 +197,29 @@ def test_resolve_asks_which_of_several_matches(ohio, tmp_path, monkeypatch):
     assert R.resolve_and_write(_resolve_args(tmp_path, "mills"), IndexHosts(tmp_path, ohio)) == (2, None)
 
 
+def test_osm_key_and_osm_pick(ohio):
+    """FEAT-245: the game hands over the OSM area it picked; a bare number is a way"""
+    feats = ohio[0]
+    assert [R.osm_key(x) for x in ("452323654", "way/452323654", "relation/7", " 12 ", "node/1", "x")] ==         ["way/452323654", "way/452323654", "relation/7", "way/12", None, None]
+    assert R.osm_pick(feats, "452323654") == "bm" and R.osm_pick(feats, "way/391698033") == "bw"
+    assert R.osm_pick(feats, "relation/452323654") is None and R.osm_pick(feats, "1") is None
+
+
+def test_resolve_with_osm_picks_the_area_without_asking(ohio, tmp_path, monkeypatch, capsys):
+    _answers(monkeypatch, [], console=True)                     # asking would raise StopIteration
+    hosts = IndexHosts(tmp_path, ohio)
+    a = _resolve_args(tmp_path, "Mills", alone=True)              # a name that matches two areas: --osm decides
+    a.osm = "way/391698033"
+    assert R.resolve_and_write(a, hosts) == (0, "brandywine")
+    cfg = json.load(open(tmp_path / "resorts" / "brandywine" / "brandywine.json", encoding="utf-8"))
+    assert cfg["openskidata"]["ids"] == ["bw"]
+    a.osm = "way/1"
+    assert R.resolve_and_write(a, hosts) == (1, None)
+    assert "no ski area in OpenSkiData built from OSM way/1" in capsys.readouterr().out
+    a.osm, a.id = "391698033", "bw"
+    assert R.resolve_and_write(a, hosts) == (2, None)              # --osm or --id, not both
+
+
 def test_add_rerun_keeps_the_answer_without_asking(ohio, tmp_path, monkeypatch):
     hosts = IndexHosts(tmp_path, ohio)
     _answers(monkeypatch, ["2"])
