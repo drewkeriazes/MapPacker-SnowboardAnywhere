@@ -23,7 +23,7 @@ sys.path.insert(0, PIPELINE)
 import paths  # noqa: E402
 
 SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-OSM_RE = re.compile(r"^((way|relation)/)?[1-9][0-9]{0,15}$")
+OSM_RE = re.compile(r"^((way|relation|skimap)/)?[1-9][0-9]{0,15}$")   # skimap/497: no OSM outline (FEAT-286)
 REQUESTED_BY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$")   # a game account id (Firebase uid) or a login
 MAX_NAME = 100
 
@@ -42,7 +42,7 @@ def check_inputs(name, osm_id, slug, requested_by, resorts_dir=None):
     if len(name) > MAX_NAME or any(ord(c) < 32 or ord(c) == 127 for c in name) or name.startswith("-"):
         raise Refused(f"name is longer than {MAX_NAME} characters, has control characters or starts with -")
     if osm_id and not OSM_RE.fullmatch(osm_id):
-        raise Refused(f"osm_id {osm_id!r} is not an OSM id (123, way/123 or relation/123)")
+        raise Refused(f"osm_id {osm_id!r} is not an OSM or Skimap.org id (123, way/123, relation/123 or skimap/123)")
     if requested_by and not REQUESTED_BY_RE.fullmatch(requested_by):
         raise Refused("requested_by is not an account id (a letter or digit, then letters, digits and _.:@-, "
                       "at most 128)")

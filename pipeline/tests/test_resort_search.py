@@ -16,14 +16,17 @@ import resort as R  # noqa: E402
 import build_pack_ci  # noqa: E402
 
 
-def area(i, name, lon, lat, lifts=1, runs=2, site=None, region="Ohio", cc="US", osm="way/1", status="operating"):
+def area(i, name, lon, lat, lifts=1, runs=2, site=None, region="Ohio", cc="US", osm="way/1", status="operating",
+         skimap=7, point=False):
     d = 0.003
     return {"type": "Feature",
-            "geometry": {"type": "Polygon", "coordinates": [[[lon - d, lat - d], [lon + d, lat - d], [lon + d, lat + d],
+            "geometry": {"type": "Point", "coordinates": [lon, lat]} if point else
+                        {"type": "Polygon", "coordinates": [[[lon - d, lat - d], [lon + d, lat - d], [lon + d, lat + d],
                                                              [lon - d, lat + d], [lon - d, lat - d]]]},
             "properties": {
                 "id": i, "name": name, "type": "skiArea", "status": status,
-                "sources": ([{"type": "openstreetmap", "id": osm}] if osm else []) + [{"type": "skimap.org", "id": 7}],
+                "sources": ([{"type": "openstreetmap", "id": osm}] if osm else [])
+                           + ([{"type": "skimap.org", "id": skimap}] if skimap else []),
                 "websites": [site] if site else [],
                 "places": [{"iso3166_2": f"{cc}-XX", "iso3166_1Alpha2": cc, "localized": {"en": {"region": region}}}],
                 "statistics": {"lifts": {"byType": {"chair_lift": {"count": lifts}}} if lifts else {"byType": {}},
@@ -35,6 +38,11 @@ FEATS = [
          osm="way/452323654"),
     area("bw", "Brandywine Ski Resort", -81.555, 41.284, lifts=9, runs=9, site="https://bmbw.com", osm="way/391698033"),
     area("bh", "Boston Hills", -71.09, 42.64, lifts=0, runs=0, region="Massachusetts", osm=None, status="abandoned"),
+    # FEAT-286: OpenSkiData's Beaver Creek is a Point from Skimap.org alone, its runs and lifts mapped in OSM
+    area("bc", "Beaver Creek Resort (Arrowhead Mountain)", -106.53, 39.6, lifts=24, runs=247, region="Colorado",
+         osm=None, skimap=497, point=True),
+    area("bcn", "Beaver Creek Nordic Ski Area", -108.7, 42.55, lifts=0, runs=8, region="Wyoming", osm="way/666180090"),
+    area("ghost", "Beaver Creek Ghost", -100.0, 40.0, lifts=0, runs=0, osm=None, skimap=None),   # nothing to build by
     area("bn", "Boston Nordic", -81.575, 41.262, lifts=0, runs=3, osm="relation/55"),
     area("pc1", "Pine Crest", -105.0, 40.0, lifts=3, region="Colorado", osm="way/11"),
     area("pc2", "Pine Crest", -89.0, 45.0, lifts=2, region="Wisconsin", osm="relation/22"),
@@ -81,7 +89,7 @@ def test_a_hit_and_the_area_sold_with_it(index, capsys):
     # lifts first (Boston Nordic has none), Brandywine listed as its own match since bmbw.com sells both
     assert names == ["Boston Mills Ski Resort", "Brandywine Ski Resort", "Boston Nordic"]
     assert [m["sold_with"] for m in r["matches"]] == [None, "Boston Mills Ski Resort", None]
-    assert r["skipped"] == 1                              # Boston Hills: skimap.org only, no OSM id to build
+    assert r["skipped"] == 1                              # Boston Hills: no runs and no lifts, nothing to build
     assert r["closest"] == []
 
 
@@ -170,3 +178,22 @@ def test_osm_source_prefers_a_way():
     assert R.osm_source({"sources": [{"type": "openstreetmap", "id": "node/5"}, {"type": "skimap.org", "id": 3}]}) \
         is None
     assert R.osm_source({}) is None
+
+
+def test_a_skimap_only_area_is_listed_with_an_id_build_pack_takes(index, capsys):
+    """FEAT-286: "beaver creek" lists Beaver Creek (no OSM outline) by its Skimap.org id; only the area with no
+    runs and no lifts is skipped"""
+    r = json.loads(run(index, capsys, "beaver creek", "--json")[1])
+    assert [(m["openskidata_id"], m["osm_id"]) for m in r["matches"]] ==         [("bc", "skimap/497"), ("bcn", "way/666180090")]                   # lifts first
+    assert r["skipped"] == 1                                               # Beaver Creek Ghost
+    bc = r["matches"][0]
+    got = build_pack_ci.check_inputs(bc["name"], bc["osm_id"], bc["slug"], "uid123", resorts_dir=str(index[1]))
+    assert got["mode"] == "new" and got["osm_id"] == "skimap/497"
+    assert R.osm_pick(FEATS, bc["osm_id"]) == "bc"                         # resort.py add --osm finds it
+
+
+def test_build_source_falls_back_to_the_skimap_id():
+    assert R.build_source({"sources": [{"type": "skimap.org", "id": 497}]}) == "skimap/497"
+    assert R.build_source({"sources": [{"type": "skimap.org", "id": 3}, {"type": "openstreetmap", "id": "way/9"}]})         == "way/9"                                                         # OSM first, as before
+    assert R.build_source({"sources": [{"type": "skimap.org", "id": "x"}]}) is None
+    assert R.build_source({}) is None

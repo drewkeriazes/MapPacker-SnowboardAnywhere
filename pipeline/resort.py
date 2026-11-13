@@ -161,20 +161,30 @@ def osm_way(props):
 
 
 def osm_key(osm):
-    """FEAT-245: "123", "way/123" or "relation/123" -> "way/123" / "relation/123" (a bare number is a way); None
-    for anything else"""
-    m = re.fullmatch(r"(?:(way|relation)/)?(\d+)", str(osm).strip())
+    """FEAT-245: "123", "way/123" or "relation/123" -> "way/123" / "relation/123" (a bare number is a way);
+    FEAT-286: "skimap/497" -> "skimap/497", a ski area OpenSkiData knows only from Skimap.org; None for anything else"""
+    m = re.fullmatch(r"(?:(way|relation|skimap)/)?(\d+)", str(osm).strip())
     return f"{m.group(1) or 'way'}/{int(m.group(2))}" if m else None
 
 
+def source_key(src):
+    """an OpenSkiData `sources` entry in osm_key's form ("way/123", "relation/123", "skimap/497"), or None"""
+    if src.get("type") == "openstreetmap":
+        return osm_key(src.get("id", ""))
+    if src.get("type") == "skimap.org" and re.fullmatch(r"\d+", str(src.get("id", ""))):
+        return f"skimap/{int(src['id'])}"
+    return None
+
+
 def osm_pick(features, osm):
-    """FEAT-245: the OpenSkiData ski area id built from OSM `osm` (that type and id exactly), or None"""
+    """FEAT-245: the OpenSkiData ski area id built from OSM `osm` (that type and id exactly), or None. FEAT-286: a
+    "skimap/<id>" key picks the area whose source is that Skimap.org id."""
     key = osm_key(osm)
     for f in features:
         p = f.get("properties") or {}
         if p.get("type") != "skiArea":
             continue
-        if any(s.get("type") == "openstreetmap" and str(s.get("id", "")) == key for s in p.get("sources") or []):
+        if key and any(source_key(s) == key for s in p.get("sources") or []):
             return p["id"]
     return None
 
@@ -191,6 +201,13 @@ def osm_source(props):
     keys = [osm_key(s.get("id", "")) for s in props.get("sources") or [] if s.get("type") == "openstreetmap"]
     keys = [k for k in keys if k]
     return next((k for k in keys if k.startswith("way/")), keys[0] if keys else None)
+
+
+def build_source(props):
+    """FEAT-286: the id build-pack's `osm_id` input and `resort.py add --osm` take for this ski area: its OSM way or
+    relation (osm_source), else its Skimap.org id ("skimap/497": Beaver Creek, which has no OSM outline; the pack
+    is built on the box of its runs and lifts, which are in OSM). None when OpenSkiData names neither."""
+    return osm_source(props) or next((k for k in map(source_key, props.get("sources") or []) if k), None)
 
 
 # ------------------------------------------------------------------------------------------------ geometry
@@ -469,8 +486,10 @@ def sold_with(features, hits):
 
 def search_result(features, query, limit=SEARCH_LIMIT, resorts_dir=None):
     """the object `resort.py search --json` prints: {"query", "matches", "skipped", "closest"}. Matches with lifts
-    first, then by match quality; an area with no OSM id is left out (build-pack cannot build it) and counted in
-    "skipped"; "closest" (names) only when nothing matched. Pure apart from looking for resorts/<slug>/."""
+    first, then by match quality. `osm_id` is the id build-pack takes (build_source: the OSM way or relation, else
+    the Skimap.org id, FEAT-286). An area build-pack cannot build (no such id, or no runs and no lifts in
+    OpenSkiData, so nothing to put in a pack) is left out and counted in "skipped"; "closest" (names) only when
+    nothing matched. Pure apart from looking for resorts/<slug>/."""
     hits = search(features, query)
     found = [(f, None) for f in hits] + sold_with(features, hits)
 
@@ -480,15 +499,17 @@ def search_result(features, query, limit=SEARCH_LIMIT, resorts_dir=None):
         region, _, cc = place(p)
         b = bounds(geom_points(f["geometry"]))
         slug = slugify(p["name"])
-        return {"openskidata_id": p["id"], "osm_id": osm_source(p), "name": p["name"], "region": region,
+        return {"openskidata_id": p["id"], "osm_id": build_source(p), "name": p["name"], "region": region,
                 "country": cc, "lat": round((b[1] + b[3]) / 2, 6), "lon": round((b[0] + b[2]) / 2, 6),
                 "runs": runs, "lifts": lifts, "status": p.get("status"), "slug": slug,
                 "configured": bool(slug) and os.path.isdir(paths.resort_dir(slug, resorts_dir)),
                 "sold_with": ref["properties"]["name"] if ref else None}
 
     rows = [row(f, ref) for f, ref in found]
-    skipped = sum(1 for r in rows if not r["osm_id"])
-    rows = [r for r in rows if r["osm_id"]]
+    def buildable(r):
+        return bool(r["osm_id"]) and r["runs"] + r["lifts"] > 0
+    skipped = sum(1 for r in rows if not buildable(r))
+    rows = [r for r in rows if buildable(r)]
     rows.sort(key=lambda r: (r["lifts"] == 0, r["sold_with"] is not None, -match_quality(query, r["name"]),
                              r["name"], r["openskidata_id"]))
     return {"query": query, "matches": rows[:max(0, limit)], "skipped": skipped,
@@ -1370,11 +1391,11 @@ def cmd_search(a, hosts):
     sys.stdout.reconfigure(errors="replace")                  # a cp1252 console and a name in another script
     for r in out["matches"]:
         print(f"{r['slug']:<24} {r['name']}  ({r['region'] or '?'}, {r['country'] or '?'}; {r['runs']} runs, "
-              f"{r['lifts']} lifts, {r['status']}; OSM {r['osm_id']}"
+              f"{r['lifts']} lifts, {r['status']}; --osm {r['osm_id']}"
               + (f"; sold with {r['sold_with']}" if r["sold_with"] else "")
               + ("; configured" if r["configured"] else "") + ")")
     if out["skipped"]:
-        print(f"({out['skipped']} more with no OSM id, which build-pack cannot build)")
+        print(f"({out['skipped']} more that build-pack cannot build: no runs and no lifts, or no OSM or Skimap.org id)")
     if not out["matches"] and out["closest"]:
         print("no match; closest: " + ", ".join(out["closest"]))
     return 0
@@ -1439,11 +1460,11 @@ def resolve_and_write(a, hosts, keep_planned=False):
             print("give --osm or --id, not both")
             return 2, None
         if not osm_key(osm):
-            print(f"--osm {osm!r} is not an OSM id (123, way/123 or relation/123)")
+            print(f"--osm {osm!r} is not an OSM or Skimap.org id (123, way/123, relation/123 or skimap/123)")
             return 2, None
         pick_id = osm_pick(feats, osm)
         if not pick_id:
-            print(f"no ski area in OpenSkiData built from OSM {osm_key(osm)}")
+            print(f"no ski area in OpenSkiData built from {'Skimap.org' if osm_key(osm).startswith('skimap/') else 'OSM'} {osm_key(osm)}")
             return 1, None
     while True:
         st, r = resolve(a.name, feats, hosts.index("lifts.geojson"), hosts.index("runs.geojson"),
@@ -1779,7 +1800,8 @@ def main(argv=None):
     r.add_argument("name")
     r.add_argument("--id", help="OpenSkiData ski area id, when several match")
     r.add_argument("--osm", help="the OSM way or relation the ski area is built from (123, way/123 or relation/123), "
-                   "instead of a name search (FEAT-245)")
+                   "or its Skimap.org id when OpenSkiData has no OSM outline (skimap/497), instead of a name search "
+                   "(FEAT-245, FEAT-286)")
     r.add_argument("--with", dest="with_", action="append", help="a neighbour to build into the same pack")
     r.add_argument("--alone", action="store_true", help="leave the neighbours' runs and lifts out")
     r.add_argument("--slug", help="slug to write (default from the name)")
@@ -1800,7 +1822,8 @@ def main(argv=None):
     d.add_argument("name")
     d.add_argument("--id", help="OpenSkiData ski area id, when several match")
     d.add_argument("--osm", help="the OSM way or relation the ski area is built from (123, way/123 or relation/123), "
-                   "instead of a name search (FEAT-245)")
+                   "or its Skimap.org id when OpenSkiData has no OSM outline (skimap/497), instead of a name search "
+                   "(FEAT-245, FEAT-286)")
     d.add_argument("--with", dest="with_", action="append", help="a neighbour to build into the same pack")
     d.add_argument("--alone", action="store_true", help="leave the neighbours' runs and lifts out")
     d.add_argument("--slug", help="slug (default from the name)")
