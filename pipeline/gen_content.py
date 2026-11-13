@@ -29,8 +29,10 @@ rendered from this build stays valid:
   (an `index.json` without `generated`) is left alone; a rerun that picks the same shots keeps the still and the
   takes `auto_attract.mjs` added, one that picks new shots drops them.
 
-The game's hand-made content still wins in the game: `world/Landmarks.ts` starts and the menu in
-`game/public/attract/<slug>/` (Vail, Breckenridge) until FEAT-243 moves them into the pack.
+Hand content wins: `pack_content.py` (FEAT-243, the next step of `build_resort.py`'s content stage) puts the
+resort's landmarks and a placed start from `resorts/<slug>/` over this start, and a hand-made menu over these shots;
+the game still prefers its own hand-made menu in `game/public/attract/<slug>/` (Vail, Breckenridge) until its tools
+save into `resorts/<slug>/attract/`.
 """
 import argparse
 import json

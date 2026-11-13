@@ -103,6 +103,26 @@ def test_start_in_trees_and_cover(tmp_path):
     assert line(rep, "13")["status"] == pr.FAIL                    # mid / far cover without the WorldCover credit
 
 
+def test_hand_content_lines_read_the_pack_not_the_game(tmp_path):
+    """FEAT-243: lines 10, 11, 17 and 18 read what pack_content.py put in the pack, with no game checkout"""
+    pack = make_pack(tmp_path / "packs")
+    rep = pr.build_report(str(pack), repo=str(tmp_path), game=str(tmp_path / "no-game"))
+    assert line(rep, "18")["status"] == pr.FAIL and "resorts/demo/landmarks.json" in line(rep, "18")["detail"]
+    assert line(rep, "11")["status"] == pr.PASS and "resorts.ts" not in line(rep, "11")["detail"]
+    meta = json.load(open(pack / "meta.json", encoding="utf-8"))
+    meta["landmarks"] = [{"id": "g", "kind": "gateway", "name": "The Gate", "x": 0, "y": 0, "heading": 0}]
+    meta["start"] = dict(meta["start"], label="Starts at The Gate", source="landmark")
+    meta["attract"] = {"generated": False}
+    (pack / "attract").mkdir()
+    (pack / "attract" / "index.json").write_text(json.dumps({"shots": True, "hand": True}))
+    write_meta(str(pack), meta)
+    rep = pr.build_report(str(pack), repo=str(tmp_path), game=str(tmp_path / "no-game"))
+    assert line(rep, "18")["status"] == pr.PASS and "The Gate" in line(rep, "18")["detail"]
+    assert "Starts at The Gate (landmark, resorts/demo/landmarks.json)" in line(rep, "10")["detail"]
+    assert line(rep, "17")["status"] == pr.PASS and "resorts/demo/attract/" in line(rep, "17")["detail"]
+    assert line(rep, "19")["status"] == pr.SKIP                    # the compare spots are still the game's
+
+
 def test_line_20_passes_on_a_measured_treeline_or_a_measured_none(tmp_path):
     """FEAT-234: `treeline: null` is measured (forest to the top of the box); absent is an older pack"""
     pack = make_pack(tmp_path / "packs")

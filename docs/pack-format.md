@@ -243,7 +243,7 @@ The build writes `debug/species.png` into the pack: the most common species per 
 
 Cell size is `meta.instances.cellSize` (1000 m), origin `meta.instances.minX/minY`. `treeCells`, `rockCells` and `shrubCells` list the cells that have a file (`"cx_cy"`); the client only requests those. Packs built before BUG-036 lack the lists and the client requests every cell in range; add them without a rebuild with `python pipeline/packwriter.py packs/<slug>`.
 
-`packs/index.json` (`{"packs": ["synth", "vail"], "names": {"synth": "Test mountain (synthetic)", "vail": "Vail"}}`) lists every pack folder with a `meta.json`, and each pack's `meta.json` `name` (FEAT-175). `write_meta` rewrites it after each build, and `get_pack.mjs` after each install; the menu reads it instead of probing each resort's `meta.json`, and lists every pack in it under that name, so a new resort needs no entry in `game/src/resorts.ts` (which only orders the known ones and names packs in an index without `names`).
+`packs/index.json` (`{"packs": ["synth", "vail"], "names": {"synth": "Test mountain (synthetic)", "vail": "Vail"}}`) lists every pack folder with a `meta.json`, and each pack's `meta.json` `name` (FEAT-175). `write_meta` rewrites it after each build, and `get_pack.mjs` after each install; the menu reads it instead of probing each resort's `meta.json`, and lists every pack in it under that name, so a new resort needs no entry in the game (FEAT-243: its `game/src/resorts.ts` keeps no list of resorts).
 
 ## Main menu (optional, FEAT-175)
 
@@ -257,8 +257,25 @@ the still `<shot id>.jpg` (1920 x 1080, shown only while `looks.<id>.pack` is th
 `<shot id>-start-run[-v<n>]-<i>.json` (the game's `AttractTake`: replay samples at 20 Hz). `meta.attract`
 (`{"generated": true}`) tells the game the folder is there, so a pack without it requests nothing. A game whose own
 `game/public/attract/index.json` lists the resort uses that instead. An `index.json` without `generated` is hand-made
-content (FEAT-243 moves Vail's and Breckenridge's here) and `gen_content.py` leaves it alone. Optional and ignored by
-an older game: no format bump.
+content and `gen_content.py` leaves it alone. FEAT-243: `pipeline/pack_content.py` copies a resort's hand-made menu
+from `resorts/<slug>/attract/` (the same layout, only the files its `index.json` lists) over a generated one, marks the
+copied `index.json` `"hand": true` and sets `meta.attract` to `{"generated": false}`. Optional and ignored by an older
+game: no format bump.
+
+## Landmarks and the start (optional, FEAT-243)
+
+`meta.landmarks` lists a resort's hand-placed landmarks, the game's `Landmark` (`game/src/world/Landmarks.ts`):
+`{"id", "kind": "gateway", "name", "x", "y" (pack metres of the arch's centre), "heading" (degrees clockwise from
+north, the way riders pass through it), "span", "clearance" (m), "text", "sub": [two lines]?, "source", "start"?}`.
+`pipeline/pack_content.py` copies them from `resorts/<slug>/landmarks.json` (which also keeps a `note` per landmark,
+left out of the pack). Absent: the resort has none.
+
+The pipeline resolves the default start, so the game reads only `meta.start`: a landmark with `start: true` (the rider
+15 m uphill of it, facing through it; `source: "landmark"`, `landmark: <id>`, `label: "Starts at <name>"`), else
+`resorts/<slug>/start.json` (`{x, y, heading in degrees, label, source, note}`; `source: "placed"`), else the start
+`gen_content.py` or `build_pack.py` wrote. While a hand start covers that one it is kept in `meta.baseStart`, so a
+rerun resolves from it again. Both keys are optional; a game that does not read `meta.landmarks` ignores it: no
+format bump.
 
 ## features.json
 
@@ -307,8 +324,12 @@ an older game: no format bump.
               "cells": ["cx_cy", ...], "stems" },          // cells with an image; stems over the pack at full density
   "start": { "x", "y", "heading", "run", "lift", "label", "source" },  // default drop-in, heading in radians from north;
                                                            // gen_content.py (FEAT-175): source "generated", the top of the
-                                                           // highest lift (`lift`) on `run`, `label` the menu's line
-  "attract": { "generated": true },                       // optional (FEAT-175): the pack has attract/ (Main menu above)
+                                                           // highest lift (`lift`) on `run`, `label` the menu's line;
+                                                           // "landmark" or "placed" (FEAT-243, pack_content.py)
+  "baseStart": {...},                                     // optional (FEAT-243): the build's start under a hand-made one; a log
+  "landmarks": [{ "id", "kind", "name", "x", "y", "heading", ... }], // optional (FEAT-243): Landmarks and the start below
+  "attract": { "generated": true },                       // optional (FEAT-175): the pack has attract/ (Main menu above);
+                                                           // false when it is a hand-made one (FEAT-243)
   "generated": { "start": true, "shots": 5, "buildStart": {...} },  // optional (FEAT-175): gen_content.py ran on this build,
                                                            // what it found and the build's own start; a log, the client ignores it
   "treeline": 2700,                                       // optional, m (DATA-021): measured from the canopy; absent = 3,480 (Colorado);
@@ -369,6 +390,7 @@ Lines are as of 2026-11-11 (the game at `51efba2`); search for the name if they 
 | Record crown radius / height per id | `pipeline/species.py:29` `CROWN_K` (field 4 of `trees/*.bin`, the table under Instances) | `game/src/world/trees/species.ts:92` `crownRadius`: the drawn radius nudged by record / natural, clamped to 0.85..1.25 | not checked: it need not equal `SPECIES[].radius` |
 | Default treeline (`treeline` absent; `null` is none, FEAT-234) | `pipeline/species.py:23` `COLORADO_TREELINE` (3,480 m, what the species bands were tuned for) | `game/src/pack/treeline.ts:4` `DEFAULT_TREELINE`; `game/src/pack/types.ts:111` | `tests/test_contract.py`: must be equal |
 | `packs/index.json` `{"packs", "names"}` | `pipeline/packwriter.py:100` `index_packs` | `game/tools/get_pack.mjs:59` `writePackIndex` (rewrites it after an install); `game/src/resorts.ts:14` `PackIndex` | `tests/test_publish_pack.py` round trip through `get_pack.mjs` (needs the game checkout and node) |
+| `meta.landmarks` (the `Landmark` shape) and `meta.start` `source` / `label` (FEAT-243) | `pipeline/pack_content.py` `read_landmarks`, `resolve_start` (from `resorts/<slug>/landmarks.json`, `start.json`) | `game/src/world/Landmarks.ts` `Landmark`, `game/src/pack/types.ts` `PackMeta.landmarks`, `start.label` (from SnowboardAnywhere's FEAT-243 PR) | `tests/test_pack_content.py` (the writer's side only) |
 | `catalog.json` | `pipeline/publish_pack.py:141` `catalog_entry`, `:156` `update_catalog` | `game/tools/get_pack.mjs:19` `CATALOG_URL`, `:75` `getPack`; `game/src/ui/ResortPicker.ts:42` | `tests/test_publish_pack.py` round trip |
 | `terrain.coarse` (FEAT-229) | `pipeline/coarse_set.py`, `pipeline/build_pack.py` stage 1 | `game/src/pack/Pack.ts` `coarse`, `skipFine`; `game/src/terrain/Terrain.ts` `update` | not checked across repos |
 | Terrarium heights | `pipeline/packwriter.py:17` `encode_terrarium` | `game/src/pack/HeightSet.ts:88` | not checked across repos |

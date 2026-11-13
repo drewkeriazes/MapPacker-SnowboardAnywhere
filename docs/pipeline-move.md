@@ -73,7 +73,7 @@ FEAT-241 as built: `publish_pack.py --synth` builds the synthetic pack and publi
 
 ## 6. Later: per-resort content in the pack (FEAT-243)
 
-A new resort should need no game PR. Today these still live in the game repo per slug: `game/public/attract/<slug>/`, `docs/compare/<slug>/`, `LANDMARKS` and `STARTS` in `game/src/world/Landmarks.ts`, entries in `game/src/resorts.ts`. Each moves into the pack (a format bump), written from the resort's config here. Overlaps FEAT-175 step 4 (generated start, attract shots, compare spots).
+A new resort should need no game PR. Today these still live in the game repo per slug: `game/public/attract/<slug>/`, `docs/compare/<slug>/`, `LANDMARKS` and `STARTS` in `game/src/world/Landmarks.ts`, entries in `game/src/resorts.ts`. Each moves into the pack, written from the resort's folder here. Overlaps FEAT-175 step 4 (generated start, attract shots, compare spots). Done so far (FEAT-243, 2026-11-13): the landmarks and the placed start are in `resorts/<slug>/` and the pack (`meta.landmarks`, `meta.start`, `pipeline/pack_content.py`), with no format bump (optional keys), and the game's `resorts.ts` list goes in its own PR. Left: the menu files and the compare spots, which move once the game's tools that write them save here.
 
 ## Risks
 
