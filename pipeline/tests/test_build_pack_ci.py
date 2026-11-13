@@ -22,6 +22,10 @@ def test_a_new_slug_needs_a_name_and_an_osm_id(tmp_path):
     got = ci.check_inputs(" Boston Mills ", "way/123", "boston-mills", "uid-1", tmp_path)
     assert got["mode"] == "new" and got["name"] == "Boston Mills" and got["osm_id"] == "way/123"
     assert got["deps"] == [] and got["tier"] == "gold"
+    assert ci.check_inputs("Beaver Creek", "skimap/497", "beaver-creek", "", tmp_path)["osm_id"] == "skimap/497"
+    for bad in ("skimap/0", "skimap.org/497", "node/5", "skimap/497; rm -rf /"):        # FEAT-286 shapes only
+        with pytest.raises(ci.Refused, match="not an OSM or Skimap.org id"):
+            ci.check_inputs("Beaver Creek", bad, "beaver-creek", "", tmp_path)
 
 
 def test_an_existing_slug_is_a_rebuild_from_its_config(tmp_path):

@@ -25,7 +25,7 @@ body:
     attributes:
       label: OpenStreetMap id or OpenSkiMap link
       description: |
-        The ski area's OSM id: `123456`, `way/123456` or `relation/123456` (a bare number is a way). An openstreetmap.org link to the ski area (`https://www.openstreetmap.org/way/123456`) is fine too, or an OpenSkiMap link to it on [openskimap.org](https://openskimap.org), and the builder reads the OSM id from it. It names the one ski area to build, so nobody has to guess between areas with similar names.
+        The ski area's OSM id: `123456`, `way/123456` or `relation/123456` (a bare number is a way), or `skimap/123` for a ski area OpenSkiMap knows only from Skimap.org (its OpenSkiMap link ends in `obj_type=skimap_org`, with the number after `obj=`). An openstreetmap.org link to the ski area (`https://www.openstreetmap.org/way/123456`) is fine too, or an OpenSkiMap link to it on [openskimap.org](https://openskimap.org), and the builder reads the OSM id from it. It names the one ski area to build, so nobody has to guess between areas with similar names.
       placeholder: way/452323654
     validations:
       required: true

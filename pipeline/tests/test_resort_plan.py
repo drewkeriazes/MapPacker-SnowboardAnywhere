@@ -18,10 +18,11 @@ NETWORK = os.environ.get("SBA_NETWORK") == "1"
 
 # ------------------------------------------------------------------------------------------------ fixtures
 
-def area(i, name, geom, lifts=1, site=None, iso="US-OH", region="Ohio", way=None):
+def area(i, name, geom, lifts=1, site=None, iso="US-OH", region="Ohio", way=None, skimap=None):
     return {"type": "Feature", "geometry": geom, "properties": {
         "id": i, "name": name, "type": "skiArea", "status": "operating",
-        "sources": [{"type": "openstreetmap", "id": f"way/{way}"}] if way else [],
+        "sources": ([{"type": "openstreetmap", "id": f"way/{way}"}] if way else [])
+                   + ([{"type": "skimap.org", "id": skimap}] if skimap else []),
         "websites": [site] if site else [],
         "places": [{"iso3166_2": iso, "iso3166_1Alpha2": iso[:2], "localized": {"en": {"region": region}}}],
         "statistics": {"lifts": {"byType": {"chair_lift": {"count": lifts}}},
@@ -63,7 +64,8 @@ def ohio(tmp_path):
         area("xc", "Boston Nordic", point(-81.575, 41.262), lifts=0),
         area("far", "Mills Peak", point(-80.9, 41.9), lifts=3),
         area("club", "Peninsula Club", point(-81.560, 41.270), lifts=2, site="https://club.example"),
-        area("copper", "Copperish", point(-81.52, 41.26), lifts=4, site="https://copperish.example"),
+        area("copper", "Copperish", point(-81.52, 41.26), lifts=4, site="https://copperish.example",
+             skimap=497),                                   # skimap.org only, as Beaver Creek (FEAT-286)
     ]
     lifts = [member("bm", [[-81.5687, 41.2615], [-81.5628, 41.2656]], 1),
              member("bw", [[-81.5572, 41.2819], [-81.5501, 41.2856]], 2),
@@ -203,6 +205,22 @@ def test_osm_key_and_osm_pick(ohio):
     assert [R.osm_key(x) for x in ("452323654", "way/452323654", "relation/7", " 12 ", "node/1", "x")] ==         ["way/452323654", "way/452323654", "relation/7", "way/12", None, None]
     assert R.osm_pick(feats, "452323654") == "bm" and R.osm_pick(feats, "way/391698033") == "bw"
     assert R.osm_pick(feats, "relation/452323654") is None and R.osm_pick(feats, "1") is None
+    # FEAT-286: an area OpenSkiData knows only from Skimap.org is picked by that id
+    assert [R.osm_key(x) for x in ("skimap/497", "skimap/0497", "skimap.org/497", "skimap/")] ==         ["skimap/497", "skimap/497", None, None]
+    assert R.osm_pick(feats, "skimap/497") == "copper" and R.osm_pick(feats, "skimap/498") is None
+    assert R.osm_pick(feats, "way/497") is None                 # a Skimap.org number is not an OSM way
+
+
+def test_resolve_a_skimap_only_area_from_its_runs_and_lifts(ohio, tmp_path, monkeypatch):
+    """FEAT-286 (Beaver Creek): a Point with no OSM outline builds on the box of its runs and lifts"""
+    _answers(monkeypatch, [], console=True)
+    a = _resolve_args(tmp_path, "anything", alone=True)
+    a.osm = "skimap/497"
+    assert R.resolve_and_write(a, IndexHosts(tmp_path, ohio)) == (0, "copperish")
+    cfg = json.load(open(tmp_path / "resorts" / "copperish" / "copperish.json", encoding="utf-8"))
+    assert cfg["openskidata"]["ids"] == ["copper"] and cfg["osm_ski_area_way"] is None
+    assert cfg["lonlat_bbox"] == [-81.522, 41.26, -81.518, 41.262]          # the point and its lift
+    assert cfg["openskidata"]["lifts"] == 1
 
 
 def test_resolve_with_osm_picks_the_area_without_asking(ohio, tmp_path, monkeypatch, capsys):

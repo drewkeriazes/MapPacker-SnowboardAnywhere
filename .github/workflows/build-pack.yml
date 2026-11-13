@@ -40,7 +40,7 @@ on:
         required: false
         type: string
       osm_id:
-        description: OSM id of the ski area picked in the game (a new slug), e.g. 123456 or way/123456
+        description: OSM id of the ski area picked in the game (a new slug), e.g. 123456 or way/123456; skimap/497 for one with no OSM outline
         required: false
         type: string
       requested_by:
