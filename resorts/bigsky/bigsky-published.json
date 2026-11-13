@@ -1,0 +1,54 @@
+{
+ "version": 1,
+ "slug": "bigsky",
+ "fetched": "2026-11-13",
+ "areas": [
+  {
+   "openskidata_id": "d4086b2e9d44022ca27bde811816b5a4fc859c87",
+   "name": "Big Sky Resort",
+   "wikidata": "Q4906372",
+   "found_by": "Wikidata search 'Big Sky Resort'",
+   "wikipedia": "Big Sky Resort",
+   "infobox": true
+  }
+ ],
+ "figures": {
+  "summit": {
+   "value": 3403,
+   "unit": "m",
+   "source": "Wikipedia: Big Sky Resort",
+   "text": "11166 ft"
+  },
+  "base": {
+   "value": 2073,
+   "unit": "m",
+   "source": "Wikipedia: Big Sky Resort",
+   "text": "6800 ft; ''Lone Moose''; 7500 ft; ''Mountain Village''"
+  },
+  "vertical": {
+   "value": 1326,
+   "unit": "m",
+   "source": "Wikipedia: Big Sky Resort",
+   "text": "4350 ft; ''total''"
+  },
+  "lifts": {
+   "value": 40,
+   "unit": "",
+   "source": "Wikipedia: Big Sky Resort",
+   "text": "40 lifts (1 aerial tram, 2 gondolas, 8 high-speed detachable chairlifts, 16 fixed-grip chairlifts, and 13 surface lifts)"
+  },
+  "runs": {
+   "value": 320,
+   "unit": "",
+   "source": "Wikipedia: Big Sky Resort",
+   "text": "320+; - 21% beginner; - 29% intermediate; - 31% advanced; - 19% expert and extreme"
+  },
+  "area": {
+   "value": 23.67,
+   "unit": "km2",
+   "source": "Wikipedia: Big Sky Resort",
+   "text": "5850 acre"
+  }
+ },
+ "trails": null
+}

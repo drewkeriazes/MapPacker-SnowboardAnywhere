@@ -1,0 +1,50 @@
+{
+ "version": 1,
+ "slug": "boston-mills",
+ "fetched": "2026-11-13",
+ "areas": [
+  {
+   "openskidata_id": "cd7f28de9a4b85aff0761e9af449c5e6c9626168",
+   "name": "Boston Mills Ski Resort",
+   "wikidata": "Q4947991",
+   "found_by": "Wikidata search 'Boston Mills'",
+   "wikipedia": "Boston Mills/Brandywine Ski Resorts",
+   "infobox": true
+  },
+  {
+   "openskidata_id": "abc97db78f6238663faf95a23b1bce2f4f6bf1c6",
+   "name": "Brandywine Ski Resort",
+   "wikidata": null,
+   "found_by": null,
+   "wikipedia": null,
+   "infobox": false
+  }
+ ],
+ "figures": {
+  "vertical": {
+   "value": 73,
+   "unit": "m",
+   "source": "Wikipedia: Boston Mills/Brandywine Ski Resorts",
+   "text": "240 ft"
+  },
+  "lifts": {
+   "value": 15,
+   "unit": "",
+   "source": "Wikipedia: Boston Mills/Brandywine Ski Resorts",
+   "text": "15"
+  },
+  "runs": {
+   "value": 18,
+   "unit": "",
+   "source": "Wikipedia: Boston Mills/Brandywine Ski Resorts",
+   "text": "18"
+  },
+  "area": {
+   "value": 0.32,
+   "unit": "km2",
+   "source": "Wikipedia: Boston Mills/Brandywine Ski Resorts",
+   "text": "79 acre"
+  }
+ },
+ "trails": null
+}

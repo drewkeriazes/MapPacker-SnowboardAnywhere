@@ -1,0 +1,54 @@
+{
+ "version": 1,
+ "slug": "crystal-mountain",
+ "fetched": "2026-11-13",
+ "areas": [
+  {
+   "openskidata_id": "89f555b5b8a62c0c002adaa796997b635f38e6da",
+   "name": "Crystal Mountain",
+   "wikidata": "Q1624333",
+   "found_by": "OpenSkiData wikidataID",
+   "wikipedia": "Crystal Mountain (Washington)",
+   "infobox": true
+  }
+ ],
+ "figures": {
+  "summit": {
+   "value": 2131,
+   "unit": "m",
+   "source": "Wikipedia: Crystal Mountain (Washington)",
+   "text": "7012 ft; 6992 ft - lifts"
+  },
+  "base": {
+   "value": 1341,
+   "unit": "m",
+   "source": "Wikipedia: Crystal Mountain (Washington)",
+   "text": "3912 ft; 4400 ft - lifts"
+  },
+  "vertical": {
+   "value": 790,
+   "unit": "m",
+   "source": "Wikipedia: Crystal Mountain (Washington)",
+   "text": "3100 ft; 2592 ft - lifts"
+  },
+  "lifts": {
+   "value": 11,
+   "unit": "",
+   "source": "Wikipedia: Crystal Mountain (Washington)",
+   "text": "1 gondola; 9 chairs; 1 magic carpet"
+  },
+  "runs": {
+   "value": 80,
+   "unit": "",
+   "source": "Wikipedia: Crystal Mountain (Washington)",
+   "text": "80 (57 designated trails); - 11% easiest; - 54% more difficult; - 35% most difficult"
+  },
+  "area": {
+   "value": 10.52,
+   "unit": "km2",
+   "source": "Wikipedia: Crystal Mountain (Washington)",
+   "text": "2600 acre; lift serviced:; 2300 acre; inbounds backcountry:; 300 acre"
+  }
+ },
+ "trails": null
+}

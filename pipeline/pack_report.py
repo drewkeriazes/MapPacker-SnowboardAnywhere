@@ -7,7 +7,8 @@ pass, warn (works, but worth a look), fail, or skip (cannot tell from what it wa
 raw-data lines). The pack is **playable** when no MVP line (F and 1 to 14) is fail or skip (EPIC-15 rule 2);
 `publish_pack.py` reads that. `--gate` exits 1 when it is not.
 
-Reads only the pack, the resort config, the raw folder when given (file presence, no decoding), the catalog, and
+Reads only the pack, the resort config, the raw folder when given (file presence, no decoding), the catalog, the
+resort's published figures (`resorts/<slug>/<slug>-published.json`, published.py, FEAT-293: line 21), and
 the hand content in the game checkout (`docs/compare/<slug>/`, `game/public/attract/<slug>/` or else the pack's
 generated `attract/` (gen_content.py, FEAT-175 step 4),
 `game/src/world/Landmarks.ts`, `game/src/resorts.ts`; ../SnowboardAnywhere, or --game-repo / SBA_GAME_REPO, until
@@ -17,7 +18,9 @@ FEAT-243 moves that content into the pack). Without the game those lines say so 
 - trees: crowns + stems per km2 over the bounds and per 100 m elevation band, crowns and stems on lift lines,
   trees per hectare within 100 m of each compare spot (DATA-022 item 14's measure);
 - runs: the steepest 30 m pitch of each run against its OSM difficulty (The Slot kind of outlier);
-- the start: on snow, on a run, clear of trees.
+- the start: on snow, on a run, clear of trees;
+- published figures (line 21, a warn at most): summit, base and vertical from the lift stations, the lift count,
+  the distinct run names and the run footprint against the resort's own, and its trail list against the OSM names.
 """
 import argparse
 import datetime
@@ -36,6 +39,7 @@ from canopy_spots import run_half_width  # noqa: E402
 from packwriter import FORMAT_VERSION, decode_terrarium  # noqa: E402
 from species import UNKNOWN_WARN  # noqa: E402
 import paths  # noqa: E402
+import published  # noqa: E402
 import tiers  # noqa: E402
 
 REPO = paths.REPO
@@ -306,12 +310,13 @@ def gate(lines):
 # ------------------------------------------------------------------ the report
 
 class Report:
-    def __init__(self, pack_dir, cfg, raw=None, repo=REPO, reference=None, game=None):
+    def __init__(self, pack_dir, cfg, raw=None, repo=REPO, reference=None, game=None, resorts=None):
         self.pack = pack_dir
         self.meta = load_json(os.path.join(pack_dir, "meta.json"))
         fpath = os.path.join(pack_dir, "features.json")
         self.features = load_json(fpath) if os.path.isfile(fpath) else {}
         self.cfg, self.raw, self.repo = cfg, raw, repo
+        self.resorts = resorts or os.path.join(repo, "resorts")   # FEAT-293: <slug>-published.json is in the resort's folder
         self.game = game or paths.game_repo(repo=repo)      # the SnowboardAnywhere checkout, for the hand content
         self.has_game = paths.has_game(self.game)
         self.ref = reference or REFERENCE
@@ -325,6 +330,7 @@ class Report:
         self.naip = self.sources["surface"]["source"] == "NAIP"
         self.lines, self.numbers = [], {}
         self.bands, self.spots, self.layers, self.outliers = [], [], [], {}
+        self.published_rows, self.published_trails, self.published_record = [], None, None
 
     def line(self, id_, item, status, detail, mvp=True):
         self.lines.append({"id": id_, "item": item, "status": status, "detail": detail, "mvp": mvp})
@@ -739,6 +745,23 @@ class Report:
         tuned = (bool(tl) or tl_none) and {"rock", "canopy"} <= {k.split(".")[0] for k in derived}
         self.line("20", "Values derived for the resort, not copied from Vail", PASS if tuned else FAIL,
                   "; ".join(parts) + ("" if tuned else "; rock and canopy thresholds are Vail's (FEAT-175 step 2)"), mvp=False)
+        self.line("21", "Published figures", *self.check_published(), mvp=False)
+
+    def check_published(self):
+        """FEAT-293 line 21: the pack against what the resort publishes (published.py: Wikipedia's infobox, the
+        resort's trail list). Warns, never fails: published figures are marketing numbers."""
+        rec = published.load(self.slug, self.resorts)
+        if rec is None:
+            return SKIP, f"no resorts/{self.slug}/{self.slug}-published.json (python pipeline/published.py {self.slug})"
+        if not self.features:
+            return SKIP, "no features.json"
+        self.published_rows, self.published_trails = published.compare(rec, self.features)
+        self.published_record = rec
+        if not self.published_rows:
+            return SKIP, rec.get("why") or "no figures found"
+        warns = [r for r in self.published_rows if r["status"] == WARN]
+        names = ", ".join(r["label"].lower() for r in warns)
+        return (WARN if warns else PASS), (f"{names} off" if warns else f"{len(self.published_rows)} figures match") +             f" ({'; '.join(dict.fromkeys([r['source'] for r in self.published_rows if r['source']] + ([self.published_trails['source']] if self.published_trails else [])))}; table below)"
 
     def check_menu(self):
         """line 17: the game's hand-made menu for the resort, else the pack's generated one (FEAT-175 step 4)"""
@@ -806,7 +829,31 @@ class Report:
                 "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "reference": self.ref, "playable": playable, "failing": failing, "lines": self.lines,
                 "numbers": self.numbers, "outliers": self.outliers, "bands": self.bands, "spots": self.spots,
-                "layers": self.layers}
+                "layers": self.layers, "published": self.published_json()}
+
+    def published_json(self):
+        if self.published_record is None:
+            return None
+        t = self.published_trails
+        return {"fetched": self.published_record.get("fetched"), "rows": self.published_rows,
+                "trails": t and {"source": t["source"], "published": t["published"], "matched": len(t["matched"]),
+                                 "unmatched": t["unmatched"], "osmOnly": len(t["osm_only"])}}
+
+    def published_markdown(self):
+        """FEAT-293: the published figures table and the published trails with no OSM run"""
+        j = self.published_json()
+        if not j or not j["rows"]:
+            return []
+        out = ["", f"## Published figures (gathered {j['fetched']} by published.py)", "",
+               "| Figure | Published | Source | This pack | | Note |", "|---|---:|---|---:|---|---|"]
+        for r in j["rows"]:
+            out.append(f"| {r['label']} | {fmt_figure(r['published'], r['unit'])} | {r['source'] or ''} | "
+                       f"{fmt_figure(r['pack'], r['unit'])} | {ICON[r['status']]} | {r['note']} |")
+        t = j["trails"]
+        if t and t["unmatched"]:
+            out += ["", f"**Published trails with no OSM run** ({len(t['unmatched'])} of {t['published']} on {t['source']}; "
+                    "map them in OSM, or fix the name, to close the gap):", "", ", ".join(t["unmatched"])]
+        return out
 
     def to_markdown(self):
         j = self.to_json()
@@ -848,6 +895,7 @@ class Report:
             if self.outliers.get(key):
                 more = len(self.outliers[key]) - 8
                 out += ["", f"**{label}:** " + ", ".join(self.outliers[key][:8]) + (f", and {more} more" if more > 0 else "")]
+        out += self.published_markdown()
         if self.bands:
             out += ["", "## Trees by elevation band", "", "| Band, m | Area, km2 | Crowns | Stems | Per km2 |", "|---|---:|---:|---:|---:|"]
             out += [f"| {b['z']:.0f} | {b['areaKm2']} | {b['crowns']:,} | {b['stems']:,} | {b['perKm2']:,} |" for b in self.bands]
@@ -857,6 +905,16 @@ class Report:
         out += ["", "## Layers", "", "| Layer | In meta | Files | MB | Modified |", "|---|---|---:|---:|---|"]
         out += [f"| {l['layer']} | {'yes' if l['inMeta'] else 'no'} | {l['files']} | {l['mb']} | {l['modified'] or ''} |" for l in self.layers]
         return "\n".join(out) + "\n"
+
+
+def fmt_figure(v, unit):
+    if v is None:
+        return ""
+    if unit == "m":
+        return f"{v:,.0f} m ({v / published.FT:,.0f} ft)"
+    if unit == "km2":
+        return f"{v:,.1f} km2 ({v * 1e6 / published.ACRE:,.0f} acres)"
+    return f"{v:,}"
 
 
 def find_config(slug, repo=REPO):
@@ -872,7 +930,8 @@ def build_report(pack_dir, raw=None, config=None, against=None, repo=REPO, game=
     if against:
         a = load_json(against)
         ref = {"slug": a["slug"], "build": a.get("build"), **{k: a["numbers"].get(k) for k in ("treesPerKm2", "rockShare", "canopyShare", "runCanopy")}}
-    r = Report(pack_dir, cfg, raw=raw, repo=repo, reference=ref, game=game)
+    resorts = os.path.dirname(os.path.dirname(os.path.abspath(cfg_path))) if cfg_path else None
+    r = Report(pack_dir, cfg, raw=raw, repo=repo, reference=ref, game=game, resorts=resorts)
     r.measure()
     r.check()
     return r

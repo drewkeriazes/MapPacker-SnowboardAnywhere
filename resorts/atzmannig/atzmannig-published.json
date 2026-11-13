@@ -1,0 +1,26 @@
+{
+ "version": 1,
+ "slug": "atzmannig",
+ "fetched": "2026-11-13",
+ "areas": [
+  {
+   "openskidata_id": "27c943529e7f72139a749bd67b1a0b621a66840f",
+   "name": "Atzmännig",
+   "wikidata": "Q758345",
+   "found_by": "OpenSkiData wikidataID",
+   "wikipedia": null,
+   "infobox": false
+  },
+  {
+   "openskidata_id": "ed1dc3eea539c61f394bd02c508be3f2367859ab",
+   "name": "Atzmännig",
+   "wikidata": null,
+   "found_by": null,
+   "wikipedia": null,
+   "infobox": false
+  }
+ ],
+ "figures": {},
+ "trails": null,
+ "why": "no English Wikipedia article with an Infobox ski area for Atzmännig, Atzmännig"
+}

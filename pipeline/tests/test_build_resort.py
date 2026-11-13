@@ -81,6 +81,9 @@ class Fake:
                       open(os.path.join(r.out, "attract", "index.json"), "w"))
         elif script == "propose_spots.py":
             self.packs = os.environ.get("SHOT_PACKS")
+        elif script == "published.py":
+            res = cmd[cmd.index("--resorts") + 1]
+            json.dump({"version": 1, "figures": {}}, open(os.path.join(res, "demo", "demo-published.json"), "w"))
         return 0
 
 
@@ -108,7 +111,7 @@ def test_first_run_runs_every_stage_then_nothing_but_index_and_report(resort):
     go(resort, f)
     assert f.calls == ["ept_select.py", "gen_manifest.py", "fetch.ps1", "fetch_landfire.mjs EVT",
                        "fetch_landfire.mjs EVC", "fetch_landfire.mjs EVH", "fetch_grooming.py", "build_pack.py",
-                       "gen_content.py", "pack_report.py"]
+                       "gen_content.py", "published.py", "pack_report.py"]
     assert json.load(open(os.path.join(resort.out, "..", "index.json")))["packs"] == ["demo"]
     f2 = Fake(resort)
     lines = go(B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests), f2)
@@ -248,7 +251,7 @@ def test_from_stop_after_force_and_dry_run(resort):
     assert f.calls == ["build_pack.py", "gen_content.py", "pack_report.py"]   # a new meta.json: the content again
     f = Fake(resort)
     go(resort, f, force=["all"])
-    assert len(f.calls) == 10                      # attract and spots skip without the game, forced or not
+    assert len(f.calls) == 11                      # attract and spots skip without the game, forced or not
 
 
 def test_a_failed_build_and_the_gate(resort):
@@ -346,8 +349,8 @@ def test_content_attract_and_spots_with_the_game(resort, monkeypatch, tmp_path):
     monkeypatch.setattr(B.paths, "game_repo", lambda *a, **k: str(game))
     f = Fake(resort)
     lines = go(resort, f)
-    assert f.calls[-6:] == ["build_pack.py", "gen_content.py", "vite", "auto_attract.mjs", "propose_spots.py",
-                            "pack_report.py"]
+    assert f.calls[-7:] == ["build_pack.py", "gen_content.py", "vite", "auto_attract.mjs", "propose_spots.py",
+                            "published.py", "pack_report.py"]
     assert f.packs == os.path.dirname(resort.out)          # the game's tools serve the pack from where it was built
     assert "SHOT_PACKS" not in os.environ
     # done: the still and ghosts are there; spots run again only while the game has none for the resort
@@ -367,7 +370,7 @@ def test_content_that_finds_nothing_is_still_done(resort, monkeypatch, tmp_path)
     (game / "docs" / "compare" / "demo" / "top" / "spot.json").write_text("{}")
     f = Fake(resort, finds=False)
     go(resort, f)
-    assert f.calls[-2:] == ["gen_content.py", "pack_report.py"]          # no shots: no still, no vite build
+    assert f.calls[-3:] == ["gen_content.py", "published.py", "pack_report.py"]   # no shots: no still, no vite build
     f = Fake(resort, finds=False)
     lines = go(B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests), f)
     assert f.calls == ["pack_report.py"]                                 # not the ray-march again
@@ -406,7 +409,7 @@ def test_raw_from_builds_on_the_other_resorts_data_with_its_own_state(resort):
     assert mash.node_files() == resort.node_files()          # the lists are demo's
     f = Fake(mash)
     lines = go(mash, f)
-    assert f.calls == ["build_pack.py", "gen_content.py", "pack_report.py"]
+    assert f.calls == ["build_pack.py", "gen_content.py", "published.py", "pack_report.py"]
     assert any("the raw data is from demo" in s for s in lines if s.startswith("[fetch]"))
     assert os.path.isfile(mash.state_path) and open(resort.state_path).read() == before
     assert any(s.startswith("[fetch] skip") for s in lines)
@@ -432,7 +435,7 @@ def test_a_pack_with_a_sourced_move_checks_and_fingerprints_the_source(resort):
     go(src, Fake(src))
     f = Fake(mash)
     go(mash, f)
-    assert f.calls == ["build_pack.py", "gen_content.py", "pack_report.py"]
+    assert f.calls == ["build_pack.py", "gen_content.py", "published.py", "pack_report.py"]
     f = Fake(mash)
     go(mash, f)
     assert "build_pack.py" not in f.calls                     # nothing changed
@@ -505,3 +508,20 @@ def test_fetch_runs_windows_powershell_else_pwsh(monkeypatch):
     have.clear()
     with pytest.raises(B.Failed, match="pwsh"):
         B.powershell()
+
+
+def test_a_failed_published_refresh_is_not_recorded(resort):
+    """FEAT-293: Wikidata down while the inputs changed: the build goes on, the old figures stay, and the stage
+    runs again next time instead of recording the new fingerprint on the old file"""
+    go(resort, Fake(resort))
+    old = resort.state["published"]
+    json.dump(dict(json.load(open(resort.cfg_path)), name="Renamed"), open(resort.cfg_path, "w"))
+    r2 = B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests)
+    f = Fake(r2, fail="published")
+    lines = go(r2, f)
+    assert "published.py" in f.calls and f.calls[-1] == "pack_report.py"
+    assert "[published] not done, the build goes on" in lines
+    assert B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests).state["published"] == old
+    f = Fake(r2)
+    go(B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests), f)
+    assert "published.py" in f.calls

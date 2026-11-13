@@ -131,7 +131,7 @@ It needs the game clone next to this one with `npm ci` done in `game/`. Builds o
 | `pipeline/` | The pipeline: `resort.py` (name to config and data plan, and `add`), `build_resort.py`, `build_pack.py` and its stages, `pack_report.py`, `publish_pack.py`, the fetch scripts, tests in `pipeline/tests/`. Moved from the game repo with its history (FEAT-238) |
 | `docs/pipeline-scripts.md` | Every script in `pipeline/`: what it reads and writes, its options (moved from the game's developer guide in FEAT-242) |
 | `docs/pack-format.md` | The pack format: the layout, the encodings, `formatVersion` and its bump rule, and the Contract, every value this repo and the game must agree on (FEAT-239) |
-| `resorts/<slug>/` | A folder per resort: `<slug>.json`, the config the pipeline reads, the EPT node lists it names (`nodes_file`, beside it) and the data plan (`<slug>-plan.md`) |
+| `resorts/<slug>/` | A folder per resort: `<slug>.json`, the config the pipeline reads, the EPT node lists it names (`nodes_file`, beside it), the data plan (`<slug>-plan.md`) and the resort's published figures (`<slug>-published.json`, `published.py`, FEAT-293) |
 | `manifests/<slug>.json` | The download manifest the raw data was fetched with |
 | `reports/<slug>.md` | The build report of the published pack |
 | `*.cmd` | Launchers for Drew's PC (above) |

@@ -221,3 +221,29 @@ def test_landfire_line_logs_the_unknown_evt_share(tmp_path):
         json.dump(meta, open(meta_p, "w", encoding="utf-8"))
         ln = line(pr.build_report(str(pack), repo=str(tmp_path)), "4")
         assert ln["status"] == want and f"{unk:.1%} of the forest" in ln["detail"] and "east rules" in ln["detail"], ln
+
+
+def test_line_21_published_figures(tmp_path):
+    """FEAT-293: skips without resorts/<slug>/<slug>-published.json, passes on figures that fit, warns (never fails)
+    on ones that don't, and lists the published trails with no OSM run"""
+    import published
+    pack = make_pack(tmp_path / "packs")
+    rep = pr.build_report(str(pack), repo=str(tmp_path))
+    assert line(rep, "21")["status"] == pr.SKIP and "published.py demo" in line(rep, "21")["detail"]
+    fig = lambda v, u="": {"value": v, "unit": u, "source": "Wikipedia: Demo Mountain", "text": str(v)}
+    rec = {"version": 1, "slug": "demo", "fetched": "2026-11-13", "areas": [],
+           "figures": {"summit": fig(2590, "m"), "base": fig(2410, "m"), "vertical": fig(178, "m"), "lifts": fig(1),
+                       "runs": fig(1), "area": fig(0.07, "km2")},
+           "trails": {"source": "demo.example terrain status, 2026-04-01", "names": ["Main"]}}
+    published.write(rec, "demo", str(tmp_path / "resorts"))
+    rep = pr.build_report(str(pack), repo=str(tmp_path))
+    assert line(rep, "21")["status"] == pr.PASS, rep.published_rows
+    assert "6 figures match" in line(rep, "21")["detail"]
+    rec["figures"]["lifts"], rec["trails"]["names"] = fig(12), ["Main", "Back Bowl", "Ridge"]
+    published.write(rec, "demo", str(tmp_path / "resorts"))
+    rep = pr.build_report(str(pack), repo=str(tmp_path))
+    assert line(rep, "21")["status"] == pr.WARN and line(rep, "21")["detail"].startswith("lifts, runs off")
+    assert not line(rep, "21")["mvp"]
+    md = rep.to_markdown()
+    assert "## Published figures" in md and "Back Bowl, Ridge" in md and "| Summit | 2,590 m (8,497 ft) |" in md
+    assert rep.to_json()["published"]["trails"]["unmatched"] == ["Back Bowl", "Ridge"]
