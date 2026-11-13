@@ -264,7 +264,7 @@ an older game: no format bump.
                  "cable": [[x,y,z],...], "capacity" }],
   "runs":      [{ "name", "difficulty": "easy|intermediate|advanced|expert|freeride",
                  "groomed": bool, "gladed": bool, "points": [[x,y,z],...], "osmId",
-                 "groomNights", "mogulScore" }],  // groomNights: nights the resort's reports groomed it (absent when never); mogulScore: 0..1 from pipeline/moguls.py (absent in packs before FEAT-059)
+                 "groomNights", "mogulScore", "altName" }],  // groomNights: nights the resort's reports groomed it (absent when never); mogulScore: 0..1 from pipeline/moguls.py (absent in packs before FEAT-059); altName (FEAT-296, optional, not read by the game): the way's OSM `name` when `piste:name` differs and is the run's name
   "buildings": [{ "name", "points": [[x,y],...], "zBase", "zMax", "height", "heightDefault", "kind" }],  // zMax: highest ground under the footprint, absent in packs before BUG-024; heightDefault: true when OSM had no height or levels and the pipeline used its 5.5 / 9 m fallback (absent in older packs, where the client guesses from those values)
   "roads":     [{ "name", "kind", "points": [[x,y,z],...], "width" }],
   "water":     [{ "name", "points": [[x,y],...], "z" }],

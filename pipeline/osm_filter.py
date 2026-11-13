@@ -10,11 +10,21 @@ lift way when:
   - its OSM id is listed in an entry's `osm_ways` (`{"name", "osm_ways": [<id>, ...]}`): the neighbour's own runs and
     lifts by id, as `resort.py resolve --alone` writes them from OpenSkiData (FEAT-223), exact where a ring is not.
 Buildings, roads and the terrain stay: the slopes and their clearings are real, only the in-game runs and lifts go.
-Pure helpers, tested in tests/test_osm_filter.py."""
+`run_names` (FEAT-296) picks a run's name from its tags. Pure helpers, tested in tests/test_osm_filter.py."""
 
 PRIVATE = ("private", "no", "members")
 ACCESS_KEYS = ("access", "aerialway:access", "piste:access")
 SKI_KEYS = ("piste:type", "aerialway")
+
+
+def run_names(tags):
+    """FEAT-296: (name, altName) of a piste way. `piste:name` first: when a way has both and they differ, `name` is
+    nearly always the summer road, ridge or lift the run follows ("Meadow Road", "Bottom Lift 10", "McConkeys"; on
+    Beaver Creek, Park City and Breckenridge 26 of 33 such ways match the resort's own trail list only by
+    piste:name, none only by name), as OpenSkiData reads it too. The other name is kept as altName, or None."""
+    pn, n = (tags.get("piste:name") or "").strip() or None, (tags.get("name") or "").strip() or None
+    first = pn or n
+    return first, (n if pn and n and n != pn else None)
 
 
 def is_private(tags):

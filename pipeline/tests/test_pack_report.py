@@ -245,5 +245,6 @@ def test_line_21_published_figures(tmp_path):
     assert line(rep, "21")["status"] == pr.WARN and line(rep, "21")["detail"].startswith("lifts, runs off")
     assert not line(rep, "21")["mvp"]
     md = rep.to_markdown()
-    assert "## Published figures" in md and "Back Bowl, Ridge" in md and "| Summit | 2,590 m (8,497 ft) |" in md
+    assert "## Published figures" in md and "| Summit | 2,590 m (8,497 ft) |" in md
+    assert "OSM to-do" in md and "| Back Bowl |  |  |  |" in md            # a version 1 list: no area, no link
     assert rep.to_json()["published"]["trails"]["unmatched"] == ["Back Bowl", "Ridge"]

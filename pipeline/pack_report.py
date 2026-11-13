@@ -747,6 +747,15 @@ class Report:
                   "; ".join(parts) + ("" if tuned else "; rock and canopy thresholds are Vail's (FEAT-175 step 2)"), mvp=False)
         self.line("21", "Published figures", *self.check_published(), mvp=False)
 
+    def to_lonlat(self):
+        """pack x, y to lon, lat (meta crs and origin), or None"""
+        crs, origin = self.meta.get("crs"), self.meta.get("origin")
+        if not crs or not origin:
+            return None
+        from pyproj import Transformer
+        t = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+        return lambda x, y: t.transform(x + origin[0], y + origin[1])
+
     def check_published(self):
         """FEAT-293 line 21: the pack against what the resort publishes (published.py: Wikipedia's infobox, the
         resort's trail list). Warns, never fails: published figures are marketing numbers."""
@@ -755,7 +764,7 @@ class Report:
             return SKIP, f"no resorts/{self.slug}/{self.slug}-published.json (python pipeline/published.py {self.slug})"
         if not self.features:
             return SKIP, "no features.json"
-        self.published_rows, self.published_trails = published.compare(rec, self.features)
+        self.published_rows, self.published_trails = published.compare(rec, self.features, self.to_lonlat())
         self.published_record = rec
         if not self.published_rows:
             return SKIP, rec.get("why") or "no figures found"
@@ -837,6 +846,7 @@ class Report:
         t = self.published_trails
         return {"fetched": self.published_record.get("fetched"), "rows": self.published_rows,
                 "trails": t and {"source": t["source"], "published": t["published"], "matched": len(t["matched"]),
+                                 "todo": t.get("todo") or [],
                                  "unmatched": t["unmatched"], "osmOnly": len(t["osm_only"])}}
 
     def published_markdown(self):
@@ -851,8 +861,16 @@ class Report:
                        f"{fmt_figure(r['pack'], r['unit'])} | {ICON[r['status']]} | {r['note']} |")
         t = j["trails"]
         if t and t["unmatched"]:
-            out += ["", f"**Published trails with no OSM run** ({len(t['unmatched'])} of {t['published']} on {t['source']}; "
-                    "map them in OSM, or fix the name, to close the gap):", "", ", ".join(t["unmatched"])]
+            # FEAT-296: the OSM to-do. Mapped (or renamed) in OSM, a trail reaches the pack on its next build
+            out += ["", f"**OSM to-do: published trails with no OSM run** ({len(t['unmatched'])} of {t['published']} on "
+                    f"{t['source']}). Map each one in OpenStreetMap (or fix its name there) and the next build has it; "
+                    "the link opens the editor where the trail's area's other runs are.", "",
+                    "| Trail | Area | Difficulty | Where |", "|---|---|---|---|"]
+            todo = {d["name"]: d for d in t.get("todo") or []}
+            for n in t["unmatched"]:
+                d = todo.get(n, {})
+                where = f"[edit]({published.osm_edit_link(d['lonlat'])})" if d.get("lonlat") else ""
+                out.append(f"| {n} | {d.get('area') or ''} | {d.get('difficulty') or ''} | {where} |")
         return out
 
     def to_markdown(self):

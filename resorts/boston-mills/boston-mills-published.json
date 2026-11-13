@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "slug": "boston-mills",
  "fetched": "2026-11-13",
  "areas": [
@@ -46,5 +46,12 @@
    "text": "79 acre"
   }
  },
- "trails": null
+ "trails": null,
+ "outside": [],
+ "box": [
+  452900,
+  4569100,
+  454800,
+  4571100
+ ]
 }

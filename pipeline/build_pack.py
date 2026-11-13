@@ -14,6 +14,7 @@ Steps
   10 m canopy height on WorldCover tree cover, with no crowns (the trees are all stands, step 8) and no far tree
   ring; no `naip` makes step 5's masks from the WorldCover classes. `meta.json` records `tier` and `sources`.
   6. OSM: pistes, lifts (+pylons, stations), buildings, roads, water, peaks -> features.json
+     (a run's name is its piste:name, else its name; a different name is kept as altName, FEAT-296)
   7. Masks (2 m): rock, scree, groomed piste corridors, canopy cover; piste direction for the groomers
   8. Trees: crown detection on the CHM/NDVI, species 0..7 (species.py: LANDFIRE class, elevation, aspect,
      water, ridges, grey dead crowns); shrubs from LANDFIRE, streams, NAIP and forest edges; rocks on the rock mask
@@ -797,9 +798,12 @@ for el in ski["elements"]:
     # runs are not corduroy. The game is 1:1 with real data: an untagged run stays ungroomed snow.
     groomed = grooming in ("classic", "classic+skating", "skating", "scooter")
     closed = pts[0] == pts[-1] and len(pts) > 3 and t.get("area") == "yes"
-    rec = {"name": t.get("name") or t.get("piste:name"), "difficulty": diff, "groomed": bool(groomed),
+    name, alt = osm_filter.run_names(t)       # FEAT-296: piste:name first, the road or ridge name as altName
+    rec = {"name": name, "difficulty": diff, "groomed": bool(groomed),
            "gladed": t.get("piste:gladed") == "yes" or t.get("gladed") == "yes", "osmId": el["id"], "area": closed,
            "points": [[x, y, ground(x, y)] for x, y in pts]}
+    if alt:
+        rec["altName"] = alt
     if t.get("bridge", "no") != "no":
         rec["bridge"] = True   # bare-earth DEM has no bridge; the client builds a deck
     rec["mogulTag"] = grooming == "mogul"   # FEAT-059: popped before writing
@@ -837,6 +841,10 @@ if reports:
         k, b = run_key(r["name"]), run_base(r["name"])
         if not k:
             continue
+        if r.get("altName") and k not in listed and base_nights.get(b) is None:   # FEAT-296: the report may use it
+            ka, ba = run_key(r["altName"]), run_base(r["altName"])
+            if ka in listed or ba in base_nights:
+                k, b = ka, ba
         if k in listed:                       # the report names this exact run or section
             nights = groom_nights.get(k, 0)
             if nights:

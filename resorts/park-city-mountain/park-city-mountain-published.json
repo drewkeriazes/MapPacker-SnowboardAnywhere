@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "slug": "park-city-mountain",
  "fetched": "2026-11-13",
  "areas": [
@@ -52,356 +52,1759 @@
  },
  "trails": {
   "source": "parkcitymountain.com terrain status, 2026-04-01",
-  "names": [
-   "1/2 Load",
-   "1/4 Load",
-   "10th Mountain",
-   "1st Bowl",
-   "3 Kings",
-   "3/4 Load",
-   "6 Bells",
-   "94 Turns",
-   "A-Chute",
-   "After Shock",
-   "Alley",
-   "Alley Cat",
-   "Alloy Alley",
-   "Alpenglow",
-   "Another World",
-   "Apex Ridge",
-   "Aplande",
-   "Apparition",
-   "Arrowhead",
-   "Aspen Grove",
-   "Assessment",
-   "Backstreet",
-   "Badger's Bypass",
-   "Badlands",
-   "Belmont",
-   "Berg's Bowl",
-   "Black Forest",
-   "Black Hole",
-   "Blaise's Way",
-   "Blanche",
-   "Blaster",
-   "Bliss",
-   "Blueslip Bowl",
-   "Bonanza",
-   "Bonanza Access",
-   "Boogeyman",
-   "Boomer",
-   "Broadway",
-   "Broken Arrow",
-   "Buckeye",
-   "Bugle Ridge",
-   "Bugle Ridge Bypass",
-   "C.B.'s Run",
-   "Canis Lupus",
-   "Carbide Cut",
-   "Cascade",
-   "Chance",
-   "Charlie Brown",
-   "Chicane",
-   "Chimera",
-   "Chrome Alley",
-   "Claimjumper",
-   "Climax",
-   "Cloud 9",
-   "Cobalt Woods",
-   "Combustion",
-   "Commitment",
-   "Comstock",
-   "Condor Woods",
-   "Constellation",
-   "Copperhead",
-   "Courchevel",
-   "Creole",
-   "Crescent",
-   "Dawn",
-   "Day Dream",
-   "Dead Tree",
-   "Deschutes",
-   "Detonator",
-   "Devil's Friend",
-   "Diablo",
-   "Diamond Ridge",
-   "Dividend",
-   "Doc's Run",
-   "Double Jack",
-   "Double Nickel",
-   "Drift",
-   "Dutch Hollow",
-   "Dynamite",
-   "Déjà Vu",
-   "EZ Street",
-   "Eagle",
-   "Echo",
-   "Eclipse",
-   "Ecstasy",
-   "Elk Dance",
-   "Elk Ridge",
-   "Encore",
-   "End Zone",
-   "Erika's Gold",
-   "Escapade Woods",
-   "Escape",
-   "Eureka",
-   "First Time Run",
-   "Five Trees",
-   "Flat Iron",
-   "Flume",
-   "Flying Salmon",
-   "Fool's Gold",
-   "Fools Paradise",
-   "Fortune Teller",
-   "Fright Gully",
-   "Funnel Cloud",
-   "G-Force",
-   "Gallery",
-   "Georgeanna",
-   "Glory Hole",
-   "Golden Glades",
-   "Golden Spruce",
-   "Goldfinger",
-   "Gotcha Cut-Off",
-   "Grande",
-   "Grizzly",
-   "Half Moon",
-   "Half Pipe",
-   "Hawkeye",
-   "Heavy Metal",
-   "Heckler",
-   "Hidden Bear",
-   "Hidden Splendor",
-   "High Card",
-   "High Peak",
-   "Homelite",
-   "Homerun (Full)",
-   "Homerun (Lower)",
-   "Hot Spot",
-   "Hurricane Alley",
-   "Illusion",
-   "Indicator",
-   "Iron Man",
-   "Jonesy's",
-   "Junipers",
-   "Jupiter Access",
-   "Kestrel",
-   "Keystone",
-   "King Con Access",
-   "King Con Ridge",
-   "King Con Run",
-   "King's Crown",
-   "Kokopelli",
-   "Ladies' Slalom",
-   "Lazy Day",
-   "Lead Foot",
-   "Liberty",
-   "Ligety Split",
-   "Lightning",
-   "Limelite",
-   "Lite's Out",
-   "Little Kings",
-   "Lone Pine",
-   "Lookout Ridge",
-   "Lost Prospector",
-   "Lower Boa",
-   "Lower Crowning Glory",
-   "Lower East Face",
-   "Lower Harmony",
-   "Lower Silver Skis",
-   "Lucky Boy",
-   "Lynx",
-   "Magic Line",
-   "Main Bowl",
-   "Mainline",
-   "Massacre",
-   "McConkey's Bowl",
-   "McDonalds Meadow",
-   "Mel's Alley",
-   "Mellow Moose",
-   "Men's Slalom",
-   "Mercury",
-   "Mid-Mountain",
-   "Mid-Mountain Cutoff",
-   "Mid-Mountain Meadows",
-   "Middle Crowning Glory",
-   "Mikey's",
-   "Mimi's Way",
-   "Mine Shaft",
-   "Mini Pipe",
-   "Mirage",
-   "Molly's",
-   "Monitor",
-   "Moraine",
-   "Motherlode Meadows",
-   "Muckers",
-   "Murdock Bowl",
-   "Mystic Pines",
-   "Nail Driver",
-   "New Moon",
-   "Newport",
-   "O-Zone",
-   "OO2",
-   "One Hundred Turns",
-   "Oops",
-   "Outlaw",
-   "P-Zone",
-   "Painted Horse",
-   "Panorama",
-   "Paradise",
-   "Paradise Bowl",
-   "Paradise Chutes",
-   "Parley's Park",
-   "PayDay Run",
-   "Peace",
-   "Phantasm",
-   "Picabo's",
-   "Pick 'N Shovel",
-   "Pick Axe",
-   "Pinball Alley",
-   "Pine Draw",
-   "Pinecone Bowl",
-   "Pinecone Ridge",
-   "Pinyon Ridge",
-   "Pioneer",
-   "Pioneer Ridge",
-   "Pipe Dream",
-   "Platinum Woods",
-   "Portuguese Gap",
-   "Powder Keg",
-   "Powder Monkey",
-   "Power Alley",
-   "Prospector",
-   "Puma Bowl",
-   "Quarter Moon",
-   "Quit 'N Time",
-   "RDR",
-   "Raptor Way",
-   "Reaper",
-   "Red Fox",
-   "Red Pine Chutes",
-   "Red Pine Road",
-   "Rendezvous Bowl",
-   "Rendezvous Ridge",
-   "Renegade",
-   "Renny's Ridge",
-   "Retreat",
-   "Rhapsody",
-   "Rhino",
-   "Ripsaw",
-   "Road D.O.",
-   "Road to Thaynes Canyon",
-   "Rosebud",
-   "Royal",
-   "STH",
-   "Saddle Chutes",
-   "Sam's Knob",
-   "Sampson",
-   "Sanctuary",
-   "Sandman",
-   "Scott's Bowl",
-   "Seldom Seen",
-   "Serenity",
-   "Shadow Lands",
-   "Shadow Ridge",
-   "Shadows",
-   "Shaft",
-   "Shamus",
-   "Short Fuse",
-   "Shortline",
-   "Showcase",
-   "Sidewinder",
-   "Silver Cliff",
-   "Silver Hollow",
-   "Silver Horse",
-   "Silver King",
-   "Silver Queen",
-   "Silver Skis",
-   "Silver Spur",
-   "Silver Star",
-   "Silver Streak",
-   "Silverado",
-   "Silverado Bowl",
-   "Single Jack",
-   "Sitka",
-   "Sixes",
-   "Sleeper",
-   "Snow Dancer",
-   "Snow Draw",
-   "Snow Meadow",
-   "Snowonder",
-   "Solace",
-   "South Fork",
-   "Specter",
-   "Spider Monkey",
-   "Spiro",
-   "Spur",
-   "Sticks & Stones",
-   "Stope",
-   "Sundog",
-   "Sunnyside",
-   "Sunrise",
-   "Super Fury",
-   "Sweet Pea",
-   "TNT",
-   "Talus Garden",
-   "Temptation",
-   "Thaynes",
-   "Thaynes Canyon",
-   "The Abyss",
-   "The Aspens",
-   "The Chutes",
-   "The Drain",
-   "The Drop",
-   "The Highway",
-   "The Hoist",
-   "The Pines",
-   "Thrasher",
-   "Thunder",
-   "Thunder Rd.",
-   "Tin Cup",
-   "Tombstone Alley",
-   "Tower",
-   "Town Run",
-   "Trance",
-   "Tranquility",
-   "Transitions Terrain Park",
-   "Treasure Hollow",
-   "Tree Time",
-   "Tube",
-   "Tunnel of Fun",
-   "Turtle Trail",
-   "Twilight",
-   "Twister",
-   "Two Goons",
-   "Tycoon",
-   "Upper Apex Ridge",
-   "Upper Boa",
-   "Upper Crowning Glory",
-   "Upper East Face",
-   "Upper First Time",
-   "Upper Harmony",
-   "Upper Lookout Ridge",
-   "Upper Mainline",
-   "Upper White Pine",
-   "Vista",
-   "Wapiti",
-   "War Zone",
-   "Waterfall",
-   "West Face",
-   "West Scott's Bowl",
-   "Western Boundary",
-   "Whippets Chutes",
-   "White Pine",
-   "Whitewater",
-   "Widowmaker",
-   "Willow Draw",
-   "Willy's Run",
-   "Winter Way",
-   "Woodside",
-   "Yard Sale",
-   "Zeke's Road"
+  "list": [
+   {
+    "name": "1/2 Load",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "1/4 Load",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "easy"
+   },
+   {
+    "name": "10th Mountain",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "1st Bowl",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "3 Kings",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "3/4 Load",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "easy"
+   },
+   {
+    "name": "6 Bells",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "94 Turns",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "A-Chute",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "After Shock",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Alley",
+    "area": "Condor",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Alley Cat",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Alloy Alley",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Alpenglow",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Another World",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Apex Ridge",
+    "area": "Condor",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Aplande",
+    "area": "Condor",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Apparition",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Arrowhead",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Aspen Grove",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Assessment",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Backstreet",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Badger's Bypass",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Badlands",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Belmont",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Berg's Bowl",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Black Forest",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Black Hole",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Blaise's Way",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Blanche",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Blaster",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bliss",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Blueslip Bowl",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Bonanza",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Bonanza Access",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Boogeyman",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Boomer",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Broadway",
+    "area": "King Con",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Broken Arrow",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Buckeye",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Bugle Ridge",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Bugle Ridge Bypass",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "C.B.'s Run",
+    "area": "King Con",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Canis Lupus",
+    "area": "Condor",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Carbide Cut",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cascade",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Chance",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Charlie Brown",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Chicane",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Chimera",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Chrome Alley",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Claimjumper",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Climax",
+    "area": "King Con",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Cloud 9",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Cobalt Woods",
+    "area": "Iron Mountain",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Combustion",
+    "area": "King Con",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Commitment",
+    "area": "King Con",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Comstock",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Condor Woods",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Constellation",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Copperhead",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Courchevel",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Creole",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Crescent",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Dawn",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Day Dream",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Dead Tree",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Deschutes",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Detonator",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Devil's Friend",
+    "area": "Condor",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Diablo",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Diamond Ridge",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Dividend",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Doc's Run",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Double Jack",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Double Nickel",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Drift",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Dutch Hollow",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Dynamite",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Déjà Vu",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "EZ Street",
+    "area": "Condor",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Eagle",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Echo",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Eclipse",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ecstasy",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Elk Dance",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Elk Ridge",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Encore",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "End Zone",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Erika's Gold",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Escapade Woods",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Escape",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Eureka",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "First Time Run",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Five Trees",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Flat Iron",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Flume",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Flying Salmon",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Fool's Gold",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Fools Paradise",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Fortune Teller",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Fright Gully",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Funnel Cloud",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "G-Force",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Gallery",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Georgeanna",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Glory Hole",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Golden Glades",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Golden Spruce",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Goldfinger",
+    "area": "Iron Mountain",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Gotcha Cut-Off",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Grande",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Grizzly",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Half Moon",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Half Pipe",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Hawkeye",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Heavy Metal",
+    "area": "Iron Mountain",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Heckler",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Hidden Bear",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Hidden Splendor",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "High Card",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "High Peak",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Homelite",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Homerun (Full)",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Homerun (Lower)",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Hot Spot",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Hurricane Alley",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Illusion",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Indicator",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Iron Man",
+    "area": "Iron Mountain",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Jonesy's",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Junipers",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Jupiter Access",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Kestrel",
+    "area": "Condor",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Keystone",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "King Con Access",
+    "area": "King Con",
+    "difficulty": "easy"
+   },
+   {
+    "name": "King Con Ridge",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "King Con Run",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "King's Crown",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Kokopelli",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ladies' Slalom",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lazy Day",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lead Foot",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Liberty",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ligety Split",
+    "area": "King Con",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lightning",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Limelite",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Lite's Out",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Little Kings",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Lone Pine",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Lookout Ridge",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lost Prospector",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lower Boa",
+    "area": "Condor",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lower Crowning Glory",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lower East Face",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Lower Harmony",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lower Silver Skis",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lucky Boy",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lynx",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Magic Line",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Main Bowl",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Mainline",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Massacre",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "McConkey's Bowl",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "McDonalds Meadow",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Mel's Alley",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Mellow Moose",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Men's Slalom",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Mercury",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Mid-Mountain",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Mid-Mountain Cutoff",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Mid-Mountain Meadows",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Middle Crowning Glory",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Mikey's",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Mimi's Way",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Mine Shaft",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Mini Pipe",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Mirage",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Molly's",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Monitor",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Moraine",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Motherlode Meadows",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Muckers",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Murdock Bowl",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Mystic Pines",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Nail Driver",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "New Moon",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Newport",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "O-Zone",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "OO2",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "One Hundred Turns",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Oops",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Outlaw",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "P-Zone",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Painted Horse",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Panorama",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Paradise",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Paradise Bowl",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Paradise Chutes",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Parley's Park",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "PayDay Run",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Peace",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Phantasm",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Picabo's",
+    "area": "King Con",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Pick 'N Shovel",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Pick Axe",
+    "area": "King Con",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Pinball Alley",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Pine Draw",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Pinecone Bowl",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Pinecone Ridge",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Pinyon Ridge",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Pioneer",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Pioneer Ridge",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Pipe Dream",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Platinum Woods",
+    "area": "Iron Mountain",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Portuguese Gap",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Powder Keg",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Powder Monkey",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Power Alley",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Prospector",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Puma Bowl",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Quarter Moon",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Quit 'N Time",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "RDR",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Raptor Way",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Reaper",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Red Fox",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Red Pine Chutes",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Red Pine Road",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Rendezvous Bowl",
+    "area": "Condor",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Rendezvous Ridge",
+    "area": "Condor",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Renegade",
+    "area": "Condor",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Renny's Ridge",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Retreat",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Rhapsody",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Rhino",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Ripsaw",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Road D.O.",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Road to Thaynes Canyon",
+    "area": "King Con",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Rosebud",
+    "area": "King Con",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Royal",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "STH",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Saddle Chutes",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Sam's Knob",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Sampson",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sanctuary",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sandman",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Scott's Bowl",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Seldom Seen",
+    "area": "King Con",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Serenity",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Shadow Lands",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Shadow Ridge",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Shadows",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Shaft",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Shamus",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Short Fuse",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Shortline",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Showcase",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sidewinder",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Silver Cliff",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Silver Hollow",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Silver Horse",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Silver King",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Silver Queen",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Silver Skis",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Silver Spur",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Silver Star",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Silver Streak",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Silverado",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Silverado Bowl",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Single Jack",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sitka",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sixes",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sleeper",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Snow Dancer",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Snow Draw",
+    "area": "Condor",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Snow Meadow",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Snowonder",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Solace",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "South Fork",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Specter",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Spider Monkey",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Spiro",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Spur",
+    "area": "Condor",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sticks & Stones",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Stope",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Sundog",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sunnyside",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sunrise",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Super Fury",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sweet Pea",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "TNT",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Talus Garden",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Temptation",
+    "area": "King Con",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Thaynes",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Thaynes Canyon",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "The Abyss",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "The Aspens",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Chutes",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "expert"
+   },
+   {
+    "name": "The Drain",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "The Drop",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Highway",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "The Hoist",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Pines",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Thrasher",
+    "area": "Condor",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Thunder",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Thunder Rd.",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Tin Cup",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Tombstone Alley",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Tower",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Town Run",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Trance",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Tranquility",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Transitions Terrain Park",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Treasure Hollow",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Tree Time",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Tube",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Tunnel of Fun",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Turtle Trail",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Twilight",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Twister",
+    "area": "Condor",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Two Goons",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Tycoon",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Upper Apex Ridge",
+    "area": "Condor",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Upper Boa",
+    "area": "Condor",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Upper Crowning Glory",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Upper East Face",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Upper First Time",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Upper Harmony",
+    "area": "Peak 5/9990/Tombstone",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Upper Lookout Ridge",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Upper Mainline",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Upper White Pine",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Vista",
+    "area": "King Con",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Wapiti",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "War Zone",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Waterfall",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "West Face",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "West Scott's Bowl",
+    "area": "Jupiter",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Western Boundary",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Whippets Chutes",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "White Pine",
+    "area": "Iron Mountain",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Whitewater",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Widowmaker",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Willow Draw",
+    "area": "OBX/Saddleback/Sun Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Willy's Run",
+    "area": "Payday/Town/Crescent",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Winter Way",
+    "area": "Day Break / Dreamscape / Dreamcatcher",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Woodside",
+    "area": "Bonanza/McConkey's/Pioneer",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Yard Sale",
+    "area": "Condor",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Zeke's Road",
+    "area": "Silverlode/Thaynes/Motherlode",
+    "difficulty": "intermediate"
+   }
   ]
- }
+ },
+ "outside": [],
+ "box": [
+  448200,
+  4494400,
+  459000,
+  4506600
+ ]
 }
