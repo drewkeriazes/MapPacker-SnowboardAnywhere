@@ -129,5 +129,6 @@
   ],
   "start_run": "Born Free",
   "grooming_aliases": {"Mil Creek Road": "Mill Creek Road", "Ruder's": "Ruder's Run"},
-  "terrain_status_url": "https://www.vail.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx"
+  "terrain_status_url": "https://www.vail.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+  "crown_cover_spots": {"Back Bowls sign": [-718, 496], "front side above Vail Village": [2324, 3150]}
 }

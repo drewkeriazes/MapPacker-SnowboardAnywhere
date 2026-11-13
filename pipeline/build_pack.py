@@ -34,6 +34,7 @@ from canopy_spots import run_half_width   # run corridor half widths, shared wit
 import species as spc
 import paths
 import stands
+import widths
 import tiers
 import tier_sources as ts
 from species import evt_luts
@@ -355,6 +356,8 @@ if LIDAR:
     chm[np.isnan(chm)] = 0
     chm = np.clip(chm, 0, 60).astype(np.float32)
     # fill isolated empty cells from neighbours
+    # FEAT-298: the lidar's canopy share (3 m or taller) for the crown cover log, before the closing below widens it
+    lidar_can = chm >= 3.0
     chm = ndimage.grey_closing(chm, size=3)
     log(f"  CHM: {np.mean(chm>2)*100:.1f}% of cells > 2 m, p99 {np.percentile(chm, 99):.1f} m")
 else:
@@ -1285,7 +1288,7 @@ trees = np.stack([tx, ty, tz, hgt, crown, species.astype(np.float32)], axis=1).a
 CELL = 1000.0
 cells_x = int(math.ceil(W / CELL)); cells_y = int(math.ceil(H / CELL))
 inst = {"cellSize": CELL, "minX": X0 - OX, "minY": Y0 - OY, "cellsX": cells_x, "cellsY": cells_y}
-inst["treeCount"] = write_instances(out, "trees", trees, CELL, X0 - OX, Y0 - OY, cells_x, cells_y)
+inst["treeCount"] = len(trees)     # written after the stands (FEAT-298: their stems set the crowns' widths)
 cnt = np.bincount(species.astype(np.int64), minlength=spc.N_SPECIES)
 log(f"  trees {inst['treeCount']}: " + ", ".join(f"{spc.SPECIES_NAMES[i]} {cnt[i]} ({cnt[i] / max(n_t, 1) * 100:.1f}%)" for i in range(spc.N_SPECIES)))
 lp = species == spc.LODGEPOLE
@@ -1302,7 +1305,7 @@ os.makedirs(os.path.join(out, "debug"), exist_ok=True)
 spc.debug_png(os.path.join(out, "debug", "species.png"), tx, ty, species,
               group_lut[np.clip(evt_lf.on2(data=evt_nat), 0, lut_n - 1)] if evt is not None else None, X0 - OX, Y1 - OY, W, H)
 log("  debug/species.png: species per 10 m (left), LANDFIRE group with the built classes filled (right)")
-del northeast, wet, ridge, group, a_frac, alpine, roll, naip_dec, hw_frac, trees, crown, is_snag
+del northeast, wet, ridge, group, a_frac, alpine, roll, naip_dec, hw_frac, crown, is_snag
 
 # FEAT-074: stand density per 4 m cell (stands.py): the chance of a generated stem, the stand height and species,
 # and the ground height, per 1 km tree cell. The detected crowns nearby count against the stand.
@@ -1359,14 +1362,40 @@ if LIDAR and len(rows):
     del crown4, ok4, cr4
 p4 = stands.stem_chance(canopy4, h4, sp4, det4, closed4)
 p4[canopy4 <= 0] = 0
+# FEAT-298: crown width by openness (widths.py). Openness from the neighbours' crown cover within 10 m (the detected
+# crowns and the stems in expectation, at the species radii); the crowns widen by it, and the stems are thinned per
+# block so the drawn canopy stays what it was. Record field 4 becomes the radius to draw.
+wb4 = None
+if widths.enabled(cfg) and len(rows):
+    p4, wb4, drawn4, inst["crownWidths"], line = widths.apply(trees, np.minimum(rows // 2, H4 - 1), np.minimum(cols // 2, W4 - 1),
+                                                           p4, h4, sp4, widths.multipliers(cfg), spc.hash01)
+    log("  " + line)
+    # the guard round the config's spots (crown_cover_spots): the drawn crown cover after the widening against before
+    # it, and the lidar's canopy share for reference (2 m cells, so it reads higher than a 1 m grid: 0.25 against
+    # 0.16 to 0.23 within 250 m of Vail's Back Bowls sign, where the drawn trees cover about 0.1)
+    fields = {"drawn": drawn4[0], "before": drawn4[1]}
+    if LIDAR:
+        fields["lidar"] = blk(lidar_can).mean(axis=(1, 3)).astype(np.float32)
+    for name, rad, m in widths.cover_check(fields, 4.0, X0 - OX, Y1 - OY, cfg.get("crown_cover_spots") or {}):
+        ch = m["drawn"] / max(m["before"], 1e-6) - 1
+        log(f"  crown cover {rad:.0f} m round {name}: drawn {m['drawn']:.3f}, at the species radii {m['before']:.3f} ({ch * 100:+.0f}%)"
+            + (f", lidar canopy {m['lidar']:.3f}" if "lidar" in m else "")
+            + ("  WARNING: the widths changed the canopy by over 10% (FEAT-298)" if abs(ch) > 0.10 else ""))
+    del drawn4, fields
+elif not widths.enabled(cfg):
+    log("  crown widths off (crown_widths: false): every tree at its species radius")
+if LIDAR:
+    del lidar_can
+inst["treeCount"] = write_instances(out, "trees", trees, CELL, X0 - OX, Y0 - OY, cells_x, cells_y)
+del trees
 log(f"  stands: canopy on {np.mean(canopy4 > 0) * 100:.1f}% of the 4 m cells, {p4.sum() / 1e6:.2f} M expected stems "
     f"({p4.sum() / max(np.count_nonzero(canopy4) * 16 / 1e4, 1e-6):.0f} per hectare of canopy), "
     f"detected crowns {len(pr) / 1e6:.2f} M"
     + (f", {(closed4 * (canopy4 > 0)).sum() / max(np.count_nonzero(canopy4), 1) * 100:.0f}% of the canopy in closed stands (BUG-120)" if closed4 is not None else ""))
 del closed4
-stand_meta = stands.write(out, p4, h4, sp4, z4, CELL, X0 - OX, Y0 - OY, cells_x, cells_y, Z_MIN)
+stand_meta = stands.write(out, p4, h4, sp4, z4, CELL, X0 - OX, Y0 - OY, cells_x, cells_y, Z_MIN, wb4)
 log(f"  stands/: {len(stand_meta['cells'])} cells, {stand_meta['stems'] / 1e6:.2f} M stems at full density")
-del canopy4, det4, h4, z4, sp4, p4
+del canopy4, det4, h4, z4, sp4, p4, wb4
 
 # shrubs (DATA-020): willow on creek bottoms, juniper in spruce-fir gaps and on open south crests, sagebrush and
 # Gambel oak in their LANDFIRE classes, young conifers along forest edges; density from NAIP NDVI where there is

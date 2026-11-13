@@ -205,7 +205,6 @@ crown = spc.crown_radius(species, hgt)
 trees = np.stack([TX, TY, TZ, hgt, crown, species.astype(np.float32)], axis=1).astype(np.float32)
 CELL = 1000.0; cells = int(FS // CELL)
 meta["instances"] = {"cellSize": CELL, "minX": FX0, "minY": FY0, "cellsX": cells, "cellsY": cells}
-meta["instances"]["treeCount"] = write_instances(out, "trees", trees, CELL, FX0, FY0, cells, cells)
 meta["treeSpecies"] = spc.TREE_SPECIES_VERSION
 
 # FEAT-074: stand density per 4 m cell from the forest field, the crowns above counting against it
@@ -224,7 +223,13 @@ SP4[fi, fj] = spc.assign_species(X4[fi, fj], Y4[fi, fj], Z4[fi, fj], H4[fi, fj],
 SP4[(Z4 > 3280) & (f4 > 0)] = spc.KRUMMHOLZ
 P4 = stands.stem_chance(f4, H4, SP4, det4)
 P4[f4 <= 0] = 0
-meta["stands"] = stands.write(out, P4, H4, SP4, Z4, CELL, FX0, FY0, cells, cells, meta["zRange"][0])
+# FEAT-298: crown width by openness, as a real build widens them (so the game's CI draws a pack with crown widths)
+import widths
+r4 = np.clip(((FY0 + FS) - TY) // 4, 0, N4 - 1).astype(int); c4 = np.clip((TX - FX0) // 4, 0, N4 - 1).astype(int)
+P4, WB4, _drawn, meta["instances"]["crownWidths"], line = widths.apply(trees, r4, c4, P4, H4, SP4, widths.multipliers({}), spc.hash01)
+print(line)
+meta["instances"]["treeCount"] = write_instances(out, "trees", trees, CELL, FX0, FY0, cells, cells)
+meta["stands"] = stands.write(out, P4, H4, SP4, Z4, CELL, FX0, FY0, cells, cells, meta["zRange"][0], WB4)
 print(f"stands: {meta['stands']['stems']} stems at full density in {len(meta['stands']['cells'])} cells")
 
 # shrubs: on the thin forest edge, young conifers up high, juniper, sagebrush and willow lower down

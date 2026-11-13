@@ -12,7 +12,8 @@ stands/<cx>_<cy>.png: RGB, SIZE wide and 2 * SIZE tall, row 0 = north.
     B  species id 0..9 (species.py)
   rows SIZE .. 2*SIZE-1: the ground height at the cell centre, (z - zBase) * Z_SCALE as 16 bits, R high and G low,
     where a stem can stand and one cell round it; 0 elsewhere (no data). zBase is the pack's lowest ground, so
-    a pack spans at most 2,048 m of relief.
+    a pack spans at most 2,048 m of relief. B (FEAT-298, packs with meta.instances.crownWidths): the cell's crown
+    width factor x widths.WIDTH_STEP where a stem can stand, 0 elsewhere (and in older packs).
 RGB only: a browser decoder that premultiplies alpha would zero the colour where alpha is 0.
 """
 import math
@@ -50,15 +51,16 @@ def stem_chance(canopy4, height4, species4, detected4, closed4=None):
     return p.astype(np.float32)
 
 
-def encode(p, height, species, z, z_base):
-    """one cell's (SIZE x SIZE) fields to the RGB stand image (2 * SIZE x SIZE x 3, uint8)"""
+def encode(p, height, species, z, z_base, wb=None):
+    """one cell's (SIZE x SIZE) fields to the RGB stand image (2 * SIZE x SIZE x 3, uint8); wb: the width factor
+    bytes (FEAT-298, widths.encode_factor) or None"""
     top = np.stack([np.round(np.clip(p, 0, 1) * 255),
                     np.round(np.clip(height / H_STEP, 0, 255)),
                     np.clip(species, 0, 255)], axis=-1)
     # ground height where a stem can stand and one cell round it (the client interpolates it bilinearly)
     near = ndimage.binary_dilation(p > 0, structure=np.ones((3, 3), bool))
     q = np.where(near, np.round(np.clip((z - z_base) * Z_SCALE, 1, 65535)), 0).astype(np.int64)
-    bot = np.stack([q >> 8, q & 255, np.zeros_like(q)], axis=-1)
+    bot = np.stack([q >> 8, q & 255, np.zeros_like(q) if wb is None else wb.astype(np.int64)], axis=-1)
     return np.concatenate([top, bot], axis=0).astype(np.uint8)
 
 
@@ -69,15 +71,16 @@ def decode(img, z_base):
     return t[..., 0] / 255, t[..., 1] * H_STEP, t[..., 2].astype(np.int64), (b[..., 0] * 256 + b[..., 1]) / Z_SCALE + z_base
 
 
-def write(out_dir, p, height, species, z, cell, min_x, min_y, cells_x, cells_y, z_base):
+def write(out_dir, p, height, species, z, cell, min_x, min_y, cells_x, cells_y, z_base, wb=None):
     """split the pack-wide 4 m fields (row 0 = north, the south edge at min_y) into stands/<cx>_<cy>.png per tree
-    cell; cells with no stem chance get no file. Returns the meta entry."""
+    cell; cells with no stem chance get no file. wb: the width factor bytes (FEAT-298) or None. Returns the meta entry."""
     size = int(round(cell / RES))
     H, W = p.shape
     d = os.path.join(out_dir, "stands"); os.makedirs(d, exist_ok=True)
     # south-aligned: pad (or crop) the north rows and the east columns to whole cells
     pad = lambda a: np.pad(a, ((max(0, cells_y * size - H), 0), (0, max(0, cells_x * size - W))))[-cells_y * size:, :cells_x * size]
     P, Hh, S, Z = pad(p), pad(height), pad(species), pad(z)
+    WB = None if wb is None else pad(wb)
     names, stems = [], 0.0
     for cy in range(cells_y):
         r0 = (cells_y - 1 - cy) * size
@@ -85,14 +88,22 @@ def write(out_dir, p, height, species, z, cell, min_x, min_y, cells_x, cells_y, 
             sl = (slice(r0, r0 + size), slice(cx * size, (cx + 1) * size))
             if not (P[sl] > 0.5 / 255).any():
                 continue
-            Image.fromarray(encode(P[sl], Hh[sl], S[sl], Z[sl], z_base), "RGB").save(os.path.join(d, f"{cx}_{cy}.png"), optimize=True)
+            Image.fromarray(encode(P[sl], Hh[sl], S[sl], Z[sl], z_base, None if WB is None else WB[sl]), "RGB").save(os.path.join(d, f"{cx}_{cy}.png"), optimize=True)
             names.append(f"{cx}_{cy}"); stems += float(np.round(P[sl] * 255).sum() / 255)
     return {"res": RES, "size": size, "zBase": float(z_base), "zScale": Z_SCALE, "hStep": H_STEP, "cells": sorted(names),
             "stems": int(round(stems))}
 
 
-def read_all(pack_dir, meta):
-    """yield (cx, cy, p, height, species, z) per stand file of a built pack"""
+def width_factor(img):
+    """FEAT-298: the width factor per 4 m cell of a stand image (lower half B / WIDTH_STEP; 0 reads as 1)"""
+    from widths import WIDTH_STEP
+    n = img.shape[0] // 2
+    b = img[n:, :, 2].astype(np.float32)
+    return np.where(b > 0, b / WIDTH_STEP, 1.0).astype(np.float32)
+
+
+def read_all(pack_dir, meta, with_width=False):
+    """yield (cx, cy, p, height, species, z) per stand file of a built pack, plus the width factor with `with_width`"""
     st = meta.get("stands")
     if not st:
         return
@@ -100,7 +111,8 @@ def read_all(pack_dir, meta):
         f = os.path.join(pack_dir, "stands", f"{nm}.png")
         if os.path.exists(f):
             cx, cy = (int(v) for v in nm.split("_"))
-            yield (cx, cy) + decode(np.asarray(Image.open(f).convert("RGB")), st["zBase"])
+            img = np.asarray(Image.open(f).convert("RGB"))
+            yield (cx, cy) + decode(img, st["zBase"]) + ((width_factor(img),) if with_width else ())
 
 
 def expected_crowns(pack_dir, meta, res, w, h, shadow_h):
@@ -112,14 +124,19 @@ def expected_crowns(pack_dir, meta, res, w, h, shadow_h):
     if not st:
         return area, shade, hsum, hcnt
     size, sres, cs = st["size"], st["res"], inst["cellSize"]
-    for cx, cy, p, hh, sp, _z in read_all(pack_dir, meta):
+    cw = inst.get("crownWidths")
+    for cx, cy, p, hh, sp, _z, wf in read_all(pack_dir, meta, with_width=True):
         i, j = np.nonzero(p > 0)
         x = inst["minX"] + cx * cs + (j + 0.5) * sres
         y = inst["minY"] + (cy + 1) * cs - (i + 0.5) * sres
         c = ((x - b["minX"]) / res).astype(int); r = ((b["maxY"] - y) / res).astype(int)
         ok = (c >= 0) & (c < w) & (r >= 0) & (r < h)
         pp, hv = p[i, j][ok], hh[i, j][ok]
-        a = pp * np.pi * (CROWN_RATIO[np.clip(sp[i, j][ok], 0, len(CROWN_RATIO) - 1)] * hv * 0.875) ** 2   # mean height 0.875 x the stand's
+        spp = np.clip(sp[i, j][ok], 0, len(CROWN_RATIO) - 1)
+        a = pp * np.pi * (CROWN_RATIO[spp] * hv * 0.875) ** 2   # mean height 0.875 x the stand's
+        if cw:   # FEAT-298: the stems' widths, their own draw in expectation
+            import widths
+            a = a * widths.area_factor(spp, wf[i, j][ok])
         np.add.at(area, (r[ok], c[ok]), a)
         np.add.at(shade, (r[ok], c[ok]), a * np.clip(hv * 0.875 / shadow_h, 0, 1.5))
         np.add.at(hsum, (r[ok], c[ok]), pp * hv * 0.875); np.add.at(hcnt, (r[ok], c[ok]), pp)
