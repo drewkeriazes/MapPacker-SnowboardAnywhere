@@ -20,6 +20,9 @@ packs/<slug>). The config is resorts/<slug>/<slug>.json, the manifest manifests/
   spots     the game's tools/propose_spots.py: 10 proposed compare spots with game stills in the game checkout's
             docs/compare/<slug>/, for Drew to add Street View links (once, while the resort has no spots there)
   index     packs/index.json lists the pack
+  published published.py (FEAT-293): the resort's published figures and trail list, resorts/<slug>/<slug>-published.json,
+            for the report's line 21 (Wikidata and Wikipedia; when they can't be reached the line skips, the build
+            goes on, and the next run tries again)
   report    pack_report.py: the DATA-022 scorecard (report.json, report.md in the pack)
 
 A stage is skipped when its inputs have not changed since it last ran: each stage's input fingerprint is kept in
@@ -46,7 +49,7 @@ REPO = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import paths  # noqa: E402
 
-STAGES = ["nodes", "manifest", "fetch", "landfire", "grooming", "build", "content", "attract", "spots", "index", "report"]
+STAGES = ["nodes", "manifest", "fetch", "landfire", "grooming", "build", "content", "attract", "spots", "index", "published", "report"]
 STATE = "build_resort.json"
 LANDFIRE = (("EVT", "landfire"), ("EVC", os.path.join("landfire", "evc")), ("EVH", os.path.join("landfire", "evh")))
 # raw layers build_pack.py needs (pack_report.py line 2): folder, and a file that must be in it
@@ -96,7 +99,7 @@ def file_sha(path) -> str | None:
 # and went back to the game (FEAT-242), so neither shapes a pack
 NOT_BUILD = ("pipeline/tests", "pipeline/resorts", "pipeline/manifests", "pipeline/build_resort.py",
              "pipeline/resort.py", "pipeline/publish_pack.py", "pipeline/pack_report.py", "pipeline/contract.py",
-             "pipeline/prep_textures.py", "pipeline/gen_content.py")
+             "pipeline/prep_textures.py", "pipeline/gen_content.py", "pipeline/published.py")
 # FEAT-175 step 4: gen_content.py is its own stage (content) after the build, with its own fingerprint
 NOT_BUILD_SPEC = [f":!{p}" for p in NOT_BUILD]
 
@@ -547,6 +550,24 @@ def index_run(r, ctx):
     with open(os.path.join(packs, "index.json"), encoding="utf-8") as f:
         if r.slug not in json.load(f)["packs"]:
             raise Failed(f"{r.slug} is not in {os.path.join(packs, 'index.json')}: is {r.out} named {r.slug}?")
+
+
+def published_inputs(r):
+    import published
+    groom = sorted(os.path.basename(p) for p in glob.glob(os.path.join(r.raw, "grooming", "*.json")))
+    ident = {k: r.cfg.get(k) for k in ("name", "openskidata", "osm_ski_area_way", "relocate", "terrain_status_url")}
+    return sha(published.VERSION, ident, groom[-1:])
+
+
+def published_present(r):
+    import published
+    return os.path.isfile(published.published_path(r.slug, r.resorts))
+
+
+def published_run(r, ctx):
+    cmd = [sys.executable, os.path.join(HERE, "published.py"), r.slug, "--raw", r.raw, "--resorts", r.resorts]
+    if ctx.run(cmd):
+        print("  published.py failed (Wikidata or Wikipedia not reached?): report line 21 skips; the next run tries again")
 
 
 def report_inputs(r):

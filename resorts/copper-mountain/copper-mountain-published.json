@@ -1,0 +1,54 @@
+{
+ "version": 1,
+ "slug": "copper-mountain",
+ "fetched": "2026-11-13",
+ "areas": [
+  {
+   "openskidata_id": "0bab3102857cf4c7243d3db844c283a24413fa28",
+   "name": "Copper Mountain",
+   "wikidata": "Q2362338",
+   "found_by": "OpenSkiData wikidataID",
+   "wikipedia": "Copper Mountain (Colorado)",
+   "infobox": true
+  }
+ ],
+ "figures": {
+  "summit": {
+   "value": 3753,
+   "unit": "m",
+   "source": "Wikipedia: Copper Mountain (Colorado)",
+   "text": "12313 ft"
+  },
+  "base": {
+   "value": 2960,
+   "unit": "m",
+   "source": "Wikipedia: Copper Mountain (Colorado)",
+   "text": "9712 ft"
+  },
+  "vertical": {
+   "value": 793,
+   "unit": "m",
+   "source": "Wikipedia: Copper Mountain (Colorado)",
+   "text": "2601 ft"
+  },
+  "lifts": {
+   "value": 23,
+   "unit": "",
+   "source": "Wikipedia: Copper Mountain (Colorado)",
+   "text": "23 total; - 1 Chondola; - 3 high-speed six-person chairs; - 3 high-speed quad chairs; - 5 triple chairs; - 4 double chairs; - 8 surface lifts; - 1 tubing"
+  },
+  "runs": {
+   "value": 140,
+   "unit": "",
+   "source": "Wikipedia: Copper Mountain (Colorado)",
+   "text": "140+ total; : 21% easiest; : 25% intermediate; : 36% advanced; : 18% expert"
+  },
+  "area": {
+   "value": 9.98,
+   "unit": "km2",
+   "source": "Wikipedia: Copper Mountain (Colorado)",
+   "text": "2465 acre"
+  }
+ },
+ "trails": null
+}

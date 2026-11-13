@@ -1,0 +1,54 @@
+{
+ "version": 1,
+ "slug": "heavenly",
+ "fetched": "2026-11-13",
+ "areas": [
+  {
+   "openskidata_id": "3f61859b47be735a77df9b1b9e102edbeb529286",
+   "name": "Heavenly Mountain Resort",
+   "wikidata": "Q1548153",
+   "found_by": "Wikidata search 'Heavenly Mountain Resort'",
+   "wikipedia": "Heavenly Mountain Resort",
+   "infobox": true
+  }
+ ],
+ "figures": {
+  "summit": {
+   "value": 3068,
+   "unit": "m",
+   "source": "Wikipedia: Heavenly Mountain Resort",
+   "text": "10067 ft"
+  },
+  "base": {
+   "value": 1907,
+   "unit": "m",
+   "source": "Wikipedia: Heavenly Mountain Resort",
+   "text": "6255 ft"
+  },
+  "vertical": {
+   "value": 1162,
+   "unit": "m",
+   "source": "Wikipedia: Heavenly Mountain Resort",
+   "text": "3812 ft"
+  },
+  "lifts": {
+   "value": 25,
+   "unit": "",
+   "source": "Wikipedia: Heavenly Mountain Resort",
+   "text": "25 total: 1 high speed gondola, 1 aerial tram, 2 high speed six passenger chairs, 8 high speed quads, 1 fixed grip quad, 4 triples, 2 doubles, 2 surface, 4 magic carpets"
+  },
+  "runs": {
+   "value": 97,
+   "unit": "",
+   "source": "Wikipedia: Heavenly Mountain Resort",
+   "text": "97 total; 20% Easier; 45% More Difficult; 35% Most Difficult"
+  },
+  "area": {
+   "value": 19.42,
+   "unit": "km2",
+   "source": "Wikipedia: Heavenly Mountain Resort",
+   "text": "4800 acre"
+  }
+ },
+ "trails": null
+}

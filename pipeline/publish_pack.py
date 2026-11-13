@@ -211,9 +211,10 @@ def run(cmd: list, cwd: str | None = None, capture: bool = True) -> str:
 
 
 def resort_files(slug: str, repo_dir: str = REPO) -> list:
-    """the resort's own files, relative to the repo: config, EPT node lists, data plan, manifest, report"""
+    """the resort's own files, relative to the repo: config, EPT node lists, data plan, published figures (FEAT-293),
+    manifest, report"""
     own = os.path.join("resorts", slug)
-    rel = [os.path.join(own, f"{slug}.json"), os.path.join(own, f"{slug}-plan.md"),
+    rel = [os.path.join(own, f"{slug}.json"), os.path.join(own, f"{slug}-plan.md"), os.path.join(own, f"{slug}-published.json"),
            os.path.join("manifests", f"{slug}.json"), os.path.join("reports", f"{slug}.md")]
     rel += [os.path.relpath(p, repo_dir) for p in sorted(glob.glob(os.path.join(repo_dir, own, f"{slug}_*nodes*.txt")))]
     return [p.replace(os.sep, "/") for p in rel if os.path.isfile(os.path.join(repo_dir, p))]

@@ -1,0 +1,54 @@
+{
+ "version": 1,
+ "slug": "keystone",
+ "fetched": "2026-11-13",
+ "areas": [
+  {
+   "openskidata_id": "7d855b81e131f7cb7bdbc7b55e47a18d3ccb5e67",
+   "name": "Keystone",
+   "wikidata": "Q6398500",
+   "found_by": "OpenSkiData wikidataID",
+   "wikipedia": "Keystone Resort",
+   "infobox": true
+  }
+ ],
+ "figures": {
+  "summit": {
+   "value": 3782,
+   "unit": "m",
+   "source": "Wikipedia: Keystone Resort",
+   "text": "12408 ft"
+  },
+  "base": {
+   "value": 2829,
+   "unit": "m",
+   "source": "Wikipedia: Keystone Resort",
+   "text": "9280 ft"
+  },
+  "vertical": {
+   "value": 953,
+   "unit": "m",
+   "source": "Wikipedia: Keystone Resort",
+   "text": "3128 ft"
+  },
+  "lifts": {
+   "value": 21,
+   "unit": "",
+   "source": "Wikipedia: Keystone Resort",
+   "text": "21 total (2 gondolas, 4 high speed six packs, 3 high speed quads, 1 fixed grip quad, 1 triple chairlift, 2 double chairlifts, and 8 surface lifts)"
+  },
+  "runs": {
+   "value": 135,
+   "unit": "",
+   "source": "Wikipedia: Keystone Resort",
+   "text": "135 total; (19% beginner; 32% intermediate; 49% advanced)"
+  },
+  "area": {
+   "value": 12.74,
+   "unit": "km2",
+   "source": "Wikipedia: Keystone Resort",
+   "text": "3148 acre"
+  }
+ },
+ "trails": null
+}
