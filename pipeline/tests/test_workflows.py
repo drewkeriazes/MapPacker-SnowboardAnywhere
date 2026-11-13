@@ -175,9 +175,35 @@ def test_build_pack_never_interpolates_an_input_or_a_secret_into_a_shell_line():
 
 def test_build_pack_inputs_reach_the_steps_as_env():
     wf = load(BUILD)
-    assert set(triggers(wf)["workflow_dispatch"]["inputs"]) == {"slug", "name", "osm_id", "requested_by"}
-    assert wf["env"] == {"SLUG": "${{ inputs.slug }}", "NAME": "${{ inputs.name }}",
+    assert set(triggers(wf)["workflow_dispatch"]["inputs"]) == {"rebuild", "slug", "name", "osm_id", "requested_by"}
+    assert wf["env"] == {"SLUG": "${{ inputs.slug }}", "REBUILD": "${{ inputs.rebuild }}", "NAME": "${{ inputs.name }}",
                          "OSM_ID": "${{ inputs.osm_id }}", "REQUESTED_BY": "${{ inputs.requested_by }}"}
+
+
+def test_build_pack_rebuild_list_names_only_packs_that_can_be_rebuilt():
+    """FEAT-297: a choice list, the new-resort entry first, then packs with a config that is not a relocate source.
+    Only this direction is checked: a publish PR adds a resort to the catalog but can't edit the workflow (the App
+    has no Workflows permission), so a new resort waits for rebuild_choices.py --write"""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "ci"))
+    import rebuild_choices as rc
+    inp = triggers(load(BUILD))["workflow_dispatch"]["inputs"]["rebuild"]
+    assert inp["type"] == "choice" and inp["required"] is False and inp["default"] == rc.NEW
+    assert inp["options"][0] == rc.NEW and len(inp["options"]) > 1
+    assert inp["options"] == rc.read_list(open(os.path.join(ROOT, BUILD), encoding="utf-8").read())
+    for slug in inp["options"][1:]:
+        assert rc.rebuildable(slug, os.path.join(ROOT, "resorts")), f"{slug} is on the rebuild list but can't be rebuilt"
+    assert inp["options"][1:] == sorted(inp["options"][1:])
+    assert triggers(load(BUILD))["workflow_dispatch"]["inputs"]["slug"]["required"] is False
+    assert load(BUILD)["run-name"] == "Build pack ${{ inputs.slug || inputs.rebuild }}"   # the game reads the slug off it
+
+
+def test_rebuild_choices_writes_the_list_in_place():
+    sys.path.insert(0, os.path.join(ROOT, "tools", "ci"))
+    import rebuild_choices as rc
+    text = "a:\n  options:\n    " + rc.MARKER + "\n    - '" + rc.NEW + "'\n    - old\n  next: 1\n"
+    out = rc.write_list(text, [rc.NEW, "bigsky", "vail"])
+    assert rc.read_list(out) == [rc.NEW, "bigsky", "vail"] and out.endswith("    - vail\n  next: 1\n")
+    assert rc.write_list(out, [rc.NEW, "bigsky", "vail"]) == out
 
 
 def test_build_pack_queues_then_probes_then_builds_on_hosted_runners():
