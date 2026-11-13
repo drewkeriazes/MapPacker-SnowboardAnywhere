@@ -247,6 +247,13 @@ RZ = height(RX, RY)
 rocks = np.stack([RX, RY, RZ, rng.gamma(3, 0.8, len(RX)) + 0.6, rng.uniform(0, 6.283, len(RX)), rng.integers(0, 3, len(RX))], axis=1).astype(np.float32)
 meta["instances"]["rockCount"] = write_instances(out, "rocks", rocks, CELL, FX0, FY0, cells, cells)
 
+# FEAT-294: the pack cover level (cover/pack.png and cover/pack-stands.png) as a real build writes it, from the mask,
+# runs, trees and stands above, so the game's cover path draws on the synthetic pack too: the far forest per pixel
+# (FEAT-153), the drawn trees' shadows (FEAT-168) and the clump impostors (the game's FEAT-292). No mid or far level:
+# those come from land cover data.
+import cover
+meta["cover"] = {"heightMax": cover.HEIGHT_MAX, "blend": cover.BLEND_M, "levels": [cover.pack_level(out, meta, runs)]}
+
 meta["start"] = {"x": 650.0, "y": -1300.0, "heading": 0.0}
 meta["sun"] = {"azimuth": 150, "elevation": 35}
 write_meta(out, meta)
