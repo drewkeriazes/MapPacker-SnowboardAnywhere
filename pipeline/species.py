@@ -404,6 +404,10 @@ def east_no_evt(sp, elev, northeast, wet, region, b, v):
     return np.where(above, sp, np.where(hem, HEMLOCK, HARDWOOD)).astype(np.int8)
 
 
+# BUG-129: the tallest tree that can be a limber pine (m of measured lidar height); the ridge rule below stays at 10 m
+LIMBER_MAX_H = 12.0
+
+
 def assign_species(x, y, elev, chm_at, group, aspen_frac, alpine, aspen_like, northeast, wet, ridge, aspen_roll, have_evt,
                    naip_decides=None, hardwood_frac=None, region=WEST):
     """species id per tree (int8 array). Inputs are per-tree arrays:
@@ -427,7 +431,9 @@ def assign_species(x, y, elev, chm_at, group, aspen_frac, alpine, aspen_like, no
     if have_evt:
         sp[(group == G_LODGEPOLE) & (v < 0.85)] = LODGEPOLE
         sp[(group == G_DOUGLAS) & (v < 0.65 * smoothstep(3250, 3000, elev))] = DOUGLAS
-        sp[(group == G_LIMBER) & (v < 0.8)] = LIMBER
+        # BUG-129: limber pine at treeline is short and gnarled; a tall tree in a limber-bristlecone class (a 20 m
+        # crown beside Vail's Back Bowls sign) is the class's spruce-fir and keeps the usual split
+        sp[(group == G_LIMBER) & (v < 0.8) & (np.asarray(chm_at) < LIMBER_MAX_H)] = LIMBER
         none = group == G_NONE
         if east:
             sp[none] = east_no_evt(sp, elev, northeast, wet, region, hash01(x, y, 4), v)[none]
