@@ -33,16 +33,21 @@ CROWN_RATIO = np.array([0.13, 0.17, 1.1, 0.1, 0.09, 0.17, 0.35, 0.05, 0.26, 0.16
 DETECTED_SIGMA = 6.0
 
 
-def stem_chance(canopy4, height4, species4, detected4):
+def stem_chance(canopy4, height4, species4, detected4, closed4=None):
     """chance (0..1) of one generated stem per 4 m cell.
 
     canopy4: share of the cell under canopy 0..1; height4: stand height (m); species4: species id per cell;
-    detected4: detected crowns per cell. A closed stand wants K_CLOSE / (pi r^2) stems per m2 (r the drawn crown
-    radius), scaled by the canopy share; the detected crowns nearby are subtracted."""
+    detected4: detected crowns per cell; closed4 (BUG-120): 0..1 weight of a closed stand per cell, or None.
+    A closed stand wants K_CLOSE / (pi r^2) stems per m2 (r the drawn crown radius), scaled by the canopy share;
+    the detected crowns nearby are subtracted. The canopy mask reads a sparse stand as closed canopy (BUG-069),
+    so the stems are scaled by `closed4` too: a sparse stand is carried by its detected crowns alone."""
     r = CROWN_RATIO[np.clip(species4, 0, len(CROWN_RATIO) - 1).astype(np.int64)] * np.maximum(height4, 1.0)
     want = canopy4 * K_CLOSE / (np.pi * np.maximum(r, 0.5) ** 2)                 # stems per m2
     have = ndimage.gaussian_filter(detected4.astype(np.float32), DETECTED_SIGMA / RES) / RES ** 2
-    return np.clip((want - have) * RES ** 2, 0, 1).astype(np.float32)
+    p = np.clip((want - have) * RES ** 2, 0, 1)
+    if closed4 is not None:
+        p = p * np.clip(closed4, 0, 1)
+    return p.astype(np.float32)
 
 
 def encode(p, height, species, z, z_base):

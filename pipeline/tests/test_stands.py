@@ -47,6 +47,11 @@ def test_stem_chance():
     det = np.zeros((n, n), np.float32); det[::2, ::2] = 1           # a crown every 8 m
     pd = stands.stem_chance(canopy * 0.5, h, spruce, det)
     assert pd[n // 2, n // 2] < p[n // 2, n // 2] * 0.5
+    # BUG-120: the closed-stand weight scales the chance, none outside closed stands
+    closed = np.zeros((n, n), np.float32); closed[:, n // 2:] = 1; closed[:, n // 4:n // 2] = 0.5
+    pc = stands.stem_chance(canopy * 0.5, tall, spruce, none, closed)
+    pt5 = stands.stem_chance(canopy * 0.5, tall, spruce, none)
+    assert (pc[:, :n // 4] == 0).all() and np.allclose(pc[:, n // 2:], pt5[:, n // 2:]) and np.allclose(pc[:, n // 4:n // 2], pt5[:, n // 4:n // 2] * 0.5)
 
 
 def test_write_splits_cells_south_up(tmp_path):
