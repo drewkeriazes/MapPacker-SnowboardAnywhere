@@ -1,0 +1,199 @@
+{
+  "slug": "heavenly",
+  "name": "Heavenly Mountain",
+  "country": "US",
+  "region": "Nevada",
+  "osm_ski_area_way": null,
+  "crs": "EPSG:26911",
+  "utm_zone": "11N",
+  "lonlat_bbox": [
+    -119.9437925,
+    38.9130342,
+    -119.8802563,
+    38.9678267
+  ],
+  "buffer_m": 1000,
+  "utm_bbox": [
+    243700,
+    4310000,
+    251500,
+    4318400
+  ],
+  "origin": [
+    247600,
+    4314200
+  ],
+  "elevation_range_m": [
+    1750,
+    3100
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "3DEP ImageServer",
+    "res_m": 1,
+    "chunk_px": 1500
+  },
+  "naip": {
+    "source": "Planetary Computer naip 2024 60cm (5 quarter quads from 2022 where 2024 has none)",
+    "res_m": 1,
+    "max_px": 4000,
+    "items": [
+      "ca_m_3811901_ne_11_060_20240821",
+      "ca_m_3811901_nw_11_060_20240821",
+      "ca_m_3811901_se_11_060_20240821",
+      "ca_m_3811901_sw_11_060_20240821",
+      "ca_m_3811902_sw_11_060_20240821",
+      "nv_m_3811901_ne_11_060_20220614",
+      "nv_m_3811901_nw_11_060_20220610",
+      "nv_m_3811901_se_11_060_20220630",
+      "nv_m_3811902_nw_11_060_20220614",
+      "nv_m_3811902_sw_11_060_20220630"
+    ],
+    "item_bboxes_ll": {
+      "ca_m_3811901_ne_11_060_20240821": [
+        -119.942,
+        38.934,
+        -119.87,
+        39.003
+      ],
+      "ca_m_3811901_nw_11_060_20240821": [
+        -120.005,
+        38.934,
+        -119.933,
+        39.003
+      ],
+      "ca_m_3811901_se_11_060_20240821": [
+        -119.942,
+        38.872,
+        -119.87,
+        38.941
+      ],
+      "ca_m_3811901_sw_11_060_20240821": [
+        -120.005,
+        38.872,
+        -119.933,
+        38.941
+      ],
+      "ca_m_3811902_sw_11_060_20240821": [
+        -119.88,
+        38.872,
+        -119.808,
+        38.941
+      ],
+      "nv_m_3811901_ne_11_060_20220614": [
+        -119.942,
+        38.935,
+        -119.871,
+        39.003
+      ],
+      "nv_m_3811901_nw_11_060_20220610": [
+        -120.004,
+        38.934,
+        -119.933,
+        39.003
+      ],
+      "nv_m_3811901_se_11_060_20220630": [
+        -119.942,
+        38.872,
+        -119.871,
+        38.94
+      ],
+      "nv_m_3811902_nw_11_060_20220614": [
+        -119.879,
+        38.935,
+        -119.808,
+        39.003
+      ],
+      "nv_m_3811902_sw_11_060_20220630": [
+        -119.879,
+        38.872,
+        -119.808,
+        38.94
+      ]
+    }
+  },
+  "lidar": {
+    "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/CA_SierraNevada_8_2022/",
+    "dataset": "CA_SierraNevada_8_2022",
+    "max_depth_resort": 10,
+    "max_depth_outside": 9,
+    "nodes_file": "heavenly_ept_nodes.txt",
+    "extra": [
+      {
+        "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/NV_WestCentralEarthMRI_3_2020/",
+        "dataset": "NV_WestCentralEarthMRI_3_2020",
+        "max_depth_resort": 9,
+        "max_depth_outside": 8,
+        "nodes_file": "heavenly_ept_nodes_NV_WestCentralEarthMRI_3_2020.txt",
+        "utm_bbox": [
+          248500,
+          4312000,
+          251500,
+          4318400
+        ]
+      }
+    ],
+    "far": {
+      "pad_m": 5000,
+      "max_depth": 9,
+      "nodes_file": "heavenly_ept_far_nodes.txt"
+    }
+  },
+  "attribution": [
+    "Elevation: USGS 3DEP 1 m lidar DEM (CA_SierraNevada_B22, NV_Reno_Carson_QL1_2017, NV_USFSR4_D23, NV_WestCentral_EarthMRI_2020_D20), public domain",
+    "Canopy: USGS 3DEP lidar point clouds CA_SierraNevada_8_2022 and NV_WestCentralEarthMRI_3_2020 via AWS usgs-lidar-public, public domain",
+    "Imagery: USDA NAIP 2024 (2022 where 2024 has none) via Microsoft Planetary Computer, public domain",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "terrain_status_url": "https://www.skiheavenly.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+  "osm": {
+    "geofabrik": "us/nevada",
+    "pbf": "https://download.geofabrik.de/north-america/us/nevada-latest.osm.pbf"
+  },
+  "openskidata": {
+    "ids": [
+      "3f61859b47be735a77df9b1b9e102edbeb529286"
+    ],
+    "names": [
+      "Heavenly Mountain Resort"
+    ],
+    "iso3166_2": "US-NV",
+    "websites": [
+      "https://www.skiheavenly.com/"
+    ],
+    "lifts": 27,
+    "runs": 143
+  },
+  "names": {
+    "states": [
+      "NV",
+      "CA"
+    ],
+    "source": "USGS GNIS",
+    "towns": "US Census 2024 Gazetteer and population estimates"
+  },
+  "tier": "gold",
+  "sources": {
+    "terrain": {
+      "source": "3DEP 1 m",
+      "tier": "gold"
+    },
+    "trees": {
+      "source": "lidar crowns + stands",
+      "tier": "gold"
+    },
+    "surface": {
+      "source": "NAIP",
+      "tier": "gold"
+    }
+  }
+}
