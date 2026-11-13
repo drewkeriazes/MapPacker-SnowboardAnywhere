@@ -608,7 +608,7 @@ def compare(rec, features, to_lonlat=None):
             if share < TRAILS_MATCHED:
                 st = "warn"
             detail += (f"; of the {trails['published']} trails on {trails['source']}, {len(trails['matched'])} have an OSM "
-                       f"run and {len(trails['unmatched'])} have none (listed below: not mapped in OSM, or named "
+                       f"run and {len(trails['unmatched'])} have none (the OSM to-do below: not mapped in OSM, or named "
                        f"differently); {len(trails['osm_only'])} OSM names are not on the list")
         elif pub and st == "warn" and ratio < 1:
             detail += ": runs not mapped in OSM, mapped with no name, or part of the resort left out"
