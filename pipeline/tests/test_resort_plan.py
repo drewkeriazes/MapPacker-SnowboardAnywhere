@@ -333,6 +333,26 @@ def test_match_workunit():
     assert R.match_workunit("MT_StatewideP4_5_B22", units) is None
 
 
+def test_workunits_from_wesm_csv(tmp_path):
+    """BUG-117: Hosts.workunits() reads USGS's WESM.csv (header as published) with dates as epoch ms for season()"""
+    header = ("workunit,workunit_id,project,project_id,collect_start,collect_end,ql,spec,p_method,dem_gsd_meters,"
+              "horiz_crs,vert_crs,geoid,lpc_pub_date,lpc_update,lpc_category,lpc_reason,sourcedem_pub_date,"
+              "sourcedem_update,sourcedem_category,sourcedem_reason,onemeter_category,onemeter_reason,"
+              "seamless_category,seamless_reason,lpc_link,sourcedem_link,metadata_link")
+    pad = "," * 21    # the 21 columns after ql
+    rows = ["CO_Central_Western_2016,64530,CO_Central_and_WesternCO_2016_A16,64532,2016/05/28,2016/10/07,QL 2" + pad,
+            "XX_NoDates_2020,1,XX_NoDates,2,,,QL 1" + pad,
+            "XX_BadDate_2020,3,XX_BadDate,4,2020-05-01,not a date,QL 1" + pad]
+    (tmp_path / "wesm.csv").write_text("\n".join([header] + rows) + "\n", encoding="utf-8")
+    units = R.Hosts(str(tmp_path)).workunits(None)
+    assert [u["workunit"] for u in units] == ["CO_Central_Western_2016", "XX_NoDates_2020", "XX_BadDate_2020"]
+    u = R.match_workunit("USGS_LPC_CO_Central_Western_2016_LAS_2018", units)
+    assert u["project"] == "CO_Central_and_WesternCO_2016_A16" and u["ql"] == "QL 2"
+    assert u["collect_start"] == 1464393600000          # 2016-05-28T00:00Z
+    assert R.season(u["collect_start"], u["collect_end"]) == {"from": "2016-05", "to": "2016-10", "leaf": "leaf-on"}
+    assert all(u[k] is None for u in units[1:] for k in ("collect_start", "collect_end"))
+
+
 def naip_item(i, bbox, year, gsd=0.6):
     return {"id": i, "bbox": bbox, "properties": {"datetime": f"{year}-09-21T16:00:00Z", "naip:year": year, "gsd": gsd}}
 
