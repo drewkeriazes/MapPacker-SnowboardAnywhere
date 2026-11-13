@@ -30,6 +30,17 @@ def test_an_existing_slug_is_a_rebuild_from_its_config(tmp_path):
     assert got["mode"] == "rebuild" and got["name"] == "Vail"
 
 
+def test_the_workflow_call_reads_the_repo_resorts_folder(monkeypatch):
+    """BUG-116: the workflow calls from_env(), no folder given; None must mean resorts/, not crash"""
+    monkeypatch.setenv("SLUG", "vail")
+    for k in ("NAME", "OSM_ID", "REQUESTED_BY"):
+        monkeypatch.delenv(k, raising=False)
+    assert ci.from_env()["mode"] == "rebuild"
+    got = ci.check_inputs("Heavenly Mountain Resort", "relation/12152028", "no-such-resort-bug-116", "")
+    assert got["mode"] == "new"
+    assert sorted(ci.deps("ohio-hills")) == ["boston-mills", "mad-river-mountain"]
+
+
 @pytest.mark.parametrize("slug,osm,who", [
     ("Vail", "", ""), ("vail;rm -rf /", "", ""), ("-vail", "", ""), ("a" * 61, "", ""),
     ("new", "way/12 $(id)", ""), ("new", "node/12", ""), ("new", "0", ""),
