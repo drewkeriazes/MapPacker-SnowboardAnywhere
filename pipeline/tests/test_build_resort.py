@@ -508,3 +508,20 @@ def test_fetch_runs_windows_powershell_else_pwsh(monkeypatch):
     have.clear()
     with pytest.raises(B.Failed, match="pwsh"):
         B.powershell()
+
+
+def test_a_failed_published_refresh_is_not_recorded(resort):
+    """FEAT-293: Wikidata down while the inputs changed: the build goes on, the old figures stay, and the stage
+    runs again next time instead of recording the new fingerprint on the old file"""
+    go(resort, Fake(resort))
+    old = resort.state["published"]
+    json.dump(dict(json.load(open(resort.cfg_path)), name="Renamed"), open(resort.cfg_path, "w"))
+    r2 = B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests)
+    f = Fake(r2, fail="published")
+    lines = go(r2, f)
+    assert "published.py" in f.calls and f.calls[-1] == "pack_report.py"
+    assert "[published] not done, the build goes on" in lines
+    assert B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests).state["published"] == old
+    f = Fake(r2)
+    go(B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests), f)
+    assert "published.py" in f.calls

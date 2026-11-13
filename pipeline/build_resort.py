@@ -567,7 +567,9 @@ def published_present(r):
 def published_run(r, ctx):
     cmd = [sys.executable, os.path.join(HERE, "published.py"), r.slug, "--raw", r.raw, "--resorts", r.resorts]
     if ctx.run(cmd):
-        print("  published.py failed (Wikidata or Wikipedia not reached?): report line 21 skips; the next run tries again")
+        print("  published.py failed (Wikidata or Wikipedia not reached?): line 21 uses the figures already in the "
+              "resort's folder, or skips without them; the next run tries again")
+        return False      # not recorded: a new fingerprint must not sit on figures gathered for older inputs
 
 
 def report_inputs(r):
@@ -652,7 +654,9 @@ def build(r, ctx, first=None, last=None, dry=False, out=print):
         inputs, present, fn = STAGE_FN[stage]
         if go:
             t = time.time()
-            fn(r, ctx)
+            if fn(r, ctx) is False:  # a soft failure (published): not recorded, so the next run tries again
+                out(f"[{stage}] not done, the build goes on")
+                continue
             out(f"[{stage}] done in {time.time() - t:.0f} s")
         elif stage == "fetch":
             check_raw(r)             # data fetched earlier gets the same checks before it is built
