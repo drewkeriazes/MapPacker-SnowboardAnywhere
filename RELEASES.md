@@ -17,6 +17,10 @@ Every published pack, grouped by resort, newest version first. The game download
 - [v2](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/breckenridge/v2) (latest) 223 MB, 2026-11-12
 - [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/breckenridge/v1) 179 MB, 2026-11-11
 
+## Copper Mountain
+
+- [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/copper-mountain/v1) (latest) 126 MB, 2026-11-13
+
 ## Ohio Hills (custom mashup)
 
 - [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/ohio-hills/v1) (latest) 41 MB, 2026-11-12

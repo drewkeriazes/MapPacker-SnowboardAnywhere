@@ -71,6 +71,30 @@
    "report": "reports/breckenridge.md"
   },
   {
+   "slug": "copper-mountain",
+   "name": "Copper Mountain",
+   "region": "Colorado",
+   "country": "US",
+   "lonlat": [
+    -106.16263737236872,
+    39.47468407719426
+   ],
+   "tier": "gold",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261113T072155Z-8a6f55",
+    "built": "2026-11-13",
+    "pipeline": "fa4c657",
+    "bytes": 126038464,
+    "sha256": "1b2535b21cfb85081808dcf1806601082ebb85cd43623d257d3b634fac901c93",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/copper-mountain/v1/copper-mountain.zip",
+    "content": "8579721b311d17c8"
+   },
+   "report": "reports/copper-mountain.md"
+  },
+  {
    "slug": "ohio-hills",
    "name": "Ohio Hills (custom mashup)",
    "region": "Ohio",

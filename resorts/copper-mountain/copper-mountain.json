@@ -1,0 +1,175 @@
+{
+  "slug": "copper-mountain",
+  "name": "Copper Mountain",
+  "country": "US",
+  "region": "Colorado",
+  "osm_ski_area_way": 531005986,
+  "crs": "EPSG:26913",
+  "utm_zone": "13N",
+  "lonlat_bbox": [
+    -106.1899712,
+    39.4487984,
+    -106.1360052,
+    39.5005886
+  ],
+  "buffer_m": 1000,
+  "utm_bbox": [
+    396600,
+    4366100,
+    403400,
+    4374100
+  ],
+  "origin": [
+    400000,
+    4370100
+  ],
+  "elevation_range_m": [
+    2900,
+    4050
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "3DEP ImageServer",
+    "res_m": 1,
+    "chunk_px": 1500
+  },
+  "naip": {
+    "source": "Planetary Computer naip 2023 30cm",
+    "res_m": 1,
+    "max_px": 4000,
+    "items": [
+      "co_m_3910631_se_13_030_20230831_20240104",
+      "co_m_3910631_sw_13_030_20230831_20240104",
+      "co_m_3910632_sw_13_030_20230831_20240104",
+      "co_m_3910639_ne_13_030_20230831_20240104",
+      "co_m_3910639_nw_13_030_20230831_20240104",
+      "co_m_3910639_se_13_030_20230924_20240104",
+      "co_m_3910639_sw_13_030_20230924_20240104",
+      "co_m_3910640_nw_13_030_20230831_20240104",
+      "co_m_3910640_sw_13_030_20230831_20240104"
+    ],
+    "item_bboxes_ll": {
+      "co_m_3910631_se_13_030_20230831_20240104": [
+        -106.192,
+        39.497,
+        -106.12,
+        39.566
+      ],
+      "co_m_3910631_sw_13_030_20230831_20240104": [
+        -106.255,
+        39.497,
+        -106.183,
+        39.566
+      ],
+      "co_m_3910632_sw_13_030_20230831_20240104": [
+        -106.13,
+        39.497,
+        -106.058,
+        39.566
+      ],
+      "co_m_3910639_ne_13_030_20230831_20240104": [
+        -106.192,
+        39.434,
+        -106.12,
+        39.503
+      ],
+      "co_m_3910639_nw_13_030_20230831_20240104": [
+        -106.255,
+        39.434,
+        -106.183,
+        39.503
+      ],
+      "co_m_3910639_se_13_030_20230924_20240104": [
+        -106.192,
+        39.372,
+        -106.12,
+        39.441
+      ],
+      "co_m_3910639_sw_13_030_20230924_20240104": [
+        -106.255,
+        39.372,
+        -106.183,
+        39.441
+      ],
+      "co_m_3910640_nw_13_030_20230831_20240104": [
+        -106.13,
+        39.434,
+        -106.058,
+        39.503
+      ],
+      "co_m_3910640_sw_13_030_20230831_20240104": [
+        -106.13,
+        39.372,
+        -106.058,
+        39.441
+      ]
+    }
+  },
+  "lidar": {
+    "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/USGS_LPC_CO_Central_Western_2016_LAS_2018/",
+    "dataset": "USGS_LPC_CO_Central_Western_2016_LAS_2018",
+    "max_depth_resort": 9,
+    "max_depth_outside": 8,
+    "nodes_file": "copper-mountain_ept_nodes.txt",
+    "far": {
+      "pad_m": 5000,
+      "max_depth": 9,
+      "nodes_file": "copper-mountain_ept_far_nodes.txt"
+    }
+  },
+  "attribution": [
+    "Elevation: USGS 3DEP 1 m lidar DEM (CO_Central_Western_2016, CO_ParkFremontCuster_2018_C21, CO_SanLuisJuanMiguel_2020_D20), public domain",
+    "Canopy: USGS 3DEP lidar point cloud USGS_LPC_CO_Central_Western_2016_LAS_2018 via AWS usgs-lidar-public, public domain",
+    "Imagery: USDA NAIP 2023 via Microsoft Planetary Computer, public domain",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "osm": {
+    "geofabrik": "us/colorado",
+    "pbf": "https://download.geofabrik.de/north-america/us/colorado-latest.osm.pbf"
+  },
+  "openskidata": {
+    "ids": [
+      "0bab3102857cf4c7243d3db844c283a24413fa28"
+    ],
+    "names": [
+      "Copper Mountain"
+    ],
+    "iso3166_2": "US-CO",
+    "websites": [
+      "https://www.coppercolorado.com/"
+    ],
+    "lifts": 28,
+    "runs": 157
+  },
+  "names": {
+    "states": [
+      "CO"
+    ],
+    "source": "USGS GNIS",
+    "towns": "US Census 2024 Gazetteer and population estimates"
+  },
+  "tier": "gold",
+  "sources": {
+    "terrain": {
+      "source": "3DEP 1 m",
+      "tier": "gold"
+    },
+    "trees": {
+      "source": "lidar crowns + stands",
+      "tier": "gold"
+    },
+    "surface": {
+      "source": "NAIP",
+      "tier": "gold"
+    }
+  }
+}
