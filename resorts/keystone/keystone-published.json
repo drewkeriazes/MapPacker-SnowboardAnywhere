@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "slug": "keystone",
  "fetched": "2026-11-13",
  "areas": [
@@ -50,5 +50,12 @@
    "text": "3148 acre"
   }
  },
- "trails": null
+ "trails": null,
+ "outside": [],
+ "box": [
+  416200,
+  4375800,
+  423500,
+  4385600
+ ]
 }

@@ -148,3 +148,40 @@ def test_inputs_writes_the_mode_for_the_cache_step(tmp_path, monkeypatch):
     monkeypatch.setattr(ci, "from_env", lambda: ci.check_inputs("Boston Mills", "42", "boston-mills", "", tmp_path))
     assert ci.main(["inputs"]) == 0
     assert out.read_text(encoding="utf-8").splitlines() == ["mode=new", "slug=boston-mills"]
+
+
+# ------------------------------------------------------------------------------------------------ FEAT-297, BUG-124
+
+def test_a_pack_picked_in_the_rebuild_list_is_the_slug(tmp_path):
+    config(tmp_path, "vail", tier="gold", name="Vail")
+    got = ci.check_inputs("", "", "", "", tmp_path, rebuild="vail")
+    assert got["mode"] == "rebuild" and got["slug"] == "vail" and got["name"] == "Vail"
+    assert ci.check_inputs("", "", "vail", "", tmp_path, rebuild="vail")["slug"] == "vail"     # typed the same
+    with pytest.raises(ci.Refused, match="picked vail but the slug typed is heavenly"):
+        ci.check_inputs("", "", "heavenly", "", tmp_path, rebuild="vail")
+    with pytest.raises(ci.Refused, match="no config"):
+        ci.check_inputs("", "", "", "", tmp_path, rebuild="gone")
+    with pytest.raises(ci.Refused, match="not a pack slug"):
+        ci.check_inputs("", "", "", "", tmp_path, rebuild="vail; rm -rf /")
+
+
+def test_the_new_resort_entry_falls_back_to_the_typed_slug(tmp_path):
+    new = ci.rebuild_choices.NEW
+    got = ci.check_inputs("Boston Mills", "way/123", "boston-mills", "", tmp_path, rebuild=new)
+    assert got["mode"] == "new" and got["slug"] == "boston-mills"
+    with pytest.raises(ci.Refused, match="pick one in the rebuild list, or type a slug"):
+        ci.check_inputs("", "", "", "", tmp_path, rebuild=new)
+
+
+def test_the_env_carries_the_pick(monkeypatch):
+    monkeypatch.setenv("REBUILD", "vail")
+    for k in ("SLUG", "NAME", "OSM_ID", "REQUESTED_BY"):
+        monkeypatch.delenv(k, raising=False)
+    assert ci.from_env()["slug"] == "vail"                     # the repo's own resorts/vail/vail.json
+
+
+def test_the_report_step_runs_the_published_stage_first():
+    """BUG-124: published (FEAT-293) sits between index and report; build stops at index"""
+    cfg = {"slug": "vail", "mode": "rebuild", "deps": [], "tier": "gold"}
+    assert ci.stage_commands("build", cfg)[0][-4:] == ["--from", "build", "--stop-after", "index"]
+    assert ci.stage_commands("report", cfg)[0][-4:] == ["--from", "published", "--stop-after", "report"]

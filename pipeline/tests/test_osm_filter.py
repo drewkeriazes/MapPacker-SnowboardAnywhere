@@ -64,3 +64,12 @@ def test_filter_elements_keeps_nodes_and_non_ski_ways():
     kept, dropped = of.filter_ski({"elements": els}, areas)
     assert [e["id"] for e in kept["elements"]] == [3, 4, 5]
     assert dropped == {"Club": 1, "access": 1}
+
+
+def test_run_names_piste_name_first():
+    """FEAT-296: Park City's way 987605843 is name=McConkeys (the lift), piste:name=Georgeanna (the run)"""
+    assert of.run_names({"name": "McConkeys", "piste:name": "Georgeanna"}) == ("Georgeanna", "McConkeys")
+    assert of.run_names({"piste:name": "Cinch"}) == ("Cinch", None)
+    assert of.run_names({"name": "Born Free"}) == ("Born Free", None)
+    assert of.run_names({"name": "Same", "piste:name": "Same"}) == ("Same", None)
+    assert of.run_names({"name": " ", "piste:name": ""}) == (None, None)

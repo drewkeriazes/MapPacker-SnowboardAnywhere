@@ -21,7 +21,7 @@ packs/<slug>). The config is resorts/<slug>/<slug>.json, the manifest manifests/
             docs/compare/<slug>/, for Drew to add Street View links (once, while the resort has no spots there)
   index     packs/index.json lists the pack
   published published.py (FEAT-293): the resort's published figures and trail list, resorts/<slug>/<slug>-published.json,
-            for the report's line 21 (Wikidata and Wikipedia; when they can't be reached the line skips, the build
+            for the report's line 21, and (FEAT-296) the resort's own runs and lifts OpenSkiData has outside the box (Wikidata and Wikipedia; when they can't be reached the line skips, the build
             goes on, and the next run tries again)
   report    pack_report.py: the DATA-022 scorecard (report.json, report.md in the pack)
 
@@ -555,7 +555,8 @@ def index_run(r, ctx):
 def published_inputs(r):
     import published
     groom = sorted(os.path.basename(p) for p in glob.glob(os.path.join(r.raw, "grooming", "*.json")))
-    ident = {k: r.cfg.get(k) for k in ("name", "openskidata", "osm_ski_area_way", "relocate", "terrain_status_url")}
+    ident = {k: r.cfg.get(k) for k in ("name", "openskidata", "osm_ski_area_way", "relocate", "terrain_status_url",
+                                       "utm_bbox", "pack_bbox")}      # FEAT-296: the outside scan reads the box
     return sha(published.VERSION, ident, groom[-1:])
 
 

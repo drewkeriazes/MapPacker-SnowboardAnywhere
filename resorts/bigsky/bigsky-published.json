@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "slug": "bigsky",
  "fetched": "2026-11-13",
  "areas": [
@@ -23,13 +23,13 @@
    "value": 2073,
    "unit": "m",
    "source": "Wikipedia: Big Sky Resort",
-   "text": "6800 ft; ''Lone Moose''; 7500 ft; ''Mountain Village''"
+   "text": "6800 ft; Lone Moose; 7500 ft; Mountain Village"
   },
   "vertical": {
    "value": 1326,
    "unit": "m",
    "source": "Wikipedia: Big Sky Resort",
-   "text": "4350 ft; ''total''"
+   "text": "4350 ft; total"
   },
   "lifts": {
    "value": 40,
@@ -50,5 +50,12 @@
    "text": "5850 acre"
   }
  },
- "trails": null
+ "trails": null,
+ "outside": [],
+ "box": [
+  462400,
+  5009200,
+  473200,
+  5019900
+ ]
 }

@@ -2,6 +2,9 @@
 # (FEAT-246, through the dev server and Drew's gh); by hand:
 #   gh workflow run build-pack.yml -f slug=boston-mills -f name="Boston Mills" -f osm_id=<OSM way id>
 #   gh workflow run build-pack.yml -f slug=vail            (an existing slug: rebuilt from its committed config)
+#   or in the Actions tab: Run workflow, pick the pack in "Rebuild a published pack" (FEAT-297), nothing typed.
+#   The list is static (GitHub reads no list at run time): tools/ci/rebuild_choices.py --write rewrites it from
+#   catalog.json after a new resort is published.
 #
 #   queue    one build at a time, in the order they were started (tools/ci/wait_turn.py). Not `concurrency`:
 #            GitHub keeps one pending run per group and cancels the older pending one, so a third build would drop
@@ -31,9 +34,27 @@ name: Build pack
 on:
   workflow_dispatch:
     inputs:
+      rebuild:
+        description: Rebuild a published pack (FEAT-297). Leave the first entry to build from the slug typed below
+        required: false
+        type: choice
+        default: '(new resort: type the slug below)'
+        options:
+          # rebuild_choices.py writes this list from catalog.json
+          - '(new resort: type the slug below)'
+          - bigsky
+          - boston-mills
+          - breckenridge
+          - copper-mountain
+          - crystal-mountain
+          - heavenly
+          - keystone
+          - ohio-hills
+          - park-city-mountain
+          - vail
       slug:
-        description: Pack slug (an existing one is rebuilt)
-        required: true
+        description: Pack slug, for a new resort (an existing one is rebuilt); not needed when a pack is picked above
+        required: false
         type: string
       name:
         description: Resort name (a new slug)
@@ -48,13 +69,14 @@ on:
         required: false
         type: string
 
-run-name: Build pack ${{ inputs.slug }}
+run-name: Build pack ${{ inputs.slug || inputs.rebuild }}
 
 permissions:
   contents: read
 
 env:
   SLUG: ${{ inputs.slug }}
+  REBUILD: ${{ inputs.rebuild }}
   NAME: ${{ inputs.name }}
   OSM_ID: ${{ inputs.osm_id }}
   REQUESTED_BY: ${{ inputs.requested_by }}
@@ -148,13 +170,11 @@ jobs:
         name: inputs
         run: python tools/ci/build_pack_ci.py inputs
 
-      # resolve and plan read OpenSkiData's index files (runs.geojson is about 800 MB); resort.py downloads them
-      # again after 30 days, so a monthly key
+      # resolve, plan and the published stage (FEAT-293, BUG-124: every build) read OpenSkiData's index files
+      # (runs.geojson is about 800 MB); resort.py downloads them again after 30 days, so a monthly key
       - id: month
-        if: steps.inputs.outputs.mode == 'new'
         run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
-      - if: steps.inputs.outputs.mode == 'new'
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: /home/runner/osd-index
           key: openskidata-index-${{ steps.month.outputs.month }}

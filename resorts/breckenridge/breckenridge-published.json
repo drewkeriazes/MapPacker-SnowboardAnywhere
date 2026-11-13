@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "slug": "breckenridge",
  "fetched": "2026-11-13",
  "areas": [
@@ -52,199 +52,974 @@
  },
  "trails": {
   "source": "breckenridge.com terrain status, 2026-04-01",
-  "names": [
-   "4 O'Clock",
-   "9 Lives",
-   "A Lift Line",
-   "Adios",
-   "Alpine Alley",
-   "Amen",
-   "American",
-   "Angel's Rest",
-   "Art's Bowl",
-   "Barton's Breezeway",
-   "Behold",
-   "Beyond Bowl",
-   "Blackhawk",
-   "Bliss",
-   "Bonanza",
-   "Boneyard",
-   "Boreas",
-   "Boundary Chutes",
-   "Breathless",
-   "Briar Rose",
-   "Brill's Thrill",
-   "Bronc",
-   "C.J.'s",
-   "Callie's Alley",
-   "Cashier",
-   "Centennial",
-   "Chi",
-   "Cimarron",
-   "Claimjumper",
-   "Columbia",
-   "Columbine",
-   "Contact",
-   "Corsair",
-   "Country Boy",
-   "Crescendo",
-   "Crosscut",
-   "Crystal",
-   "Cucumber Bowl",
-   "Dark Rider",
-   "Daydream",
-   "Debbie's Alley",
-   "Deja Vu",
-   "Delirium",
-   "Devil's Crotch",
-   "Double Barrel",
-   "Doublejack",
-   "Duke's Run",
-   "Dyersville",
-   "E-Lift Line",
-   "E.S.P",
-   "Eagle's Nest",
-   "Easy Street",
-   "Echo",
-   "Elan",
-   "Eldorado",
-   "Eldorado Terrain Park",
-   "Elysian Fields",
-   "Epiphany",
-   "Euphoria",
-   "Felicity",
-   "Flapjack",
-   "Forget-Me-Not",
-   "Fort Mary B",
-   "Freeway",
-   "Freeway Terrain Park",
-   "Frontier",
-   "Frosty's Freeway",
-   "George's Thumb",
-   "Gold King",
-   "Gondola Ski Back",
-   "Goodbye Girl",
-   "Grits",
-   "Hades",
-   "High Anxiety",
-   "Hombre",
-   "Humbug",
-   "Imperial Bowl",
-   "Imperial Ridge",
-   "Inferno",
-   "Intuition",
-   "Irie",
-   "Joker",
-   "King",
-   "King's Way",
-   "Lake Chutes",
-   "Lincoln Meadows",
-   "Little Burn",
-   "Little Johnny",
-   "Lobo",
-   "Lost Horizon",
-   "Lower 4 O'Clock",
-   "Lower American",
-   "Lower Bonanza",
-   "Lower Boneyard",
-   "Lower Cashier",
-   "Lower Duke's Run",
-   "Lower Forget-Me-Not",
-   "Lower Lehman",
-   "Lower Peerless",
-   "Lower Psychopath",
-   "Lower Sawmill",
-   "Lower Sundown",
-   "Lowest 4 O'Clock",
-   "Lulu",
-   "Mach 1",
-   "Magic Carpet",
-   "Mine Shaft",
-   "Monte Cristo",
-   "Mule",
-   "Mustang",
-   "Needle's Eye",
-   "Nirvana",
-   "No Name",
-   "Northstar",
-   "Ore Bucket",
-   "Outlaw",
-   "Park Lane",
-   "Pathfinder",
-   "Peak 6 Parkway",
-   "Peak 7 Bowl",
-   "Peak 8 Transfer",
-   "Peerless",
-   "Pika",
-   "Pioneer",
-   "Powerline",
-   "Psychopath",
-   "Ptarmigan",
-   "Purgatory",
-   "Quandary",
-   "Queen",
-   "Quiver",
-   "Rapture",
-   "Red Rover",
-   "Rendezvous",
-   "Respite",
-   "Reverie",
-   "Rounders",
-   "Rustler",
-   "Sanctuary",
-   "Savor",
-   "Sawmill",
-   "Serenity Bowl",
-   "Shock",
-   "Silverthorne",
-   "Six Senses",
-   "Sizzler",
-   "Snow White",
-   "Snowbirds",
-   "Snowflake",
-   "Solitude",
-   "South Col",
-   "Southern Cross",
-   "Spitfire",
-   "Springmeier",
-   "Spruce",
-   "Stampede",
-   "Sublime",
-   "Sundown",
-   "Sundown Access",
-   "Swan City",
-   "Swinger",
-   "The Back 9",
-   "The Burn",
-   "The Dunes",
-   "Tiger",
-   "Tom's Baby",
-   "Tom's Mom",
-   "Too Much",
-   "Toyota Banked Slalom",
-   "Trinity",
-   "Trygve's",
-   "Tunnel",
-   "Twin Chutes",
-   "Twister",
-   "Upper 4 O'Clock",
-   "Upper Lehman",
-   "Vertigo",
-   "Volunteer",
-   "Wacky's Chute",
-   "Wanderlust",
-   "Way Out",
-   "Whale's Tail",
-   "Whiff",
-   "Whiskey River",
-   "White Crown",
-   "Windows",
-   "Wirepatch",
-   "Wonderland",
-   "Xanadu",
-   "Y-Chute",
-   "Yugen",
-   "Zoot Chute"
+  "list": [
+   {
+    "name": "4 O'Clock",
+    "area": "Peak 8",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "9 Lives",
+    "area": "Peak 8 Imperial",
+    "difficulty": "expert"
+   },
+   {
+    "name": "A Lift Line",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Adios",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Alpine Alley",
+    "area": "T-Bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Amen",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "American",
+    "area": "Peak 9",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Angel's Rest",
+    "area": "Peak 7",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Art's Bowl",
+    "area": "Peak 7 Alpine",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Barton's Breezeway",
+    "area": "Peak 6",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Behold",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Beyond Bowl",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Blackhawk",
+    "area": "Peak 10",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Bliss",
+    "area": "Peak 6",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bonanza",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Boneyard",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Boreas",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Boundary Chutes",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Breathless",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Briar Rose",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Brill's Thrill",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Bronc",
+    "area": "Peak 10",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "C.J.'s",
+    "area": "Peak 7 Alpine",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Callie's Alley",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Cashier",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Centennial",
+    "area": "Peak 10",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Chi",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Cimarron",
+    "area": "Peak 10",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Claimjumper",
+    "area": "Peak 8",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Columbia",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Columbine",
+    "area": "Peak 8",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Contact",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Corsair",
+    "area": "Peak 10",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Country Boy",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Crescendo",
+    "area": "Peak 8",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Crosscut",
+    "area": "Peak 8",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Crystal",
+    "area": "Peak 10",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Cucumber Bowl",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Dark Rider",
+    "area": "Peak 10",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Daydream",
+    "area": "Peak 6",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Debbie's Alley",
+    "area": "Peak 7 Alpine",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Deja Vu",
+    "area": "Peak 6",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Delirium",
+    "area": "Peak 6",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Devil's Crotch",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Double Barrel",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Doublejack",
+    "area": "Peak 10",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Duke's Run",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Dyersville",
+    "area": "Peak 8",
+    "difficulty": "easy"
+   },
+   {
+    "name": "E-Lift Line",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "E.S.P",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Eagle's Nest",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Easy Street",
+    "area": "Peak 8 Imperial",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Echo",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Elan",
+    "area": "Peak 10",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Eldorado",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Eldorado Terrain Park",
+    "area": "Peak 9",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Elysian Fields",
+    "area": "Peak 6",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Epiphany",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Euphoria",
+    "area": "Peak 6",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Felicity",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Flapjack",
+    "area": "Peak 10",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Forget-Me-Not",
+    "area": "T-Bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Fort Mary B",
+    "area": "Peak 7",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Freeway",
+    "area": "Peak 8",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Freeway Terrain Park",
+    "area": "Peak 8",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Frontier",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Frosty's Freeway",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "George's Thumb",
+    "area": "Peak 8 Imperial",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Gold King",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gondola Ski Back",
+    "area": "Peak 8",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Goodbye Girl",
+    "area": "Peak 8",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Grits",
+    "area": "Peak 10",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Hades",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "High Anxiety",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Hombre",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Humbug",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Imperial Bowl",
+    "area": "Peak 8 Imperial",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Imperial Ridge",
+    "area": "Peak 8 Imperial",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Inferno",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Intuition",
+    "area": "Peak 6",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Irie",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Joker",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "King",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "King's Way",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lake Chutes",
+    "area": "Peak 8 Imperial",
+    "difficulty": "extreme"
+   },
+   {
+    "name": "Lincoln Meadows",
+    "area": "Peak 7",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Little Burn",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Little Johnny",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lobo",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lost Horizon",
+    "area": "Peak 6",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lower 4 O'Clock",
+    "area": "Peak 8",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lower American",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lower Bonanza",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lower Boneyard",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lower Cashier",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lower Duke's Run",
+    "area": "Peak 8",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lower Forget-Me-Not",
+    "area": "Peak 7",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lower Lehman",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lower Peerless",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lower Psychopath",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lower Sawmill",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lower Sundown",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lowest 4 O'Clock",
+    "area": "Peak 8",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lulu",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Mach 1",
+    "area": "Peak 8",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Magic Carpet",
+    "area": "Peak 7 Alpine",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Mine Shaft",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Monte Cristo",
+    "area": "Peak 7",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Mule",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Mustang",
+    "area": "Peak 10",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Needle's Eye",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Nirvana",
+    "area": "Peak 6",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "No Name",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Northstar",
+    "area": "Peak 8",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ore Bucket",
+    "area": "Peak 7",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Outlaw",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Park Lane",
+    "area": "Peak 8",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Pathfinder",
+    "area": "Peak 8",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Peak 6 Parkway",
+    "area": "Peak 7",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Peak 7 Bowl",
+    "area": "Peak 7 Alpine",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Peak 8 Transfer",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Peerless",
+    "area": "Peak 9",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Pika",
+    "area": "T-Bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Pioneer",
+    "area": "Peak 7",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Powerline",
+    "area": "Peak 8",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Psychopath",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ptarmigan",
+    "area": "T-Bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Purgatory",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Quandary",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Queen",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Quiver",
+    "area": "Peak 10",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Rapture",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Red Rover",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Rendezvous",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Respite",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Reverie",
+    "area": "Peak 6",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Rounders",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Rustler",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Sanctuary",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Savor",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Sawmill",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Serenity Bowl",
+    "area": "Peak 6",
+    "difficulty": "extreme"
+   },
+   {
+    "name": "Shock",
+    "area": "Peak 9",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Silverthorne",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Six Senses",
+    "area": "Peak 6",
+    "difficulty": "extreme"
+   },
+   {
+    "name": "Sizzler",
+    "area": "Peak 9",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Snow White",
+    "area": "Peak 8 Imperial",
+    "difficulty": "extreme"
+   },
+   {
+    "name": "Snowbirds",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Snowflake",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Solitude",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "South Col",
+    "area": "Peak 6",
+    "difficulty": "extreme"
+   },
+   {
+    "name": "Southern Cross",
+    "area": "Peak 8",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Spitfire",
+    "area": "Peak 10",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Springmeier",
+    "area": "Peak 8",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Spruce",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Stampede",
+    "area": "T-Bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Sublime",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Sundown",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sundown Access",
+    "area": "Peak 9",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Swan City",
+    "area": "Peak 7",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Swinger",
+    "area": "Peak 8",
+    "difficulty": "easy"
+   },
+   {
+    "name": "The Back 9",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "The Burn",
+    "area": "Peak 10",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Dunes",
+    "area": "Peak 7 Alpine",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Tiger",
+    "area": "Peak 8",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Tom's Baby",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Tom's Mom",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Too Much",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Toyota Banked Slalom",
+    "area": "Peak 8",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Trinity",
+    "area": "Peak 10",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Trygve's",
+    "area": "Peak 8",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Tunnel",
+    "area": "Peak 8",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Twin Chutes",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Twister",
+    "area": "Peak 8",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Upper 4 O'Clock",
+    "area": "Back Bowls",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Upper Lehman",
+    "area": "Peak 9",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Vertigo",
+    "area": "Peak 7 Alpine",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Volunteer",
+    "area": "Peak 9",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Wacky's Chute",
+    "area": "Peak 8 Imperial",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Wanderlust",
+    "area": "Peak 6",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Way Out",
+    "area": "Back Bowls",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Whale's Tail",
+    "area": "Peak 8 Imperial",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Whiff",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Whiskey River",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "White Crown",
+    "area": "T-Bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Windows",
+    "area": "Peak 9",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Wirepatch",
+    "area": "Peak 7",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Wonderland",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Xanadu",
+    "area": "Peak 6",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Y-Chute",
+    "area": "Peak 7 Alpine",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Yugen",
+    "area": "Peak 6",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Zoot Chute",
+    "area": "Peak 8 Imperial",
+    "difficulty": "expert"
+   }
   ]
- }
+ },
+ "outside": [],
+ "box": [
+  401900,
+  4364800,
+  412000,
+  4375300
+ ]
 }

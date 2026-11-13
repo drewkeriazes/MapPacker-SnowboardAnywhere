@@ -131,7 +131,8 @@ def test_article_none_keeps_the_tied_item():
 
 def feed(raw, name, trails):
     os.makedirs(os.path.join(raw, "grooming"), exist_ok=True)
-    json.dump({"date": "x", "trails": [{"name": t} for t in trails]}, open(os.path.join(raw, "grooming", name), "w"))
+    json.dump({"date": "x", "trails": [{"name": t, "area": "Front Side", "difficulty": 2} for t in trails]},
+              open(os.path.join(raw, "grooming", name), "w"))
 
 
 def test_gather_figures_hand_and_trails(tmp_path):
@@ -148,7 +149,9 @@ def test_gather_figures_hand_and_trails(tmp_path):
     assert rec["areas"][0]["wikipedia"] == "Vail Ski Resort"
     assert rec["figures"]["runs"]["value"] == 278                 # a hand figure wins and is kept
     assert rec["figures"]["lifts"]["value"] == 31                 # a gathered one is replaced
-    assert rec["trails"] == {"source": "vail.com terrain status, 2026-04-01", "names": ["Born Free", "Riva Ridge"]}
+    assert rec["trails"] == {"source": "vail.com terrain status, 2026-04-01",
+                             "list": [{"name": "Born Free", "area": "Front Side", "difficulty": "intermediate"},
+                                      {"name": "Riva Ridge", "area": "Front Side", "difficulty": "intermediate"}]}
     again = P.gather(cfg, [AREA], web, raw=str(tmp_path / "gone"), old=rec)
     assert again["trails"] == rec["trails"]                       # raw moved away: the list read before stays
 
@@ -256,3 +259,112 @@ def test_a_summit_off_either_way_warns_and_no_figures_no_rows():
     rec["figures"]["summit"] = fig(3300, "m")
     assert statuses(P.compare(rec, resort_features())[0])["summit"] == "warn"
     assert P.compare({"figures": {}, "trails": None}, resort_features()) == ([], None)
+
+
+# ------------------------------------------------------------------------------------------------ FEAT-296
+
+def test_version_1_trails_still_read():
+    assert P.trail_entries({"source": "x", "names": ["A"]}) == [{"name": "A", "area": None, "difficulty": None}]
+    assert P.trail_entries(None) == []
+
+
+def test_terrain_park_and_alt_names_match():
+    m = P.match_trails(["Park Lane", "Georgeanna", "McConkeys"], ["Park Lane Terrain Park", "Georgeanna"], ["McConkeys"])
+    assert dict(m["matched"]) == {"Park Lane": "Park Lane Terrain Park", "Georgeanna": "Georgeanna",
+                                  "McConkeys": "McConkeys"}
+    assert m["osm_only"] == []
+    assert P.loose_key("Park Lane") != ""                      # "Park" alone stays
+
+
+def test_alt_names_do_not_count_as_runs():
+    f = {"runs": [{"name": "Georgeanna", "altName": "McConkeys", "points": [[0, 0, 1], [0, 10, 0]]}], "lifts": []}
+    r = P.pack_figures(f)["runs"]
+    assert r["value"] == 1 and r["names"] == ["Georgeanna"] and r["alt"] == ["McConkeys"]
+
+
+def test_osm_todo_points_at_the_area():
+    entries = [{"name": "East 0", "area": "East", "difficulty": "easy"},
+               {"name": "East 9", "area": "East", "difficulty": "advanced"},
+               {"name": "Ghost", "area": "East", "difficulty": "expert"},
+               {"name": "Lost", "area": "Nowhere", "difficulty": None}]
+    rec = {"figures": {}, "trails": {"source": "demo", "list": entries}}
+    _, t = P.compare(rec, resort_features(), to_lonlat=lambda x, y: (x / 1000, y / 1000))
+    todo = {d["name"]: d for d in t["todo"]}
+    assert set(todo) == {"Ghost", "Lost"}
+    assert todo["Ghost"]["difficulty"] == "expert" and todo["Ghost"]["lonlat"] is not None
+    assert todo["Lost"]["lonlat"] is None                     # no matched run in its area: no link
+    assert P.osm_edit_link([-106.38151, 39.60793]) == "https://www.openstreetmap.org/edit#map=16/39.60793/-106.38151"
+
+
+# OpenSkiData lines: one feature per line, as runs.geojson and lifts.geojson hold them
+OWN, CLUB, OTHER = "own-area", "club-area", "other-resort"
+CFG = {"slug": "demo", "crs": "EPSG:32613", "utm_bbox": [400000, 4400000, 405000, 4405000]}
+
+
+def osd_line(kind, name, area, lonlats):
+    import pyproj
+    t = pyproj.Transformer.from_crs("EPSG:32613", "EPSG:4326", always_xy=True)
+    coords = [list(t.transform(x, y)) for x, y in lonlats]
+    props = {"name": name, "uses": ["downhill"] if kind == "run" else None, "liftType": "chair_lift" if kind == "lift" else None,
+             "skiAreas": [{"properties": {"id": area, "name": area}}] if area else []}
+    return json.dumps({"type": "Feature", "geometry": {"type": "LineString", "coordinates": coords}, "properties": props}) + ",\n"
+
+
+def osd_files(tmp_path, runs, lifts):
+    rp, lp = tmp_path / "runs.geojson", tmp_path / "lifts.geojson"
+    rp.write_text('{"type":"FeatureCollection","features":[\n' + "".join(runs) + "]}\n", encoding="utf-8")
+    lp.write_text('{"type":"FeatureCollection","features":[\n' + "".join(lifts) + "]}\n", encoding="utf-8")
+    return str(rp), str(lp)
+
+
+def test_outside_pack_finds_the_resorts_own_and_near_namesakes(tmp_path):
+    runs = [osd_line("run", "Inside", OWN, [(401000, 4401000), (401000, 4402000)]),
+            osd_line("run", "West Bowl", OWN, [(398500, 4401000), (399500, 4401000)]),         # own, 1.5 km out
+            osd_line("run", "Ghost", CLUB, [(406000, 4401000), (406500, 4401000)]),           # a trail's name, 1.5 km
+            osd_line("run", "Ghost", None, [(412000, 4401000), (412500, 4401000)]),           # 7.5 km: another trail
+            osd_line("run", "Ptarmigan", OTHER, [(405500, 4401000), (406000, 4401000)]),      # another resort's
+            osd_line("run", "Unlisted", None, [(406000, 4402000), (406500, 4402000)])]        # not a published trail
+    lifts = [osd_line("lift", "West Chair", OWN, [(398000, 4400500), (399800, 4401500)]),
+             osd_line("lift", "Other Chair", OTHER, [(406000, 4400500), (407000, 4400500)])]
+    out = P.outside_pack(CFG, [OWN], ["Ghost", "Ptarmigan", "Inside"], *osd_files(tmp_path, runs, lifts), foreign=[OTHER])
+    got = {(o["kind"], o["name"], o["own"]): o["km"] for o in out}
+    assert got == {("run", "West Bowl", True): 1.5, ("run", "Ghost", False): 1.5, ("lift", "West Chair", True): 2.0}
+    row = P.outside_row(out, CFG["utm_bbox"])
+    assert row["status"] == "warn" and "1 runs and 1 lifts of the resort's own" in row["note"]
+    assert "[397700, 4400000, 405000, 4405000]" in row["note"]           # grown 300 m past West Chair, on 100 m
+    assert 'published trails just outside the pack: Ghost (club-area, 1.5 km)' in row["note"]
+    assert row["note"].endswith('`resort.py resolve <name> --with "club-area"` takes in that area')
+
+
+def test_outside_pack_leaves_a_relocated_area_alone(tmp_path):
+    cfg = dict(CFG, relocate=[{"name": "Brandywine", "from": [398000, 4400000, 399900, 4402000], "to": [401000, 4401000]}])
+    runs = [osd_line("run", "Brandywine run", OWN, [(398500, 4401000), (399500, 4401000)])]
+    assert P.outside_pack(cfg, [OWN], [], *osd_files(tmp_path, runs, [])) == []
+
+
+def test_gather_records_outside_and_the_box(tmp_path):
+    runs = [osd_line("run", "West Bowl", "a1", [(398500, 4401000), (399500, 4401000)])]
+    web = FakeWeb({}, {})
+    rec = P.gather(dict(CFG, name="Vail", osm_ski_area_way=531009607), [AREA], web, osd=osd_files(tmp_path, runs, []))
+    assert [o["name"] for o in rec["outside"]] == ["West Bowl"] and rec["box"] == CFG["utm_bbox"]
+    rows, _ = P.compare(rec, resort_features())
+    assert next(r for r in rows if r["figure"] == "outside")["status"] == "warn"
+
+
+def test_grow_config_edits_the_boxes_in_place(tmp_path):
+    path = tmp_path / "demo.json"
+    path.write_text('{\n  "slug": "demo",\n  "crs": "EPSG:32613",\n  "lonlat_bbox": [-106.15, 39.75, -106.1, 39.78],\n'
+                    '  "utm_bbox": [\n    400000,\n    4400000,\n    405000,\n    4405000\n  ],\n'
+                    '  "pack_bbox": [401000, 4401000, 404000, 4404000],\n  "notes": "kept"\n}\n', encoding="utf-8")
+    rec = {"outside": [{"own": True, "utm": [399000, 4401500, 400500, 4402000]},
+                       {"own": False, "utm": [420000, 4401500, 421000, 4402000]}]}     # a namesake: not grown to
+    assert P.grow_config(str(path), rec) == ([401000, 4401000, 404000, 4404000], [398700, 4401000, 404000, 4404000])
+    cfg = json.loads(path.read_text(encoding="utf-8"))
+    assert cfg["pack_bbox"] == [398700, 4401000, 404000, 4404000]
+    assert cfg["utm_bbox"] == [398700, 4400000, 405000, 4405000] and cfg["notes"] == "kept"
+    # the OSM fetch and resort.py plan read lonlat_bbox: it reaches the outside run's west end (x 399000)
+    import pyproj
+    west = pyproj.Transformer.from_crs("EPSG:32613", "EPSG:4326", always_xy=True).transform(399000, 4401500)[0]
+    assert cfg["lonlat_bbox"][0] == pytest.approx(min(west, -106.15), abs=1e-4) and cfg["lonlat_bbox"][0] < -106.15
+    assert cfg["lonlat_bbox"][2] == -106.1
+    assert P.grow_config(str(path), {"outside": []}) is None
