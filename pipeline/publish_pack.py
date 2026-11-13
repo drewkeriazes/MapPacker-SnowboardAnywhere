@@ -268,8 +268,12 @@ def publish_branch(slug: str, version: int) -> str:
     return f"publish/{slug}-v{version}"
 
 
+REBUILD_LIST = ("New resort: after this merges, `python tools/ci/rebuild_choices.py --write` in a PR of its own adds "
+                "it to Build pack's rebuild list (FEAT-297; a publish PR can't change a workflow file)")
+
+
 def pr_body(entry: dict, *, why: str, release_url: str, started_by: str, run_url: str | None,
-            requested_by: str | None) -> str:
+            requested_by: str | None, new_resort: bool = False) -> str:
     """the publish PR's description; `Build:` and `Run:` are read back by resort.py and the merge workflow"""
     p = entry["pack"]
     lines = [f"Publishes **{entry['name']}** v{p['version']}: {entry['status']} ({why}).", "",
@@ -280,6 +284,7 @@ def pr_body(entry: dict, *, why: str, release_url: str, started_by: str, run_url
     lines += [f"Requested by: {requested_by}"] if requested_by else []
     lines += [f"Build: {p['build']}", f"Pipeline: {p['pipeline']}"]
     lines += [f"{CONTENT_LINE}{p['content']}"] if p.get("content") else []   # read back by pending_same_content
+    lines += ["", REBUILD_LIST] if new_resort else []
     lines += ["",
               "Approve with the `automerge` label, not the merge button: the merge workflow publishes the draft "
               "release before it merges, so the catalog never names a download that is not live (FEAT-272)."]
@@ -492,7 +497,7 @@ def main(argv=None) -> None:
         # the recipe that built it goes in the PR beside the catalog: config, node lists, plan, manifest, report;
         # RELEASES.md lists this publish's draft as out (the merge workflow publishes it before it merges)
         body = pr_body(entry, why=why, release_url=release_url, started_by=login, run_url=a.run_url,
-                       requested_by=a.requested_by)
+                       requested_by=a.requested_by, new_resort=not test and old is None)
         try:
             releases = [r for r in list_releases(a.repo, run) if r.get("tag_name") != tag]
             releases.append(own_release(slug, version, f"{meta['name']} v{version}", size))
@@ -505,6 +510,8 @@ def main(argv=None) -> None:
             "once checks pass it releases and merges itself, when the publish App is set up (publish-merge.yml)"
             if trusted else
             f"{login} is not in .github/maintainers.txt, so a maintainer approves it with the automerge label"))
+        if not test and old is None:
+            print(REBUILD_LIST)
         print(f"Without the App nothing merges itself: once checks pass, run gh release edit {tag} -R {a.repo} "
               f"--draft=false first, then merge the PR (never the merge button while the release is a draft)")
     finally:

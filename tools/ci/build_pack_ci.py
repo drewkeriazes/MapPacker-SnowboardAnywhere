@@ -21,6 +21,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 PIPELINE = os.path.join(ROOT, "pipeline")
 sys.path.insert(0, PIPELINE)
 import paths  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import rebuild_choices  # noqa: E402
 
 SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 OSM_RE = re.compile(r"^((way|relation|skimap)/)?[1-9][0-9]{0,15}$")   # skimap/497: no OSM outline (FEAT-286)
@@ -32,11 +34,23 @@ class Refused(Exception):
     pass
 
 
-def check_inputs(name, osm_id, slug, requested_by, resorts_dir=None):
+def check_inputs(name, osm_id, slug, requested_by, resorts_dir=None, rebuild=None):
     """-> dict(mode, slug, name, osm_id, requested_by, tier, deps). Raises Refused on bad input. `mode` is "rebuild"
     when resorts/<slug>/<slug>.json exists (name and osm_id are then optional: the config already says which ski
-    area it is), else "new" (both needed)."""
-    name, osm_id, slug, requested_by = (s.strip() for s in (name or "", osm_id or "", slug or "", requested_by or ""))
+    area it is), else "new" (both needed). FEAT-297: `rebuild` is the form's pick from the rebuild list; a pack
+    picked there is the slug (a typed slug must then be the same one), and it must already have a config."""
+    name, osm_id, slug, requested_by, rebuild = (s.strip() for s in (name or "", osm_id or "", slug or "",
+                                                                      requested_by or "", rebuild or ""))
+    if rebuild and rebuild != rebuild_choices.NEW:
+        if not SLUG_RE.fullmatch(rebuild) or len(rebuild) > 60:
+            raise Refused(f"rebuild {rebuild!r} is not a pack slug")
+        if slug and slug != rebuild:
+            raise Refused(f"the rebuild list picked {rebuild} but the slug typed is {slug}: pick one")
+        if not os.path.isfile(paths.config_path(rebuild, resorts_dir)):
+            raise Refused(f"{rebuild} has no config in resorts/: it can't be rebuilt")
+        slug = rebuild
+    if not slug:
+        raise Refused("no pack: pick one in the rebuild list, or type a slug (with name and osm_id for a new resort)")
     if not SLUG_RE.fullmatch(slug) or len(slug) > 60:
         raise Refused(f"slug {slug!r} is not lower-case letters, digits and single hyphens (at most 60)")
     if len(name) > MAX_NAME or any(ord(c) < 32 or ord(c) == 127 for c in name) or name.startswith("-"):
@@ -148,7 +162,8 @@ def stage_commands(stage, cfg):
     if stage == "build":
         return [py("build_resort.py", slug, "--from", "build", "--stop-after", "index")]
     if stage == "report":
-        return [py("build_resort.py", slug, "--from", "report", "--stop-after", "report")]
+        # BUG-124: from `published` (FEAT-293), the stage before the report: the resort's figures for line 21
+        return [py("build_resort.py", slug, "--from", "published", "--stop-after", "report")]
     if stage == "publish":
         cmd = py("publish_pack.py", os.path.join(paths.PACKS, slug), "--tier", cfg["tier"])
         if cfg.get("run_url"):
@@ -161,7 +176,7 @@ def stage_commands(stage, cfg):
 
 def from_env():
     return check_inputs(os.environ.get("NAME"), os.environ.get("OSM_ID"), os.environ.get("SLUG"),
-                        os.environ.get("REQUESTED_BY"))
+                        os.environ.get("REQUESTED_BY"), rebuild=os.environ.get("REBUILD"))
 
 
 def main(argv=None, runner=stream):

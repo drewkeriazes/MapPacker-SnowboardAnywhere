@@ -99,6 +99,10 @@ def test_pr_body_names_the_requester_and_the_build():
     assert f"Build: {ENTRY['pack']['build']}" in body and "not the merge button" in body
     local = publish_pack.pr_body(ENTRY, why="w", release_url="u", started_by="d", run_url=None, requested_by=None)
     assert "Run:" not in local and "Requested by:" not in local
+    assert "rebuild_choices.py --write" not in local                       # FEAT-297: only a new resort's says it
+    new = publish_pack.pr_body(ENTRY, why="w", release_url="u", started_by="d", run_url=None, requested_by=None,
+                               new_resort=True)
+    assert "rebuild_choices.py --write" in new and "rebuild list" in new
 
 
 def test_publish_opens_a_pr_and_never_pushes_main(tmp_path, monkeypatch):
