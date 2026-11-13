@@ -1,0 +1,141 @@
+{
+  "slug": "crystal-mountain",
+  "name": "Crystal Mountain",
+  "country": "US",
+  "region": "Washington",
+  "osm_ski_area_way": null,
+  "crs": "EPSG:26910",
+  "utm_zone": "10N",
+  "lonlat_bbox": [
+    -121.5089145,
+    46.9088953,
+    -121.4671841,
+    46.9567407
+  ],
+  "buffer_m": 1000,
+  "utm_bbox": [
+    612400,
+    5195100,
+    617800,
+    5202500
+  ],
+  "origin": [
+    615100,
+    5198800
+  ],
+  "elevation_range_m": [
+    900,
+    2150
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "3DEP ImageServer",
+    "res_m": 1,
+    "chunk_px": 1500
+  },
+  "naip": {
+    "source": "Planetary Computer naip 2023 60cm",
+    "res_m": 1,
+    "max_px": 4000,
+    "items": [
+      "wa_m_4612104_ne_10_060_20230815_20240209",
+      "wa_m_4612104_se_10_060_20230802_20240209",
+      "wa_m_4612105_nw_10_060_20230802_20240209",
+      "wa_m_4612105_sw_10_060_20230802_20240209"
+    ],
+    "item_bboxes_ll": {
+      "wa_m_4612104_ne_10_060_20230815_20240209": [
+        -121.567,
+        46.935,
+        -121.496,
+        47.003
+      ],
+      "wa_m_4612104_se_10_060_20230802_20240209": [
+        -121.567,
+        46.872,
+        -121.496,
+        46.94
+      ],
+      "wa_m_4612105_nw_10_060_20230802_20240209": [
+        -121.504,
+        46.935,
+        -121.433,
+        47.003
+      ],
+      "wa_m_4612105_sw_10_060_20230802_20240209": [
+        -121.504,
+        46.872,
+        -121.433,
+        46.94
+      ]
+    }
+  },
+  "lidar": {
+    "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/WA_EasternCascades_5_2019/",
+    "dataset": "WA_EasternCascades_5_2019",
+    "max_depth_resort": 9,
+    "max_depth_outside": 8,
+    "nodes_file": "crystal-mountain_ept_nodes.txt",
+    "far": {
+      "pad_m": 5000,
+      "max_depth": 8,
+      "nodes_file": "crystal-mountain_ept_far_nodes.txt"
+    }
+  },
+  "attribution": [
+    "Elevation: USGS 3DEP 1 m lidar DEM (WA_EasternCascades_2019_B19), public domain",
+    "Canopy: USGS 3DEP lidar point cloud WA_EasternCascades_5_2019 via AWS usgs-lidar-public, public domain",
+    "Imagery: USDA NAIP 2023 via Microsoft Planetary Computer, public domain",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "osm": {
+    "geofabrik": "us/washington",
+    "pbf": "https://download.geofabrik.de/north-america/us/washington-latest.osm.pbf"
+  },
+  "openskidata": {
+    "ids": [
+      "89f555b5b8a62c0c002adaa796997b635f38e6da"
+    ],
+    "names": [
+      "Crystal Mountain"
+    ],
+    "iso3166_2": "US-WA",
+    "websites": [
+      "https://www.crystalmountainresort.com/"
+    ],
+    "lifts": 11,
+    "runs": 88
+  },
+  "names": {
+    "states": [
+      "WA",
+      "OR"
+    ],
+    "source": "USGS GNIS",
+    "towns": "US Census 2024 Gazetteer and population estimates"
+  },
+  "tier": "silver",
+  "sources": {
+    "terrain": {
+      "source": "3DEP 1 m",
+      "tier": "gold"
+    },
+    "trees": {
+      "source": "lidar crowns + stands",
+      "tier": "silver"
+    },
+    "surface": {
+      "source": "NAIP",
+      "tier": "gold"
+    }
+  }
+}

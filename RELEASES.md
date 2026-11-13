@@ -21,6 +21,10 @@ Every published pack, grouped by resort, newest version first. The game download
 
 - [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/copper-mountain/v1) (latest) 126 MB, 2026-11-13
 
+## Crystal Mountain
+
+- [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/crystal-mountain/v1) (latest) 95 MB, 2026-11-13
+
 ## Ohio Hills (custom mashup)
 
 - [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/ohio-hills/v1) (latest) 41 MB, 2026-11-12
