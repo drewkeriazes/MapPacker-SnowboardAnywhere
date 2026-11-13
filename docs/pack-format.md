@@ -106,13 +106,14 @@ cleared strips (areas filled, lines at 0.6 of their corridor width; gladed runs 
 mask's rock, and the mean tree height per 16 m from the tree instances. The forest is then weighted by
 the pack's tree instances (BUG-069), so a sparse stand the lidar canopy reads as closed is not a dark patch
 around its few trees. R, the forest seen from far off, is weighted by the share of the ground under the
-crowns, the generated stems' in expectation included (averaged over 16 m, full weight from 0.2 up). The level's optional `stands` image (greyscale, same
+detected crowns (averaged over 16 m, full weight from 0.05 up, a quarter of the 0.2 all drawn trees reach in timber;
+BUG-120: before, it counted the generated stems in expectation, which now fill closed stands only). The level's optional `stands` image (greyscale, same
 grid, `cover/pack-stands.png`) is the forest seen from near, where single trees show: only closed stands
 keep it (the detected trees' crown share averaged over 10 m passes 0.05 to 0.14, and the stand is at least 40 m across:
 smaller clumps are dropped, holes that size inside a stand filled; BUG-101: the generated stems do not count here,
 the thresholds were tuned without them; a pack without lidar, FEAT-225, has no detected trees and reads its stems at a
-quarter of their share, the part the detected crowns are of all drawn trees on Vail). The shader shows `stands` to 1.2 km and
-R from 2.8 km. With `"crowns": true` on the level the image is RGB and its G is where the drawn trees
+quarter of their share, the part the detected crowns are of all drawn trees on Vail; it reads R from them the same way). The shader shows `stands` to 1.2 km and
+R from 2.8 km, and (game BUG-120) `stands` as far as it draws the generated stems (2.5 km on High), R from 1.5 times that. With `"crowns": true` on the level the image is RGB and its G is where the drawn trees
 stand: the share of each cell under their crowns, each tree weighted by its height over 12 m (FEAT-168; the
 shader throws their shadows on the snow from it). A pack without tree instances keeps the canopy as is.
 
@@ -216,7 +217,10 @@ Ground height = `(R * 256 + G) / zScale + zBase` m, stored where a stem can stan
 `zBase` is the pack's lowest ground and `zScale` 32, so a pack spans at most 2,048 m of relief.
 
 The chance is the stems a closed stand needs (`K_CLOSE` crown area per m2 of canopy: canopy share / (pi r^2),
-r = the species' crown ratio times the stand height), less the detected crowns within about 6 m. Stems stand only
+r = the species' crown ratio times the stand height), less the detected crowns within about 6 m, times the closed-stand
+weight of the cell (BUG-120: the same test as the cover's `stands` image below, on the detected crowns; the canopy mask
+reads a sparse stand as closed, so without it the stems filled sparse stands at about 4x their detected crowns; a pack
+without lidar keeps every stem). Stems stand only
 on canopy, off truly open LANDFIRE classes, groomed runs, built-up ground, cliffs and lift lines. Stand height is
 the tallest lidar return in the 4 m cell, LANDFIRE EVH (DATA-010) where the lidar reads under 4 m, at least 3 m.
 Species come from the same rules as the trees (`species.assign_species`) at the cell centre.
@@ -224,7 +228,7 @@ Species come from the same rules as the trees (`species.assign_species`) at the 
 The client keeps a stem where `hash(cell centre) < chance x density` (the Forest setting), jitters it within 90 %
 of the cell, draws it 0.75 to 1 times the stand height with the species' own crown, and reads the ground height
 bilinearly. So a cell gives the same stems every time, and a lower density is a subset of a higher one. The cover
-(`cover.py`) counts the stems in expectation (chance x crown area) where it weighs the forest by the drawn trees.
+(`cover.py`) counts the stems in expectation (chance x crown area) for the shadow raster.
 
 `shrubs/<tx>_<ty>.bin` (DATA-020, optional): Float32 records of 6: `x, y, z, height, radius, kind` with
 kind 0 = willow (clumps of 3 to 8 stems, 1 to 3 m, within 25 m of an OSM stream on a valley bottom or in a riparian class),

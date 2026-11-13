@@ -57,11 +57,16 @@ LC_LEVELS = (("mid", 16.0, 4), ("far", 100.0, 3))
 #     trees alone instead of a dark patch around them.
 # BUG-101: the stands test reads the detected crowns only, the share it was tuned on. FEAT-074's generated stems,
 # in expectation, add about 3x that on Vail and turned 94% of the forest into closed stands (bowl clumps read
-# 0.29 instead of 0.07), so the dark ground came back under them. R counts the stems too: without them the
-# distant timber washes out.
+# 0.29 instead of 0.07), so the dark ground came back under them.
+# BUG-120: the stems now fill closed stands only (build_pack.py, stands.stem_chance), so R reads the detected crowns
+# too, against DETECTED_OF_DRAWN of CROWN_FULL: the share all drawn trees had with the stems in every stand. It
+# keeps the far timber as it was (Vail: 0.944 of the forest kept against 0.942 counting the stems) and does not
+# change when the stems do; counting only the stems that are left washes the distant trail edges out. So from far
+# off a sparse stand of a tree every 10 m reads as forest, as it has since FEAT-074; the game shows R only past
+# where it draws the stems (TerrainMaterial coverForest), so nearer it is carried by its trees on white snow.
 # FEAT-225: a pack built without lidar (Silver and Bronze trees) has no detected crowns, every tree is a stem, so its
-# stands test reads the stems' share times the part of all drawn trees the detected crowns are on Vail (BUG-101:
-# the stems add about 3x the detected share, so a quarter); without it no stand would ever close.
+# tests read the stems' share times the part of all drawn trees the detected crowns are on Vail (BUG-101: the
+# stems add about 3x the detected share, so a quarter); without it no stand would ever close.
 DETECTED_OF_DRAWN = 0.25
 FAR_SIGMA = 16.0
 CROWN_FULL = 0.2
@@ -264,7 +269,7 @@ def pack_level(pack_dir, meta, runs, log=print):
         before = forest.sum()
         test = detected if detected.any() else stems * DETECTED_OF_DRAWN     # FEAT-225: no lidar, no crowns
         stands = forest * closed_stand(ndimage.gaussian_filter(test, CROWN_SIGMA / PACK_RES))
-        forest *= np.clip(ndimage.gaussian_filter(crowns, FAR_SIGMA / PACK_RES) / CROWN_FULL, 0, 1)
+        forest *= np.clip(ndimage.gaussian_filter(test, FAR_SIGMA / PACK_RES) / (CROWN_FULL * DETECTED_OF_DRAWN), 0, 1)   # BUG-120
         log(f"  drawn trees keep {forest.sum() / max(before, 1) * 100:.1f}% of the forest from far off, "
             f"closed stands {stands.sum() / max(before, 1) * 100:.1f}% from near (BUG-069)")
     height = tree_heights(pack_dir, meta, 16.0, w, h)

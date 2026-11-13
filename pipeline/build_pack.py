@@ -1336,11 +1336,26 @@ sp4[si, sj] = spc.assign_species(sx4, sy4, z4[si, sj] - elev_shift, h4[si, sj], 
                                  spc.hash01(sx4, sy4, 9), evt is not None, nd4, hw4, region.shifted(elev_shift))
 del si, sj, r2_, c2_, sx4, sy4, ne4, wet4, ridge4, g4, af4, al4, nd4, hw4
 del lodgepole_like
-p4 = stands.stem_chance(canopy4, h4, sp4, det4)
+# BUG-120: the stems fill closed stands only. The canopy mask reads a sparse stand (a tree every 10 m) as closed
+# canopy (BUG-069), so the stems filled the Back Bowls' sparse stands at about 4x their detected crowns, a grey
+# carpet of trees from 1 km off. A cell keeps its stems by the closed-stand test the near cover runs on the
+# detected crowns (cover.closed_stand); a pack without lidar (FEAT-225) has no detected crowns and keeps them all.
+closed4 = None
+if LIDAR and len(rows):
+    import cover
+    crown4 = np.zeros((H4, W4), np.float64)
+    ok4 = (rows < H4 * 2) & (cols < W4 * 2)
+    cr4 = cover.crown_radii(species[ok4], hgt[ok4], spc.crown_radius(species[ok4], hgt[ok4]))
+    np.add.at(crown4, (rows[ok4] // 2, cols[ok4] // 2), np.pi * cr4 ** 2)
+    closed4 = cover.closed_stand(ndimage.gaussian_filter((crown4 / 16.0).astype(np.float32), cover.CROWN_SIGMA / cover.PACK_RES))
+    del crown4, ok4, cr4
+p4 = stands.stem_chance(canopy4, h4, sp4, det4, closed4)
 p4[canopy4 <= 0] = 0
 log(f"  stands: canopy on {np.mean(canopy4 > 0) * 100:.1f}% of the 4 m cells, {p4.sum() / 1e6:.2f} M expected stems "
     f"({p4.sum() / max(np.count_nonzero(canopy4) * 16 / 1e4, 1e-6):.0f} per hectare of canopy), "
-    f"detected crowns {len(pr) / 1e6:.2f} M")
+    f"detected crowns {len(pr) / 1e6:.2f} M"
+    + (f", {(closed4 * (canopy4 > 0)).sum() / max(np.count_nonzero(canopy4), 1) * 100:.0f}% of the canopy in closed stands (BUG-120)" if closed4 is not None else ""))
+del closed4
 stand_meta = stands.write(out, p4, h4, sp4, z4, CELL, X0 - OX, Y0 - OY, cells_x, cells_y, Z_MIN)
 log(f"  stands/: {len(stand_meta['cells'])} cells, {stand_meta['stems'] / 1e6:.2f} M stems at full density")
 del canopy4, det4, h4, z4, sp4, p4

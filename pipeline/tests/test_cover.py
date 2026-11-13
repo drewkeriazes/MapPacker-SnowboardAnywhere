@@ -116,18 +116,28 @@ def test_pack_without_trees_keeps_canopy(tmp_path):
 
 
 def test_sparse_stand_fades_from_far(tmp_path):
-    """a tree every 10 m (5.3 m2 of crown per 100 m2, about 0.05 share) keeps under 0.3 of the forest"""
+    """a tree every 25 m (5.3 m2 of crown per 625 m2, about 0.01 share) keeps under 0.3 of the forest from far off.
+    BUG-120: R reads the detected crowns against a quarter of CROWN_FULL, so a tree every 10 m (0.05) counts as a
+    stand there, as it did with the stems counted"""
     from cover import crown_area
-    pack_dir, meta = _pack(tmp_path, spacing=10.0)
+    pack_dir, meta = _pack(tmp_path, spacing=25.0)
     det, stems, shade = crown_area(pack_dir, meta, 100, 100)
     area = det + stems
     share = area[20:80, 20:80].mean()
-    assert 0.04 < share < 0.07
+    assert 0.006 < share < 0.011
     # FEAT-168: the shadow raster weights each crown by its height over SHADOW_H (10 m trees here)
     from cover import SHADOW_H
     assert np.allclose(shade, area * 10.0 / SHADOW_H)
     r, _ = _pack_forest(pack_dir, meta)
     assert r[20:80, 20:80].max() < 0.3
+
+
+def test_far_weight_ignores_stems(tmp_path):
+    """BUG-120: R reads the detected crowns, so the same trees with or without stems keep the same forest from far
+    off (the stems fill closed stands only, and counting the few left washed the far trail edges out)"""
+    r0, _ = _pack_forest(*_pack(tmp_path / "a", spacing=12.0))
+    r1, _ = _pack_forest(*_pack(tmp_path / "b", spacing=12.0, stems=0.5))
+    assert np.array_equal(r0, r1) and 0.5 < r0[20:80, 20:80].mean() < 1.0
 
 
 def test_dense_timber_keeps_full_forest(tmp_path):
@@ -147,7 +157,8 @@ def test_dense_timber_keeps_full_forest(tmp_path):
 def test_sparse_clump_with_stems_is_not_closed(tmp_path):
     """BUG-101: the closed-stand test runs on the detected crowns only (what BUG-069 was tuned on). A tree every
     10 m plus generated stems whose expected crowns push the total share past CROWN_HI is still a sparse stand
-    from near, while from far off (R) the stems count and keep most of the forest"""
+    from near, while from far off (R, BUG-120: the detected share against a quarter of CROWN_FULL) it keeps most of
+    the forest"""
     from PIL import Image
     from cover import crown_area, CROWN_HI
     pack_dir, meta = _pack(tmp_path, spacing=10.0, stems=0.5)
