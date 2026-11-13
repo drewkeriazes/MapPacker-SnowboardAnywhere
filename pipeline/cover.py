@@ -58,10 +58,10 @@ LC_LEVELS = (("mid", 16.0, 4), ("far", 100.0, 3))
 # BUG-101: the stands test reads the detected crowns only, the share it was tuned on. FEAT-074's generated stems,
 # in expectation, add about 3x that on Vail and turned 94% of the forest into closed stands (bowl clumps read
 # 0.29 instead of 0.07), so the dark ground came back under them.
-# BUG-120: the stems now fill closed stands only (build_pack.py, stands.stem_chance), so R reads the detected crowns
+# BUG-120: R reads the detected crowns
 # too, against DETECTED_OF_DRAWN of CROWN_FULL: the share all drawn trees had with the stems in every stand. It
 # keeps the far timber as it was (Vail: 0.944 of the forest kept against 0.942 counting the stems) and does not
-# change when the stems do; counting only the stems that are left washes the distant trail edges out. So from far
+# change when the stems do (BUG-131 changed them again: they fill to the lidar canopy share); counting only the stems that are left washes the distant trail edges out. So from far
 # off a sparse stand of a tree every 10 m reads as forest, as it has since FEAT-074; the game shows R only past
 # where it draws the stems (TerrainMaterial coverForest), so nearer it is carried by its trees on white snow.
 # FEAT-225: a pack built without lidar (Silver and Bronze trees) has no detected crowns, every tree is a stem, so its
