@@ -95,6 +95,30 @@
    "report": "reports/copper-mountain.md"
   },
   {
+   "slug": "crystal-mountain",
+   "name": "Crystal Mountain",
+   "region": "Washington",
+   "country": "US",
+   "lonlat": [
+    -121.48792056212001,
+    46.93274472998594
+   ],
+   "tier": "silver",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261113T073854Z-466cb2",
+    "built": "2026-11-13",
+    "pipeline": "7a8c055",
+    "bytes": 94626951,
+    "sha256": "55461ef8d9221cb2c77efce18dcb42d022addb7ccd0a25a57a5dee10ee5e0375",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/crystal-mountain/v1/crystal-mountain.zip",
+    "content": "b24a7a97adbf5e55"
+   },
+   "report": "reports/crystal-mountain.md"
+  },
+  {
    "slug": "ohio-hills",
    "name": "Ohio Hills (custom mashup)",
    "region": "Ohio",
