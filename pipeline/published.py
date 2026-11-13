@@ -680,8 +680,9 @@ def outside_row(out, box):
         nr, nl = sum(o["kind"] == "run" for o in own), sum(o["kind"] == "lift" for o in own)
         parts.append(f"{nr} runs and {nl} lifts of the resort's own OpenSkiData area reach up to "
                      f"{max(o['km'] for o in own):.1f} km past the pack's edge" +
-                     (f": grow `pack_bbox` (and `utm_bbox`) to {grown_box(box, own)}, then build_resort.py fetches "
-                      "the rest" if box else ""))
+                     (f": grow the box to {grown_box(box, own)} (`published.py <slug> --grow` writes it and "
+                      "`lonlat_bbox`), then `resort.py plan <slug>` and build_resort.py fetch and build the rest"
+                      if box else ""))
     if other:
         names = ", ".join(sorted({f"{o['name']} ({o['area'] or 'no area'}, {o['km']:.1f} km)" for o in other}))
         areas = sorted({o["area"] for o in other if o["area"]})
@@ -729,10 +730,17 @@ def refresh(cfg, raw=None, resorts=None, web=None, features=None, cache=None, os
     return rec
 
 
+PLAN_AGAIN = ("python pipeline/resort.py plan {slug} (--force for a hand-written config: the NAIP items, DEM tiles "
+              "and EPT node lists for the bigger box), then build_resort.py {slug} fetches and builds the rest")
+
+
 def grow_config(cfg_path, rec):
-    """FEAT-296 --grow: the config's box grown to take in the resort's own runs and lifts outside it (`pack_bbox`
-    when the config has one, and `utm_bbox`, the fetched box, to hold it). Edits the two arrays in place, so the
-    rest of the file keeps its layout. Returns (old box, new box), or None when nothing of the resort's is outside."""
+    """FEAT-296 --grow: the config's boxes grown to take in the resort's own runs and lifts outside them:
+    `lonlat_bbox` (the ski area's extent, which the OSM fetch pads by 1.3 km and resort.py plan derives the rest
+    from) to the features' own extent, `pack_bbox` when the config has one, and `utm_bbox`, the fetched box, to hold
+    it. Edits those arrays in place, so the rest of the file keeps its layout; `resort.py plan` then re-derives the
+    NAIP items, DEM tiles and node lists (it keeps `pack_bbox`). Returns (old box, new box), or None when nothing of
+    the resort's is outside."""
     with open(cfg_path, encoding="utf-8") as f:
         text = f.read()
     cfg = json.loads(text)
@@ -743,7 +751,15 @@ def grow_config(cfg_path, rec):
     new = grown_box(box, own)
     fetched = cfg.get("utm_bbox") or new
     wide = [min(fetched[0], new[0]), min(fetched[1], new[1]), max(fetched[2], new[2]), max(fetched[3], new[3])]
-    for key, val in (("pack_bbox", new if "pack_bbox" in cfg else None), ("utm_bbox", wide if "pack_bbox" in cfg else new)):
+    ll = cfg.get("lonlat_bbox")
+    if ll and cfg.get("crs"):
+        from pyproj import Transformer
+        to_ll = Transformer.from_crs(cfg["crs"], "EPSG:4326", always_xy=True)
+        pts = [to_ll.transform(x, y) for o in own for x in (o["utm"][0], o["utm"][2]) for y in (o["utm"][1], o["utm"][3])]
+        ll = [round(min([ll[0]] + [q[0] for q in pts]), 7), round(min([ll[1]] + [q[1] for q in pts]), 7),
+              round(max([ll[2]] + [q[0] for q in pts]), 7), round(max([ll[3]] + [q[1] for q in pts]), 7)]
+    for key, val in (("pack_bbox", new if "pack_bbox" in cfg else None), ("utm_bbox", wide if "pack_bbox" in cfg else new),
+                     ("lonlat_bbox", ll if cfg.get("lonlat_bbox") else None)):
         if val is not None:
             text = re.sub(rf'("{key}"\s*:\s*)\[[^\]]*\]', lambda m: m.group(1) + json.dumps(val), text, count=1)
     with open(cfg_path, "w", encoding="utf-8", newline="\n") as f:
@@ -758,7 +774,7 @@ def main(argv=None):
     ap.add_argument("--cache", help="folder of the cached OpenSkiData index (default _index/ in the raw root)")
     ap.add_argument("--resorts", help="the folder holding every resort's folder (default resorts/)")
     ap.add_argument("--grow", action="store_true", help="FEAT-296: grow the config's box to take in the resort's own "
-                    "runs and lifts found outside it; then build_resort.py fetches and builds the rest")
+                    "runs and lifts found outside it; then resort.py plan and build_resort.py fetch and build the rest")
     a = ap.parse_args(argv)
     with open(paths.config_path(a.slug, a.resorts), encoding="utf-8") as f:
         cfg = json.load(f)
@@ -773,7 +789,8 @@ def main(argv=None):
     print(f"wrote {published_path(a.slug, a.resorts)}")
     if a.grow:
         g = grow_config(paths.config_path(a.slug, a.resorts), rec)
-        print(f"grew the box {g[0]} -> {g[1]} in {paths.config_path(a.slug, a.resorts)}: run build_resort.py {a.slug}"
+        print(f"grew the box {g[0]} -> {g[1]} and lonlat_bbox in {paths.config_path(a.slug, a.resorts)}; next: "
+              + PLAN_AGAIN.format(slug=a.slug)
               if g else "--grow: nothing of the resort's own is outside the box")
 
 

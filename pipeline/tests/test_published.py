@@ -353,7 +353,8 @@ def test_gather_records_outside_and_the_box(tmp_path):
 
 def test_grow_config_edits_the_boxes_in_place(tmp_path):
     path = tmp_path / "demo.json"
-    path.write_text('{\n  "slug": "demo",\n  "utm_bbox": [\n    400000,\n    4400000,\n    405000,\n    4405000\n  ],\n'
+    path.write_text('{\n  "slug": "demo",\n  "crs": "EPSG:32613",\n  "lonlat_bbox": [-106.15, 39.75, -106.1, 39.78],\n'
+                    '  "utm_bbox": [\n    400000,\n    4400000,\n    405000,\n    4405000\n  ],\n'
                     '  "pack_bbox": [401000, 4401000, 404000, 4404000],\n  "notes": "kept"\n}\n', encoding="utf-8")
     rec = {"outside": [{"own": True, "utm": [399000, 4401500, 400500, 4402000]},
                        {"own": False, "utm": [420000, 4401500, 421000, 4402000]}]}     # a namesake: not grown to
@@ -361,4 +362,9 @@ def test_grow_config_edits_the_boxes_in_place(tmp_path):
     cfg = json.loads(path.read_text(encoding="utf-8"))
     assert cfg["pack_bbox"] == [398700, 4401000, 404000, 4404000]
     assert cfg["utm_bbox"] == [398700, 4400000, 405000, 4405000] and cfg["notes"] == "kept"
+    # the OSM fetch and resort.py plan read lonlat_bbox: it reaches the outside run's west end (x 399000)
+    import pyproj
+    west = pyproj.Transformer.from_crs("EPSG:32613", "EPSG:4326", always_xy=True).transform(399000, 4401500)[0]
+    assert cfg["lonlat_bbox"][0] == pytest.approx(min(west, -106.15), abs=1e-4) and cfg["lonlat_bbox"][0] < -106.15
+    assert cfg["lonlat_bbox"][2] == -106.1
     assert P.grow_config(str(path), {"outside": []}) is None
