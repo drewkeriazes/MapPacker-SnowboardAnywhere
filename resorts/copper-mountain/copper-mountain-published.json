@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "slug": "copper-mountain",
  "fetched": "2026-11-13",
  "areas": [
@@ -50,5 +50,12 @@
    "text": "2465 acre"
   }
  },
- "trails": null
+ "trails": null,
+ "outside": [],
+ "box": [
+  396600,
+  4366100,
+  403400,
+  4374100
+ ]
 }

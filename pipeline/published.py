@@ -18,7 +18,11 @@ run count, skiable area in km2. Sources, in the order tried:
   only, and resort websites have no common machine-readable form, so the infobox is the one source that covers
   most resorts. Figures are facts; the article is named as the source.
 - the trail list: the newest night of the resort's terrain status feed in `<raw>/grooming/` (fetch_grooming.py,
-  Vail Resorts' resorts), every trail the resort lists by name. pack_report.py matches it with the OSM run names.
+  Vail Resorts' resorts), every trail the resort lists by name, with its area and difficulty. pack_report.py
+  matches it with the OSM run names (and their altNames, FEAT-296) and lists the rest as an OSM to-do.
+- outside the pack (FEAT-296): the runs and lifts of the resort's own OpenSkiData areas that lie past the pack's
+  box, and runs named like a published trail within 3 km of it (runs.geojson, lifts.geojson in the index cache).
+  `--grow` writes a box that takes in the resort's own into the config; build_resort.py then fetches and builds.
 
 Published figures are marketing numbers (acreage and run counts are counted in different ways), so the report
 only ever warns on them. Network: Wikidata and Wikipedia (any machine with web access, CI included).
@@ -34,7 +38,7 @@ WIKIDATA = "https://www.wikidata.org/w/api.php"
 WIKIPEDIA = "https://en.wikipedia.org/w/api.php"
 NEAR_KM = 20.0               # a Wikidata item found by name must be this close to the resort
 FT, ACRE = 0.3048, 4046.8564224
-VERSION = 1
+VERSION = 2                 # 2: trails keep each trail's area and difficulty (FEAT-296), runs and lifts outside
 FIGURES = ("summit", "base", "vertical", "lifts", "runs", "area")
 UNITS = {"summit": "m", "base": "m", "vertical": "m", "lifts": "", "runs": "", "area": "km2"}
 INFOBOX_KEYS = {"summit": ("top_elevation",), "base": ("base_elevation",), "vertical": ("vertical",),
@@ -162,8 +166,14 @@ def figures_from_infobox(box, source):
 
 # ------------------------------------------------------------------------------------------------ the trail list
 
+# the terrain status feed's Difficulty codes, read off Vail, Breckenridge and Park City's lists (5 are the parks,
+# 7 Breckenridge's hike-to chutes: Lake Chutes, South Col)
+FEED_DIFFICULTY = {1: "easy", 2: "intermediate", 3: "advanced", 4: "expert", 5: "terrain park", 7: "extreme"}
+
+
 def trail_list(raw):
-    """(names, night) from the newest terrain status feed in <raw>/grooming/ that lists trails, or (None, None)"""
+    """(entries, night) from the newest terrain status feed in <raw>/grooming/ that lists trails, or (None, None).
+    An entry is {name, area (the feed's grooming area: "Back Bowls"), difficulty}, one per name."""
     if not raw:
         return None, None
     for p in sorted(glob.glob(os.path.join(raw, "grooming", "*.json")), reverse=True):
@@ -172,10 +182,21 @@ def trail_list(raw):
                 feed = json.load(f)
         except (OSError, ValueError):
             continue
-        names = sorted({(t.get("name") or "").strip() for t in feed.get("trails") or []} - {""})
-        if names:
-            return names, os.path.splitext(os.path.basename(p))[0][:8]
+        out = {}
+        for t in feed.get("trails") or []:
+            n = (t.get("name") or "").strip()
+            if n and n not in out:
+                out[n] = {"name": n, "area": t.get("area"), "difficulty": FEED_DIFFICULTY.get(t.get("difficulty"))}
+        if out:
+            return [out[n] for n in sorted(out)], os.path.splitext(os.path.basename(p))[0][:8]
     return None, None
+
+
+def trail_entries(trails):
+    """the record's trail list as entries; a version 1 record has names only"""
+    if not trails:
+        return []
+    return trails.get("list") or [{"name": n, "area": None, "difficulty": None} for n in trails.get("names") or []]
 
 
 # ------------------------------------------------------------------------------------------------ finding the area
@@ -297,8 +318,8 @@ def article(area, cfg, web):
 
 # ------------------------------------------------------------------------------------------------ the record
 
-def gather(cfg, features, web, raw=None, old=None):
-    """the published figures record for a config"""
+def gather(cfg, features, web, raw=None, old=None, osd=None):
+    """the published figures record for a config; `osd` (runs.geojson, lifts.geojson paths) adds `outside`"""
     rec = {"version": VERSION, "slug": cfg.get("slug"), "fetched": datetime.date.today().isoformat(),
            "areas": [], "figures": {}, "trails": None}
     hand = {k: v for k, v in ((old or {}).get("figures") or {}).items() if str(v.get("source", "")).startswith("hand")}
@@ -325,13 +346,92 @@ def gather(cfg, features, web, raw=None, old=None):
         rec["why"] = "no English Wikipedia article with an Infobox ski area for " + \
                      ", ".join(a["properties"].get("name") or a["properties"]["id"] for a in areas)
     rec["figures"].update(hand)
-    names, night = trail_list(raw)
-    if names:
+    entries, night = trail_list(raw)
+    if entries:
         host = re.sub(r"^www\.", "", urllib.parse.urlparse(cfg.get("terrain_status_url") or "").netloc) or "the resort"
-        rec["trails"] = {"source": f"{host} terrain status, {night[:4]}-{night[4:6]}-{night[6:]}", "names": names}
+        rec["trails"] = {"source": f"{host} terrain status, {night[:4]}-{night[4:6]}-{night[6:]}", "list": entries}
     elif (old or {}).get("trails"):
         rec["trails"] = old["trails"]          # raw gone (Vail's was moved): keep what was read before
+    if osd is not None and areas:
+        ours = {site_of(w) for a in areas for w in a["properties"].get("websites") or []}
+        foreign = [f["properties"]["id"] for f in features if (f.get("properties") or {}).get("type") == "skiArea"
+                   and f["properties"].get("websites")
+                   and not ours & {site_of(w) for w in f["properties"]["websites"]}]
+        rec["outside"] = outside_pack(cfg, [a["properties"]["id"] for a in areas],
+                                      [e["name"] for e in trail_entries(rec["trails"])], *osd, foreign=foreign)
+        rec["box"] = pack_box(cfg)
     return rec
+
+
+# ------------------------------------------------------------------------------------------------ outside the pack
+
+OUTSIDE_KM = 3.0        # a published trail's name on a run this close outside the pack is probably the resort's own
+                        # (further, it is another trail: Breckenridge's "Humbug" is 24 km off at Arapahoe Basin)
+
+
+def site_of(url):
+    """a website's host without www ("https://www.bmbw.com/" -> "bmbw.com")"""
+    return re.sub(r"^www\.", "", urllib.parse.urlparse(url if "://" in url else "https://" + url).netloc.lower())
+
+
+def pack_box(cfg):
+    return cfg.get("pack_bbox") or cfg.get("utm_bbox")
+
+
+def outside_pack(cfg, area_ids, trail_names, runs_path, lifts_path, foreign=()):
+    """FEAT-296: the runs and lifts of the resort's own OpenSkiData areas that lie outside the pack box, and the runs
+    named like a published trail within OUTSIDE_KM of it: [{kind, name, area, km, utm: [x0, y0, x1, y1]}], km being
+    how far past the box edge the feature reaches. A run matched by name only counts when it is in no ski area or in
+    one that is not another resort (`foreign`: areas with a website the resort's own areas don't share; Park City's
+    "Liberty" at Solitude, Breckenridge's "Ptarmigan" at Copper). Both files hold one feature per line; a line is
+    parsed only when it names one of the areas or a published trail."""
+    import resort
+    from pyproj import Transformer
+    box = pack_box(cfg)
+    if not box or not cfg.get("crs"):
+        return []
+    to_utm = Transformer.from_crs("EPSG:4326", cfg["crs"], always_xy=True)
+    moved = [m["from"] for m in cfg.get("relocate") or [] if not m.get("source") and m.get("from")]
+    ids, foreign = set(area_ids), set(foreign)
+    keys = {loose_key(n) for n in trail_names if loose_key(n)}
+    id_pat = re.compile("|".join(map(re.escape, ids))) if ids else None
+    name_pat = re.compile(r'"name":\s*"((?:[^"\\]|\\.)*)"')
+    out = []
+    for kind, path in (("run", runs_path), ("lift", lifts_path)):
+        if not path or not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                own = bool(id_pat and id_pat.search(line))
+                m = None if own or kind == "lift" else name_pat.search(line)
+                if not own and not (m and loose_key(json.loads('"' + m.group(1) + '"')) in keys):
+                    continue
+                line = line.strip().rstrip(",")
+                if not line.startswith("{"):
+                    continue
+                ft = json.loads(line)
+                p = ft.get("properties") or {}
+                if kind == "run" and "downhill" not in (p.get("uses") or []):
+                    continue
+                fa = [(a.get("properties") or a) for a in p.get("skiAreas") or []]
+                mine = any(a.get("id") in ids for a in fa)
+                if not mine and not (kind == "run" and loose_key(p.get("name") or "") in keys
+                                     and not any(a.get("id") in foreign for a in fa)):
+                    continue
+                pts = [to_utm.transform(x, y) for x, y in resort.geom_points(ft["geometry"])]
+                if not pts:
+                    continue
+                pts = [q for q in pts if not any(b[0] <= q[0] <= b[2] and b[1] <= q[1] <= b[3] for b in moved)]
+                if not pts:
+                    continue          # all in an area relocate pastes into the pack (Boston Mills' Brandywine)
+                past = max(max(box[0] - x, x - box[2], box[1] - y, y - box[3], 0.0) for x, y in pts)
+                if past <= 0 or (not mine and past > OUTSIDE_KM * 1000):
+                    continue
+                xs, ys = [q[0] for q in pts], [q[1] for q in pts]
+                out.append({"kind": kind, "name": p.get("name"), "area": ", ".join(a.get("name") or "?" for a in fa) or None,
+                            "own": mine, "km": round(past / 1000, 2),
+                            "utm": [round(min(xs)), round(min(ys)), round(max(xs)), round(max(ys))]})
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ against the pack
@@ -369,8 +469,9 @@ def pack_figures(features):
         out["vertical"] = {"value": round(max(z) - min(z)), "how": f"between them"}
     out["lifts"] = {"value": len(lifts), "chairs": sum(1 for l in lifts if l.get("type") in CHAIRS)}
     named = {r["name"].strip() for r in runs if (r.get("name") or "").strip()}
+    alt = {r["altName"].strip() for r in runs if (r.get("altName") or "").strip()} - named   # FEAT-296: the road's name
     out["runs"] = {"value": len(named), "segments": len(runs), "unnamed": sum(1 for r in runs if not (r.get("name") or "").strip()),
-                   "names": sorted(named)}
+                   "names": sorted(named), "alt": sorted(alt)}
     parts = []
     for r in runs:
         pts = [(p[0], p[1]) for p in r.get("points") or []]
@@ -396,7 +497,8 @@ def _fold(s):
 
 
 def loose_key(n):
-    return "".join(x for x in name_key(n).split() if x not in LOOSE_DROP)
+    k = re.sub(r"\bterrain park\b", " ", name_key(n))     # "Park Lane Terrain Park" is breckenridge.com's "Park Lane"
+    return "".join(x for x in k.split() if x not in LOOSE_DROP)
 
 
 def edits(a, b):
@@ -410,15 +512,13 @@ def edits(a, b):
     return prev[-1]
 
 
-def match_trails(published_names, osm_names):
+def match_trails(published_names, osm_names, alt_names=()):
     """{"matched": [(published, osm)], "unmatched": [published], "osm_only": [osm]}: the same name (case, accents,
     apostrophes and "4"/"four" aside), else the same without Upper, Lower, The, Run and spaces ("Power line"), else
     the part before " - " (a resort listing parts of one run), else one letter off (two on a long name)"""
-    exact = {}
-    for n in osm_names:
+    exact, loose = {}, {}
+    for n in list(osm_names) + list(alt_names):          # a run's own name first, then the altNames (FEAT-296)
         exact.setdefault(name_key(n), n)
-    loose = {}
-    for n in osm_names:
         loose.setdefault(loose_key(n), n)
     matched, unmatched = [], []
     for p in published_names:
@@ -441,9 +541,11 @@ def _row(fig, label, pub, packv, status, note, unit=""):
             "pack": packv, "status": status, "note": note}
 
 
-def compare(rec, features):
+def compare(rec, features, to_lonlat=None):
     """rows {figure, label, published, unit, source, text, pack, status ("pass", "warn", "skip"), note} and the trail
-    match (or None), the pack against the published record. Never "fail": published figures are marketing numbers."""
+    match (or None), the pack against the published record. Never "fail": published figures are marketing numbers.
+    The trail match carries `todo` (FEAT-296): each published trail with no OSM run, with its area, difficulty and,
+    given `to_lonlat` (pack x, y to lon, lat), where its area's matched runs are, for an OSM edit link."""
     figs = (rec or {}).get("figures") or {}
     mine = pack_figures(features)
     rows = []
@@ -487,9 +589,11 @@ def compare(rec, features):
         rows.append(_row("lifts", "Lifts", pub, m["value"], st, note))
     pub, m = figs.get("runs"), mine["runs"]
     trails = None
-    if (rec or {}).get("trails"):
-        t = match_trails(rec["trails"]["names"], m["names"])
-        t["source"], t["published"] = rec["trails"]["source"], len(rec["trails"]["names"])
+    entries = trail_entries((rec or {}).get("trails"))
+    if entries:
+        t = match_trails([e["name"] for e in entries], m["names"], m["alt"])
+        t["source"], t["published"] = rec["trails"]["source"], len(entries)
+        t["todo"] = osm_todo(entries, t, features, to_lonlat)
         trails = t
     if pub or trails:
         detail = f"{m['value']} run names over {m['segments']} segments, {m['unnamed']} unnamed"
@@ -504,7 +608,7 @@ def compare(rec, features):
             if share < TRAILS_MATCHED:
                 st = "warn"
             detail += (f"; of the {trails['published']} trails on {trails['source']}, {len(trails['matched'])} have an OSM "
-                       f"run and {len(trails['unmatched'])} have none (listed below: not mapped in OSM, or named "
+                       f"run and {len(trails['unmatched'])} have none (the OSM to-do below: not mapped in OSM, or named "
                        f"differently); {len(trails['osm_only'])} OSM names are not on the list")
         elif pub and st == "warn" and ratio < 1:
             detail += ": runs not mapped in OSM, mapped with no name, or part of the resort left out"
@@ -525,7 +629,67 @@ def compare(rec, features):
             why = ": a neighbour in the pack"
         rows.append(_row("area", "Skiable area", pub, m["value"], "warn" if bad else "pass",
                          f"{m['how']}, {ratio:.2f} times the published{why}", "km2"))
+    out = (rec or {}).get("outside")
+    if out:
+        rows.append(outside_row(out, (rec or {}).get("box")))
     return rows, trails
+
+
+def osm_todo(entries, match, features, to_lonlat=None):
+    """[{name, area, difficulty, lonlat}] for the published trails with no OSM run; lonlat is the middle of the runs
+    matched to other trails in the same feed area (where to look on the map), or None"""
+    by_name = {}
+    for r in features.get("runs") or []:
+        for n in (r.get("name"), r.get("altName")):
+            if n and r.get("points"):
+                by_name.setdefault(n, []).extend(r["points"])
+    area_of = {e["name"]: e.get("area") for e in entries}
+    where = {}
+    for pub, osm in match["matched"]:
+        where.setdefault(area_of.get(pub), []).extend(by_name.get(osm, []))
+    out = []
+    for e in entries:
+        if e["name"] not in match["unmatched"]:
+            continue
+        pts = where.get(e.get("area")) if e.get("area") else None
+        ll = None
+        if pts and to_lonlat:
+            ll = [round(v, 5) for v in to_lonlat(sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))]
+        out.append({"name": e["name"], "area": e.get("area"), "difficulty": e.get("difficulty"), "lonlat": ll})
+    return out
+
+
+def osm_edit_link(lonlat, zoom=16):
+    return f"https://www.openstreetmap.org/edit#map={zoom}/{lonlat[1]:.5f}/{lonlat[0]:.5f}"
+
+
+def grown_box(box, out, pad_m=300):
+    """the pack box grown to take in `out` (and pad_m round it), on 100 m"""
+    x0 = min([box[0]] + [o["utm"][0] - pad_m for o in out]); y0 = min([box[1]] + [o["utm"][1] - pad_m for o in out])
+    x1 = max([box[2]] + [o["utm"][2] + pad_m for o in out]); y1 = max([box[3]] + [o["utm"][3] + pad_m for o in out])
+    return [int(math.floor(x0 / 100) * 100), int(math.floor(y0 / 100) * 100),
+            int(math.ceil(x1 / 100) * 100), int(math.ceil(y1 / 100) * 100)]
+
+
+def outside_row(out, box):
+    """the line 21 row for runs and lifts outside the pack, with the fix"""
+    own = [o for o in out if o["own"]]
+    other = [o for o in out if not o["own"]]
+    parts = []
+    if own:
+        nr, nl = sum(o["kind"] == "run" for o in own), sum(o["kind"] == "lift" for o in own)
+        parts.append(f"{nr} runs and {nl} lifts of the resort's own OpenSkiData area reach up to "
+                     f"{max(o['km'] for o in own):.1f} km past the pack's edge" +
+                     (f": grow the box to {grown_box(box, own)} (`published.py <slug> --grow` writes it and "
+                      "`lonlat_bbox`), then `resort.py plan <slug>` and build_resort.py fetch and build the rest"
+                      if box else ""))
+    if other:
+        names = ", ".join(sorted({f"{o['name']} ({o['area'] or 'no area'}, {o['km']:.1f} km)" for o in other}))
+        areas = sorted({o["area"] for o in other if o["area"]})
+        parts.append(f"published trails just outside the pack: {names}" +
+                     (f": `resort.py resolve <name> --with \"{areas[0]}\"` takes in that area" if areas else
+                      f": grow `pack_bbox` to {grown_box(box, other)}" if box else ""))
+    return _row("outside", "Outside the pack", None, len(out), "warn", "; ".join(parts))
 
 
 def load(slug, resorts=None):
@@ -551,12 +715,56 @@ def ski_area_features(cache=None):
     return resort.load_json(resort.index_file(cache, "ski_areas.geojson"))["features"]
 
 
-def refresh(cfg, raw=None, resorts=None, web=None, features=None, cache=None):
+def osd_files(cache=None):
+    """(runs.geojson, lifts.geojson) paths in the index cache, downloaded when missing or stale"""
+    import resort
+    cache = cache or os.environ.get("SBA_INDEX_DIR") or os.path.join(paths.raw_root(), "_index")
+    return resort.index_file(cache, "runs.geojson"), resort.index_file(cache, "lifts.geojson")
+
+
+def refresh(cfg, raw=None, resorts=None, web=None, features=None, cache=None, osd=None):
     """gather and write the record, keeping hand figures and an earlier trail list; returns it"""
     rec = gather(cfg, features if features is not None else ski_area_features(cache), web or Web(),
-                 raw=raw, old=load(cfg["slug"], resorts))
+                 raw=raw, old=load(cfg["slug"], resorts), osd=osd if osd is not None else osd_files(cache))
     write(rec, cfg["slug"], resorts)
     return rec
+
+
+PLAN_AGAIN = ("python pipeline/resort.py plan {slug} (--force for a hand-written config: the NAIP items, DEM tiles "
+              "and EPT node lists for the bigger box), then build_resort.py {slug} fetches and builds the rest")
+
+
+def grow_config(cfg_path, rec):
+    """FEAT-296 --grow: the config's boxes grown to take in the resort's own runs and lifts outside them:
+    `lonlat_bbox` (the ski area's extent, which the OSM fetch pads by 1.3 km and resort.py plan derives the rest
+    from) to the features' own extent, `pack_bbox` when the config has one, and `utm_bbox`, the fetched box, to hold
+    it. Edits those arrays in place, so the rest of the file keeps its layout; `resort.py plan` then re-derives the
+    NAIP items, DEM tiles and node lists (it keeps `pack_bbox`). Returns (old box, new box), or None when nothing of
+    the resort's is outside."""
+    with open(cfg_path, encoding="utf-8") as f:
+        text = f.read()
+    cfg = json.loads(text)
+    own = [o for o in rec.get("outside") or [] if o["own"]]
+    box = pack_box(cfg)
+    if not own or not box:
+        return None
+    new = grown_box(box, own)
+    fetched = cfg.get("utm_bbox") or new
+    wide = [min(fetched[0], new[0]), min(fetched[1], new[1]), max(fetched[2], new[2]), max(fetched[3], new[3])]
+    ll = cfg.get("lonlat_bbox")
+    if ll and cfg.get("crs"):
+        from pyproj import Transformer
+        to_ll = Transformer.from_crs(cfg["crs"], "EPSG:4326", always_xy=True)
+        pts = [to_ll.transform(x, y) for o in own for x in (o["utm"][0], o["utm"][2]) for y in (o["utm"][1], o["utm"][3])]
+        ll = [round(min([ll[0]] + [q[0] for q in pts]), 7), round(min([ll[1]] + [q[1] for q in pts]), 7),
+              round(max([ll[2]] + [q[0] for q in pts]), 7), round(max([ll[3]] + [q[1] for q in pts]), 7)]
+    for key, val in (("pack_bbox", new if "pack_bbox" in cfg else None), ("utm_bbox", wide if "pack_bbox" in cfg else new),
+                     ("lonlat_bbox", ll if cfg.get("lonlat_bbox") else None)):
+        if val is not None:
+            text = re.sub(rf'("{key}"\s*:\s*)\[[^\]]*\]', lambda m: m.group(1) + json.dumps(val), text, count=1)
+    with open(cfg_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    return box, new
 
 
 def main(argv=None):
@@ -565,16 +773,25 @@ def main(argv=None):
     ap.add_argument("--raw", help="the resort's raw folder, for the trail list in grooming/ (default <raw root>/<slug>)")
     ap.add_argument("--cache", help="folder of the cached OpenSkiData index (default _index/ in the raw root)")
     ap.add_argument("--resorts", help="the folder holding every resort's folder (default resorts/)")
+    ap.add_argument("--grow", action="store_true", help="FEAT-296: grow the config's box to take in the resort's own "
+                    "runs and lifts found outside it; then resort.py plan and build_resort.py fetch and build the rest")
     a = ap.parse_args(argv)
     with open(paths.config_path(a.slug, a.resorts), encoding="utf-8") as f:
         cfg = json.load(f)
     raw = a.raw or os.path.join(paths.raw_root(), a.slug)
     rec = refresh(cfg, raw=raw, resorts=a.resorts, cache=a.cache)
     sys.stdout.reconfigure(encoding="utf-8")
-    print(json.dumps({k: v for k, v in rec.items() if k != "trails"}, indent=1, ensure_ascii=False))
+    print(json.dumps({k: v for k, v in rec.items() if k not in ("trails", "outside")}, indent=1, ensure_ascii=False))
     if rec.get("trails"):
-        print(f"trails: {len(rec['trails']['names'])} from {rec['trails']['source']}")
+        print(f"trails: {len(trail_entries(rec['trails']))} from {rec['trails']['source']}")
+    for o in rec.get("outside") or []:
+        print(f"outside the pack: {o['kind']} {o['name']} ({o['area']}), {o['km']} km past the edge")
     print(f"wrote {published_path(a.slug, a.resorts)}")
+    if a.grow:
+        g = grow_config(paths.config_path(a.slug, a.resorts), rec)
+        print(f"grew the box {g[0]} -> {g[1]} and lonlat_bbox in {paths.config_path(a.slug, a.resorts)}; next: "
+              + PLAN_AGAIN.format(slug=a.slug)
+              if g else "--grow: nothing of the resort's own is outside the box")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "slug": "vail",
  "fetched": "2026-11-13",
  "areas": [
@@ -52,284 +52,1399 @@
  },
  "trails": {
   "source": "vail.com terrain status, 2026-04-01",
-  "names": [
-   "10% Road",
-   "12 to 1 Connector",
-   "38",
-   "Apres Vous",
-   "Avanti - Lower",
-   "Avanti - Middle",
-   "Avanti - Upper",
-   "Baccarat",
-   "Bear Tree - Lower",
-   "Bear Tree - Middle",
-   "Bear Tree - Upper",
-   "Ben's Face",
-   "Berries - Lower",
-   "Berries - Upper",
-   "Big Rock Park - East",
-   "Big Rock Park - West",
-   "Black Forest",
-   "Blue Ox",
-   "Bolshoi Ballroom",
-   "Boomer",
-   "Born Free - Lower",
-   "Born Free - Lower Middle",
-   "Born Free - Upper",
-   "Born Free - Upper Middle",
-   "Brisk Walk",
-   "Brisk Walk - Lower",
-   "Brisk Walk - Upper",
-   "Buckskin Glade",
-   "Bwana - Expert Face",
-   "Bwana - Lower",
-   "Bwana - Middle",
-   "Bwana - Upper",
-   "Bwana Junction",
-   "Bwana Loop",
-   "CJ's Glades",
-   "Cady's Café",
-   "Campbells",
-   "Cappuccino",
-   "Cascade Way",
-   "Chair 15",
-   "Challenge",
-   "Champagne Glade",
-   "Chaos Canyon",
-   "Cheetah",
-   "Chicken Yard",
-   "China Bowl to Two Elk",
-   "China Spur",
-   "Choker Cutoff",
-   "Christmas",
-   "Cloud 9 - Lower",
-   "Cloud 9 - Middle",
-   "Cloud 9 - Upper",
-   "Club Walk",
-   "Cold Feet",
-   "Columbine - Lower",
-   "Columbine - Upper",
-   "Compromise",
-   "Cookshack",
-   "Cow's Face",
-   "Coyote Crossing",
-   "Cub's Way - Lower",
-   "Cub's Way - Upper",
-   "Dealer's Choice",
-   "Deuces Wild",
-   "Dragons Teeth",
-   "Eagle's Nest Ridge",
-   "Emperor's Choice - Lower",
-   "Emperor's Choice - Upper",
-   "Encore",
-   "Fall Line - Race Trail",
-   "Faro",
-   "Faro Glade",
-   "First Step",
-   "Flap Jack - Lower",
-   "Flap Jack - Upper",
-   "Forever",
-   "Frontside Chutes",
-   "G-Force Alley",
-   "Game Trail",
-   "Gandy Dancer - Lower",
-   "Gandy Dancer - Middle",
-   "Gandy Dancer - Upper",
-   "Genghis Kahn",
-   "Giant Steps",
-   "Gillett's Dream",
-   "Gitalong Road - Lower",
-   "Gitalong Road - Middle",
-   "Gitalong Road - Upper",
-   "Golden Peak Race - Race Trail",
-   "Golden Peak Terrain Park",
-   "Golden Peak Terrain Park - Small Features",
-   "Golden Peak Terrain Park - Upper",
-   "Gopher Hill",
-   "Gorky Park",
-   "Grand Junction CW",
-   "Grand Review",
-   "Grand Review - Lower",
-   "Ha Ha - West",
-   "Hairbag Alley",
-   "Head First",
-   "Headwall",
-   "Headwall Ridge",
-   "Heavy Metal",
-   "High Noon Ridge",
-   "Highline",
-   "Highline Runout",
-   "Hornsilver",
-   "Hunky Dory",
-   "In The Wuides",
-   "Inner Mongolia",
-   "Iron Mask",
-   "Jade Glade",
-   "Kangaroo Cornice",
-   "Kelly's Toll Road",
-   "Klickity Klack",
-   "Ledges - Lower",
-   "Ledges - Upper",
-   "Lindsey's - Lower",
-   "Lindsey's - Middle",
-   "Lindsey's - Upper",
-   "Lionshead Catwalk - Lower",
-   "Lionshead Catwalk - Upper",
-   "Lionsway - Lower",
-   "Lionsway - Upper",
-   "Little Ollie",
-   "Lodgepole - Lower",
-   "Lodgepole - Upper",
-   "Lodgepole Gulch",
-   "Lodgepole Gulch Cutoff",
-   "Log Chute",
-   "Look Ma",
-   "Lost Boy",
-   "Lost Boy Catwalk",
-   "Lovers Leap",
-   "Magic Forest",
-   "Marmot South Gate",
-   "Marmot Valley",
-   "Meadows - Lower",
-   "Meadows - Upper",
-   "Mid-Vail Express",
-   "Mil Creek Road",
-   "Milts Face",
-   "Minnie Ha Ha",
-   "Minnie's - Lower",
-   "Minnie's - Middle",
-   "Minnie's - Upper",
-   "Morning Thunder",
-   "Morningside Ridge",
-   "Mudslide",
-   "Never",
-   "North Rim",
-   "Northface Catwalk",
-   "Northstar",
-   "Northwoods",
-   "Northwoods - Yeti's Face",
-   "O.S.",
-   "Old 9 Line",
-   "Orient Express",
-   "Outer Mongolia",
-   "Ouzo",
-   "Ouzo - Lower",
-   "Ouzo Glade",
-   "Over Yonder",
-   "Overeasy",
-   "Owl's Roost 1",
-   "Owl's Roost 2",
-   "Pepi's Face",
-   "Pickeroon - Lower",
-   "Pickeroon - Upper",
-   "Pika",
-   "Poker Flats",
-   "Pony Express - Lower",
-   "Pony Express - Upper",
-   "Poppy Fields East",
-   "Poppy Fields West",
-   "Post Road",
-   "Powerline",
-   "Powerline Glade",
-   "Practice Parkway",
-   "Pride - Lower",
-   "Pride - Middle",
-   "Pride - Upper",
-   "Prima - Brown's Face",
-   "Prima - Lower",
-   "Prima - Middle",
-   "Prima - Upper",
-   "Prima Cornice",
-   "Pronto",
-   "Ptarmigan Ridge",
-   "Pumphouse",
-   "Ramshorn - Lower",
-   "Ramshorn - Upper",
-   "Rasputins Revenge",
-   "Red Square",
-   "Red Zinger",
-   "Resolution",
-   "Resolution Road",
-   "Ricky's Ridge",
-   "Ricky's Tube",
-   "Ridge Route",
-   "Rip's Ride Teaching Area",
-   "Riva Catwalk",
-   "Riva Glade",
-   "Riva Ridge - Lower",
-   "Riva Ridge - Middle",
-   "Riva Ridge - Tourist Trap",
-   "Riva Ridge - Upper",
-   "Rogers Run",
-   "Ruder's - Lower",
-   "Ruder's - Upper",
-   "Safari - East",
-   "Safari - Lower",
-   "Safari - Middle",
-   "Safari - West",
-   "Seldom",
-   "Shangri-La",
-   "Showboat",
-   "Silk Road - East",
-   "Silk Road - West",
-   "Simba - Expert Face",
-   "Simba - Lower",
-   "Simba - Middle",
-   "Simba - Upper",
-   "Ski School Ledges",
-   "Skid Road",
-   "Skree Field",
-   "Slalom Alley - Race Trail",
-   "Sleepytime Road",
-   "Slifer Express",
-   "Snag Park",
-   "Sourdough",
-   "Sourdough - Lower",
-   "South Look Ma",
-   "South Rim",
-   "Spring Catwalk",
-   "Spruce Face",
-   "Steep and Deep",
-   "Straight Shot",
-   "Sun Down Catwalk",
-   "Sun Up Catwalk",
-   "Sweet N Sour",
-   "Swingsville",
-   "Swingsville Ridge",
-   "Tea Cup Glades",
-   "The Divide",
-   "The Divide Ridge",
-   "The Preserve",
-   "The Preserve - Lower",
-   "The Skipper",
-   "The Slot",
-   "The Star",
-   "The Star - Lower",
-   "The Woods",
-   "Timberline Catwalk",
-   "Timberline Face - East",
-   "Timberline Face - South",
-   "Tin Pants",
-   "Tin Pants Connector",
-   "Trans Montane",
-   "Two Elk Ridge",
-   "Vail Village Catwalk - Lower",
-   "Vail Village Catwalk - Middle",
-   "Vail Village Catwalk - Upper",
-   "WFO",
-   "Whippersnapper",
-   "Whiskey Jack",
-   "Whistle Pig",
-   "Widge's",
-   "Wild Card",
-   "Windisch Way",
-   "Windows",
-   "Windows Road",
-   "Wow",
-   "Yonder",
-   "Yonder Gully",
-   "Yonder Road",
-   "Zot"
+  "list": [
+   {
+    "name": "10% Road",
+    "area": "Game Creek Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "12 to 1 Connector",
+    "area": "Golden Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "38",
+    "area": "Vail Village",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Apres Vous",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Avanti - Lower",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Avanti - Middle",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Avanti - Upper",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Baccarat",
+    "area": "Game Creek Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bear Tree - Lower",
+    "area": "Vail Village",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bear Tree - Middle",
+    "area": "Vail Village",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bear Tree - Upper",
+    "area": "Vail Village",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ben's Face",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Berries - Lower",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Berries - Upper",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Big Rock Park - East",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Big Rock Park - West",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Black Forest",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Blue Ox",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Bolshoi Ballroom",
+    "area": "Siberia Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Boomer",
+    "area": "North East Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Born Free - Lower",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Born Free - Lower Middle",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Born Free - Upper",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Born Free - Upper Middle",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Brisk Walk",
+    "area": "Golden Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Brisk Walk - Lower",
+    "area": "Golden Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Brisk Walk - Upper",
+    "area": "Golden Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Buckskin Glade",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bwana - Expert Face",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Bwana - Lower",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bwana - Middle",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bwana - Upper",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bwana Junction",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Bwana Loop",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "CJ's Glades",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Cady's Café",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Campbells",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Cappuccino",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cascade Way",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Chair 15",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Challenge",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Champagne Glade",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Chaos Canyon",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cheetah",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Chicken Yard",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "China Bowl to Two Elk",
+    "area": "China Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "China Spur",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Choker Cutoff",
+    "area": "North East Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Christmas",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cloud 9 - Lower",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cloud 9 - Middle",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cloud 9 - Upper",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Club Walk",
+    "area": "Game Creek Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Cold Feet",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Columbine - Lower",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Columbine - Upper",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Compromise",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Cookshack",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Cow's Face",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Coyote Crossing",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Cub's Way - Lower",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Cub's Way - Upper",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Dealer's Choice",
+    "area": "Game Creek Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Deuces Wild",
+    "area": "Game Creek Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Dragons Teeth",
+    "area": "China Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Eagle's Nest Ridge",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Emperor's Choice - Lower",
+    "area": "Tea Cup Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Emperor's Choice - Upper",
+    "area": "Tea Cup Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Encore",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Fall Line - Race Trail",
+    "area": "Golden Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Faro",
+    "area": "Game Creek Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Faro Glade",
+    "area": "Game Creek Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "First Step",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Flap Jack - Lower",
+    "area": "North East Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Flap Jack - Upper",
+    "area": "North East Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Forever",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Frontside Chutes",
+    "area": "Vail Village",
+    "difficulty": "expert"
+   },
+   {
+    "name": "G-Force Alley",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Game Trail",
+    "area": "Game Creek Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Gandy Dancer - Lower",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Gandy Dancer - Middle",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Gandy Dancer - Upper",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Genghis Kahn",
+    "area": "China Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Giant Steps",
+    "area": "Vail Village",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Gillett's Dream",
+    "area": "China Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gitalong Road - Lower",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Gitalong Road - Middle",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Gitalong Road - Upper",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Golden Peak Race - Race Trail",
+    "area": "Golden Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Golden Peak Terrain Park",
+    "area": "Golden Peak",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Golden Peak Terrain Park - Small Features",
+    "area": "Golden Peak",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Golden Peak Terrain Park - Upper",
+    "area": "Golden Peak",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Gopher Hill",
+    "area": "Golden Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Gorky Park",
+    "area": "Siberia Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Grand Junction CW",
+    "area": "Golden Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Grand Review",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Grand Review - Lower",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ha Ha - West",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Hairbag Alley",
+    "area": "Golden Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Head First",
+    "area": "Vail Village",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Headwall",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Headwall Ridge",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Heavy Metal",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "High Noon Ridge",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Highline",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Highline Runout",
+    "area": "North East Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Hornsilver",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Hunky Dory",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "In The Wuides",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Inner Mongolia",
+    "area": "Mongolia Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Iron Mask",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Jade Glade",
+    "area": "China Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Kangaroo Cornice",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Kelly's Toll Road",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Klickity Klack",
+    "area": "Golden Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ledges - Lower",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ledges - Upper",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lindsey's - Lower",
+    "area": "Vail Village",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lindsey's - Middle",
+    "area": "Vail Village",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lindsey's - Upper",
+    "area": "Vail Village",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lionshead Catwalk - Lower",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lionshead Catwalk - Upper",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lionsway - Lower",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lionsway - Upper",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Little Ollie",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lodgepole - Lower",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lodgepole - Upper",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lodgepole Gulch",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lodgepole Gulch Cutoff",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Log Chute",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Look Ma",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lost Boy",
+    "area": "Game Creek Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lost Boy Catwalk",
+    "area": "Game Creek Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lovers Leap",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Magic Forest",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Marmot South Gate",
+    "area": "Tea Cup Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Marmot Valley",
+    "area": "Tea Cup Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Meadows - Lower",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Meadows - Upper",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Mid-Vail Express",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Mil Creek Road",
+    "area": "Golden Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Milts Face",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Minnie Ha Ha",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Minnie's - Lower",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Minnie's - Middle",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Minnie's - Upper",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Morning Thunder",
+    "area": "Tea Cup Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Morningside Ridge",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Mudslide",
+    "area": "Vail Village",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Never",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "North Rim",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Northface Catwalk",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Northstar",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Northwoods",
+    "area": "North East Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Northwoods - Yeti's Face",
+    "area": "North East Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "O.S.",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Old 9 Line",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Orient Express",
+    "area": "China Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Outer Mongolia",
+    "area": "Mongolia Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ouzo",
+    "area": "Game Creek Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ouzo - Lower",
+    "area": "Game Creek Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ouzo Glade",
+    "area": "Game Creek Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Over Yonder",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Overeasy",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Owl's Roost 1",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Owl's Roost 2",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Pepi's Face",
+    "area": "Vail Village",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Pickeroon - Lower",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Pickeroon - Upper",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Pika",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Poker Flats",
+    "area": "Game Creek Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Pony Express - Lower",
+    "area": "Golden Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Pony Express - Upper",
+    "area": "Golden Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Poppy Fields East",
+    "area": "China Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Poppy Fields West",
+    "area": "China Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Post Road",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Powerline",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Powerline Glade",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Practice Parkway",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Pride - Lower",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Pride - Middle",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Pride - Upper",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Prima - Brown's Face",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Prima - Lower",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Prima - Middle",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Prima - Upper",
+    "area": "Mid-Vail",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Prima Cornice",
+    "area": "Mid-Vail",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Pronto",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ptarmigan Ridge",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Pumphouse",
+    "area": "Vail Village",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Ramshorn - Lower",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ramshorn - Upper",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Rasputins Revenge",
+    "area": "China Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Red Square",
+    "area": "Siberia Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Red Zinger",
+    "area": "Tea Cup Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Resolution",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Resolution Road",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ricky's Ridge",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ricky's Tube",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ridge Route",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Rip's Ride Teaching Area",
+    "area": "Golden Peak",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Riva Catwalk",
+    "area": "Golden Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Riva Glade",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Riva Ridge - Lower",
+    "area": "Vail Village",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Riva Ridge - Middle",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Riva Ridge - Tourist Trap",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Riva Ridge - Upper",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Rogers Run",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ruder's - Lower",
+    "area": "Golden Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ruder's - Upper",
+    "area": "Golden Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Safari - East",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Safari - Lower",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Safari - Middle",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Safari - West",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Seldom",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Shangri-La",
+    "area": "China Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Showboat",
+    "area": "Game Creek Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Silk Road - East",
+    "area": "Siberia Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Silk Road - West",
+    "area": "Siberia Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Simba - Expert Face",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Simba - Lower",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Simba - Middle",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Simba - Upper",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ski School Ledges",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Skid Road",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Skree Field",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Slalom Alley - Race Trail",
+    "area": "Golden Peak",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sleepytime Road",
+    "area": "Tea Cup Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Slifer Express",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Snag Park",
+    "area": "North East Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sourdough",
+    "area": "North East Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Sourdough - Lower",
+    "area": "North East Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "South Look Ma",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "South Rim",
+    "area": "North East Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Spring Catwalk",
+    "area": "Lionshead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Spruce Face",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Steep and Deep",
+    "area": "Blue Sky Basin",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Straight Shot",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sun Down Catwalk",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sun Up Catwalk",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sweet N Sour",
+    "area": "China Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Swingsville",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Swingsville Ridge",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Tea Cup Glades",
+    "area": "Tea Cup Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Divide",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Divide Ridge",
+    "area": "Blue Sky Basin",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Preserve",
+    "area": "Lionshead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "The Preserve - Lower",
+    "area": "Lionshead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Skipper",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Slot",
+    "area": "Sun Up Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "The Star",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "The Star - Lower",
+    "area": "Blue Sky Basin",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "The Woods",
+    "area": "Game Creek Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Timberline Catwalk",
+    "area": "North East Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Timberline Face - East",
+    "area": "North East Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Timberline Face - South",
+    "area": "North East Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Tin Pants",
+    "area": "North East Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Tin Pants Connector",
+    "area": "North East Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Trans Montane",
+    "area": "Mid-Vail",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Two Elk Ridge",
+    "area": "Tea Cup Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Vail Village Catwalk - Lower",
+    "area": "Vail Village",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Vail Village Catwalk - Middle",
+    "area": "Vail Village",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Vail Village Catwalk - Upper",
+    "area": "Vail Village",
+    "difficulty": "easy"
+   },
+   {
+    "name": "WFO",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Whippersnapper",
+    "area": "Golden Peak",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Whiskey Jack",
+    "area": "North East Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Whistle Pig",
+    "area": "Mid-Vail",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Widge's",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Wild Card",
+    "area": "Game Creek Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Windisch Way",
+    "area": "Vail Village",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Windows",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Windows Road",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Wow",
+    "area": "Sun Down Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Yonder",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Yonder Gully",
+    "area": "Sun Up Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Yonder Road",
+    "area": "Sun Up Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Zot",
+    "area": "Mid-Vail",
+    "difficulty": "advanced"
+   }
   ]
- }
+ },
+ "outside": [],
+ "box": [
+  378500,
+  4378400,
+  390100,
+  4390100
+ ]
 }

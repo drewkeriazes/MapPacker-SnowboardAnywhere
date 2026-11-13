@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "slug": "atzmannig",
  "fetched": "2026-11-13",
  "areas": [
@@ -22,5 +22,12 @@
  ],
  "figures": {},
  "trails": null,
- "why": "no English Wikipedia article with an Infobox ski area for Atzmännig, Atzmännig"
+ "why": "no English Wikipedia article with an Infobox ski area for Atzmännig, Atzmännig",
+ "outside": [],
+ "box": [
+  498600,
+  5235300,
+  501700,
+  5237800
+ ]
 }

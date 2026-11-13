@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 2,
  "slug": "heavenly",
  "fetched": "2026-11-13",
  "areas": [
@@ -50,5 +50,12 @@
    "text": "4800 acre"
   }
  },
- "trails": null
+ "trails": null,
+ "outside": [],
+ "box": [
+  243700,
+  4310000,
+  251500,
+  4318400
+ ]
 }
