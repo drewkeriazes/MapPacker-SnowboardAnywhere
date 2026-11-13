@@ -143,6 +143,30 @@
    "report": "reports/heavenly.md"
   },
   {
+   "slug": "keystone",
+   "name": "Keystone",
+   "region": "Colorado",
+   "country": "US",
+   "lonlat": [
+    -105.93316340295861,
+    39.57226147133073
+   ],
+   "tier": "gold",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261113T150026Z-11a2d5",
+    "built": "2026-11-13",
+    "pipeline": "839bf62",
+    "bytes": 164969714,
+    "sha256": "e35c29314da1a3f74a3e7d7f3e3f3a059435bbef95199e6d1822213ca7986204",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/keystone/v1/keystone.zip",
+    "content": "1de0ed117114e377"
+   },
+   "report": "reports/keystone.md"
+  },
+  {
    "slug": "ohio-hills",
    "name": "Ohio Hills (custom mashup)",
    "region": "Ohio",

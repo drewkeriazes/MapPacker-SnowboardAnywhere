@@ -1,0 +1,273 @@
+{
+  "slug": "keystone",
+  "name": "Keystone",
+  "country": "US",
+  "region": "Colorado",
+  "osm_ski_area_way": 531000583,
+  "crs": "EPSG:26913",
+  "utm_zone": "13N",
+  "lonlat_bbox": [
+    -105.9631636,
+    39.5373978,
+    -105.9036621,
+    39.6065024
+  ],
+  "buffer_m": 1000,
+  "utm_bbox": [
+    416200,
+    4375800,
+    423500,
+    4385600
+  ],
+  "origin": [
+    419850,
+    4380700
+  ],
+  "elevation_range_m": [
+    2800,
+    3850
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "3DEP ImageServer",
+    "res_m": 1,
+    "chunk_px": 1500
+  },
+  "naip": {
+    "source": "Planetary Computer naip 2023 30cm",
+    "res_m": 1,
+    "max_px": 4000,
+    "items": [
+      "co_m_3910525_ne_13_030_20230830_20240104",
+      "co_m_3910525_nw_13_030_20230926_20240104",
+      "co_m_3910525_se_13_030_20230830_20240104",
+      "co_m_3910525_sw_13_030_20230926_20240104"
+    ],
+    "item_bboxes_ll": {
+      "co_m_3910525_ne_13_030_20230830_20240104": [
+        -105.942,
+        39.559,
+        -105.871,
+        39.628
+      ],
+      "co_m_3910525_nw_13_030_20230926_20240104": [
+        -106.004,
+        39.559,
+        -105.933,
+        39.628
+      ],
+      "co_m_3910525_se_13_030_20230830_20240104": [
+        -105.942,
+        39.497,
+        -105.871,
+        39.566
+      ],
+      "co_m_3910525_sw_13_030_20230926_20240104": [
+        -106.004,
+        39.497,
+        -105.933,
+        39.566
+      ]
+    }
+  },
+  "lidar": {
+    "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/USGS_LPC_CO_Central_Western_2016_LAS_2018/",
+    "dataset": "USGS_LPC_CO_Central_Western_2016_LAS_2018",
+    "max_depth_resort": 9,
+    "max_depth_outside": 8,
+    "nodes_file": "keystone_ept_nodes.txt",
+    "far": {
+      "pad_m": 5000,
+      "max_depth": 9,
+      "nodes_file": "keystone_ept_far_nodes.txt"
+    }
+  },
+  "attribution": [
+    "Elevation: USGS 3DEP 1 m lidar DEM (CO_ArapahoRooseveltPikeNF_D23, CO_Central_Western_2016, CO_DRCOG_2020_B20, CO_ParkFremontCuster_2018_C21), public domain",
+    "Canopy: USGS 3DEP lidar point cloud USGS_LPC_CO_Central_Western_2016_LAS_2018 via AWS usgs-lidar-public, public domain",
+    "Imagery: USDA NAIP 2023 via Microsoft Planetary Computer, public domain",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "terrain_status_url": "https://www.keystoneresort.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+  "osm": {
+    "geofabrik": "us/colorado",
+    "pbf": "https://download.geofabrik.de/north-america/us/colorado-latest.osm.pbf"
+  },
+  "exclude": [
+    {
+      "name": "Arapahoe Basin",
+      "openskidata_id": "1e281ff389476a82150ad7ef7be5f1ea48edd5e5",
+      "osm_ways": [
+        17144372,
+        17144445,
+        37353337,
+        37353338,
+        37353342,
+        37353345,
+        37353346,
+        37353348,
+        37353349,
+        37353350,
+        37353351,
+        37353352,
+        102018790,
+        129284070,
+        129284071,
+        258683225,
+        403344885,
+        403345454,
+        403347369,
+        403347762,
+        403347856,
+        403349986,
+        403354067,
+        403354419,
+        403359421,
+        403359424,
+        403361326,
+        403361327,
+        403362132,
+        403363572,
+        403363573,
+        403363574,
+        403508137,
+        403508138,
+        403508139,
+        403508871,
+        403551013,
+        403551402,
+        403551406,
+        403551673,
+        403551674,
+        403551954,
+        403551955,
+        403551956,
+        403552336,
+        403552338,
+        403552829,
+        403553567,
+        403553569,
+        403553570,
+        403558285,
+        403558286,
+        403558564,
+        403559510,
+        403559512,
+        403560960,
+        403560961,
+        403561054,
+        403561998,
+        403562000,
+        403562297,
+        403562706,
+        403562707,
+        403562708,
+        403562709,
+        403679830,
+        403703371,
+        403703372,
+        403703373,
+        403706303,
+        403706306,
+        403706308,
+        403706311,
+        403706318,
+        404176202,
+        677913293,
+        677913294,
+        677913295,
+        677913296,
+        677913297,
+        677913298,
+        678168814,
+        678168815,
+        678169287,
+        685993650,
+        778414393,
+        778414394,
+        778414400,
+        778414401,
+        1046885327,
+        1125353383,
+        1213733491,
+        1213733492,
+        1213733493,
+        1213733494,
+        1213733495,
+        1213733496,
+        1213733497,
+        1213733498,
+        1213733499,
+        1216124772,
+        1216124773,
+        1216124774,
+        1387605875,
+        1387605876,
+        1387605877,
+        1451231318,
+        1451231319,
+        1451231320,
+        1451231321,
+        1561869960,
+        1561872699,
+        1561872700,
+        1561872701,
+        1561872702,
+        1561872703,
+        1561872704,
+        1561872705,
+        1561872706,
+        1561878166,
+        1561878167,
+        1561878168,
+        1561993434,
+        1561994129
+      ]
+    }
+  ],
+  "openskidata": {
+    "ids": [
+      "7d855b81e131f7cb7bdbc7b55e47a18d3ccb5e67"
+    ],
+    "names": [
+      "Keystone"
+    ],
+    "iso3166_2": "US-CO",
+    "websites": [
+      "http://keystoneresort.com/"
+    ],
+    "lifts": 20,
+    "runs": 181
+  },
+  "names": {
+    "states": [
+      "CO"
+    ],
+    "source": "USGS GNIS",
+    "towns": "US Census 2024 Gazetteer and population estimates"
+  },
+  "tier": "gold",
+  "sources": {
+    "terrain": {
+      "source": "3DEP 1 m",
+      "tier": "gold"
+    },
+    "trees": {
+      "source": "lidar crowns + stands",
+      "tier": "gold"
+    },
+    "surface": {
+      "source": "NAIP",
+      "tier": "gold"
+    }
+  }
+}
