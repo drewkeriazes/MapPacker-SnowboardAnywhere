@@ -4,6 +4,7 @@
     python pipeline/resort.py resolve "<name>" [--id <id>] [--with <name or id>]... [--alone] [--slug <slug>]
     python pipeline/resort.py plan <slug> [--no-nodes] [--force]
     python pipeline/resort.py compare <slug>
+    python pipeline/resort.py search "<query>" --json [--limit N]
 
 resolve  Finds the ski area in OpenSkiData (`ski_areas.geojson`) by name, case and accent insensitive. Several
          matches: prints them and stops (`--id` picks one). A named neighbour within 3 km (Boston Mills and
@@ -17,13 +18,17 @@ plan     Derives every other field the hand-written configs have (docs/research/
          `publish_pack.py` commits the plan with the config when the pack is published.
 compare  Resolves a hand-written config's resort by name, plans it in memory and lists how it differs from the
          hand values (FEAT-223 check: Vail, Breckenridge, Big Sky). Writes nothing.
+search   FEAT-279: the ski areas a typed name finds, as JSON on stdout (`--json`), for the game's Find a resort box
+         and its Build it button (FEAT-246). Read-only: reads only the cached `ski_areas.geojson`, never the runs
+         or lifts, never writes a config, never asks. The same matching as resolve, plus the areas sold with a
+         match (the same website within 3 km: "boston" also lists Brandywine, as its own match).
 
 Hosts (Drew's PC; not reachable from the cloud sandbox, which can use cached index files): OpenSkiData, Mapterhorn,
 TNM Access, the 3DEP elevation index (lidar work units), usgs.entwine.io, the EPT bucket, Planetary Computer STAC,
 Geofabrik and the Internet Archive. The big index files are cached in `<raw root>/_index/` (`--cache`, `SBA_INDEX_DIR`)
 and re-downloaded after 30 days or with `--refresh`. Pure helpers, tested offline in tests/test_resort_plan.py.
 """
-import argparse, copy, csv, datetime, difflib, io, json, math, os, re, subprocess, sys, tempfile, unicodedata
+import argparse, copy, contextlib, copy, csv, datetime, difflib, io, json, math, os, re, subprocess, sys, tempfile, unicodedata
 import urllib.error, urllib.parse, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -178,6 +183,14 @@ def osm_ids(props):
     """OSM way ids a run or lift was built from"""
     return [int(s["id"].split("/")[1]) for s in props.get("sources") or []
             if s.get("type") == "openstreetmap" and str(s.get("id", "")).startswith("way/")]
+
+
+def osm_source(props):
+    """FEAT-279: the OSM way or relation the ski area is built from, in the form build-pack's `osm_id` input and
+    `resort.py add --osm` take ("way/123", "relation/123"); a way first; None for an area from skimap.org only"""
+    keys = [osm_key(s.get("id", "")) for s in props.get("sources") or [] if s.get("type") == "openstreetmap"]
+    keys = [k for k in keys if k]
+    return next((k for k in keys if k.startswith("way/")), keys[0] if keys else None)
 
 
 # ------------------------------------------------------------------------------------------------ geometry
@@ -416,6 +429,70 @@ def resolve(query, features, lifts_path, runs_path, pick_id=None, with_=(), alon
     if exclude:
         stub["exclude"] = exclude
     return "ok", stub
+
+
+# ------------------------------------------------------------------------------------------------ search (FEAT-279)
+
+SEARCH_LIMIT = 10
+
+
+def match_quality(query, name):
+    """how close a name is to the query, 0 to 1 (with and without "Resort"), to order the matches of one class"""
+    return max(difflib.SequenceMatcher(None, norm(short_name(query)), norm(short_name(name))).ratio(),
+               difflib.SequenceMatcher(None, norm(query), norm(name)).ratio())
+
+
+def sold_with(features, hits):
+    """[(area, the hit it is sold with)]: named ski areas with lifts that share a hit's website and lie within
+    NEIGHBOUR_M of it (Brandywine for Boston Mills, bmbw.com), from ski_areas.geojson alone. resolve asks about
+    these as neighbours; search lists each as its own match, since build-pack builds the picked area alone."""
+    have = {f["properties"]["id"] for f in hits}
+    refs = [(f, site(f["properties"]), bounds(geom_points(f["geometry"]))) for f in hits]
+    refs = [r for r in refs if r[1]]
+    out = []
+    if not refs:
+        return out
+    for f in features:
+        p = f.get("properties") or {}
+        if p.get("type") != "skiArea" or not p.get("name") or p.get("id") in have or not counts(p)[1]:
+            continue
+        host = site(p)
+        if not host:
+            continue
+        for ref, ref_host, ref_b in refs:
+            if host == ref_host and gap_m(ref_b, bounds(geom_points(f["geometry"]))) < NEIGHBOUR_M:
+                out.append((f, ref))
+                have.add(p["id"])
+                break
+    return out
+
+
+def search_result(features, query, limit=SEARCH_LIMIT, resorts_dir=None):
+    """the object `resort.py search --json` prints: {"query", "matches", "skipped", "closest"}. Matches with lifts
+    first, then by match quality; an area with no OSM id is left out (build-pack cannot build it) and counted in
+    "skipped"; "closest" (names) only when nothing matched. Pure apart from looking for resorts/<slug>/."""
+    hits = search(features, query)
+    found = [(f, None) for f in hits] + sold_with(features, hits)
+
+    def row(f, ref):
+        p = f["properties"]
+        runs, lifts = counts(p)
+        region, _, cc = place(p)
+        b = bounds(geom_points(f["geometry"]))
+        slug = slugify(p["name"])
+        return {"openskidata_id": p["id"], "osm_id": osm_source(p), "name": p["name"], "region": region,
+                "country": cc, "lat": round((b[1] + b[3]) / 2, 6), "lon": round((b[0] + b[2]) / 2, 6),
+                "runs": runs, "lifts": lifts, "status": p.get("status"), "slug": slug,
+                "configured": bool(slug) and os.path.isdir(paths.resort_dir(slug, resorts_dir)),
+                "sold_with": ref["properties"]["name"] if ref else None}
+
+    rows = [row(f, ref) for f, ref in found]
+    skipped = sum(1 for r in rows if not r["osm_id"])
+    rows = [r for r in rows if r["osm_id"]]
+    rows.sort(key=lambda r: (r["lifts"] == 0, r["sold_with"] is not None, -match_quality(query, r["name"]),
+                             r["name"], r["openskidata_id"]))
+    return {"query": query, "matches": rows[:max(0, limit)], "skipped": skipped,
+            "closest": [] if hits else closest_names(features, query)}
 
 
 # ------------------------------------------------------------------------------------------------ plan: pure parts
@@ -1271,6 +1348,38 @@ def write_json(path, obj):
         f.write("\n")
 
 
+def cmd_search(a, hosts):
+    """FEAT-279: nothing but the JSON on stdout (the game parses it); the index download message and errors go to
+    stderr, errors with a non-zero exit"""
+    if not norm(a.query):
+        print("search: give a name with a letter or digit in it", file=sys.stderr)
+        return 2
+    if a.limit < 1:
+        print("search: --limit is at least 1", file=sys.stderr)
+        return 2
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            feats = load_json(hosts.index("ski_areas.geojson"))["features"]
+    except (OSError, ValueError, KeyError, urllib.error.URLError) as e:
+        print(f"search: cannot read the OpenSkiData ski areas index: {e}", file=sys.stderr)
+        return 1
+    out = search_result(feats, a.query, a.limit, a.resorts_dir)
+    if a.json:
+        print(json.dumps(out))
+        return 0
+    sys.stdout.reconfigure(errors="replace")                  # a cp1252 console and a name in another script
+    for r in out["matches"]:
+        print(f"{r['slug']:<24} {r['name']}  ({r['region'] or '?'}, {r['country'] or '?'}; {r['runs']} runs, "
+              f"{r['lifts']} lifts, {r['status']}; OSM {r['osm_id']}"
+              + (f"; sold with {r['sold_with']}" if r["sold_with"] else "")
+              + ("; configured" if r["configured"] else "") + ")")
+    if out["skipped"]:
+        print(f"({out['skipped']} more with no OSM id, which build-pack cannot build)")
+    if not out["matches"] and out["closest"]:
+        print("no match; closest: " + ", ".join(out["closest"]))
+    return 0
+
+
 def cmd_resolve(a, hosts):
     return resolve_and_write(a, hosts)[0]
 
@@ -1681,6 +1790,11 @@ def main(argv=None):
     p.add_argument("--force", action="store_true", help="re-plan a hand-written config (its hand fields are kept)")
     c = sub.add_parser("compare", help="plan a hand-written config again and list the differences")
     c.add_argument("slug")
+    s_ = sub.add_parser("search", help="the ski areas a name finds, read-only (FEAT-279; --json for the game)")
+    s_.add_argument("query")
+    s_.add_argument("--json", action="store_true", help="print one JSON object (the game's Find a resort box)")
+    s_.add_argument("--limit", type=int, default=SEARCH_LIMIT,
+                    help=f"at most this many matches (default {SEARCH_LIMIT})")
     import build_resort
     d = sub.add_parser("add", help="resolve, plan, fetch, build, report and publish; the ride with --ride (FEAT-224)")
     d.add_argument("name")
@@ -1712,7 +1826,8 @@ def main(argv=None):
         a.force_list = a.force                                  # the stages to run even when done
         a.force = bool({"resolve", "all"} & set(a.force))       # resolve's own flag: replace a hand config
     hosts = Hosts(a.cache, a.refresh)
-    return {"resolve": cmd_resolve, "plan": cmd_plan, "compare": cmd_compare, "add": cmd_add}[a.cmd](a, hosts)
+    return {"resolve": cmd_resolve, "plan": cmd_plan, "compare": cmd_compare, "add": cmd_add,
+            "search": cmd_search}[a.cmd](a, hosts)
 
 
 if __name__ == "__main__":
