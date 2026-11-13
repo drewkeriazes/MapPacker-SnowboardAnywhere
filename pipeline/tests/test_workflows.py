@@ -1,5 +1,7 @@
-"""FEAT-272: static checks on the publish workflows' YAML, and the `pure` subcommand the reviewer skip runs."""
+"""FEAT-272: static checks on the publish workflows' YAML, and the `pure` subcommand the reviewer skip runs. FEAT-266:
+the issue forms against the form schema and the build-pack inputs."""
 import os
+import re
 import sys
 
 import pytest
@@ -217,3 +219,53 @@ def test_build_pack_gives_the_secrets_only_to_the_steps_that_need_them():
 def test_build_pack_narrows_the_app_token_to_publishing():
     (app,) = [s for s in all_steps(load(BUILD)) if "create-github-app-token" in s.get("uses", "")]
     assert {k for k in app["with"] if k.startswith("permission-")} == {"permission-contents", "permission-pull-requests"}
+
+
+# ------------------------------------------------------------------------------------------------ issue forms (FEAT-266)
+
+FORMS = [".github/ISSUE_TEMPLATE/resort-request.yml", ".github/ISSUE_TEMPLATE/pack-bug.yml"]
+ELEMENT_KEYS = {"markdown": {"value"}, "input": {"label", "description", "placeholder", "value"},
+                "textarea": {"label", "description", "placeholder", "value", "render"},
+                "dropdown": {"label", "description", "multiple", "options", "default"},
+                "checkboxes": {"label", "description", "options"}, "upload": {"label", "description"}}
+
+
+@pytest.mark.parametrize("path", FORMS)
+def test_issue_forms_follow_the_form_schema(path):
+    form = load(path)
+    assert {"name", "description", "body"} <= set(form) <= {"name", "description", "body", "title", "labels",
+                                                           "assignees", "projects", "type"}
+    ids = []
+    for el in form["body"]:
+        assert set(el["attributes"]) <= ELEMENT_KEYS[el["type"]], el
+        if el["type"] == "markdown":
+            assert "id" not in el and el["attributes"]["value"]
+        else:
+            assert el["attributes"]["label"] and re.fullmatch(r"[A-Za-z0-9_-]+", el["id"])
+            ids.append(el["id"])
+    assert len(ids) == len(set(ids))
+    names = [load(p)["name"] for p in FORMS]
+    assert len(names) == len(set(names))
+
+
+def form_fields(path):
+    return {el["id"]: el for el in load(path)["body"] if "id" in el}
+
+
+def test_a_resort_request_asks_for_every_build_pack_input_in_its_shape():
+    sys.path.insert(0, os.path.join(ROOT, "tools", "ci"))
+    import build_pack_ci as ci
+    fields = form_fields(FORMS[0])
+    inputs = set(triggers(load(BUILD))["workflow_dispatch"]["inputs"])
+    assert {"name", "osm_id", "slug"} <= set(fields) and {"name", "osm_id", "slug"} <= inputs
+    assert fields["name"]["validations"]["required"] and fields["osm_id"]["validations"]["required"]
+    assert ci.SLUG_RE.fullmatch(fields["slug"]["attributes"]["placeholder"])
+    assert ci.OSM_RE.fullmatch(fields["osm_id"]["attributes"]["placeholder"])
+    assert len(fields["name"]["attributes"]["placeholder"]) <= ci.MAX_NAME
+    assert "type: resort-request" in load(FORMS[0])["labels"]
+
+
+def test_a_pack_bug_asks_for_the_release_tag_and_points_gameplay_at_the_game():
+    assert re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*/v[1-9][0-9]*", form_fields(FORMS[1])["version"]["attributes"]["placeholder"])
+    links = load(".github/ISSUE_TEMPLATE/config.yml")["contact_links"]
+    assert any(link["url"].startswith("https://github.com/drewkeriazes/SnowboardAnywhere/") for link in links)

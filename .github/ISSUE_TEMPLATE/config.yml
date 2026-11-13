@@ -1,0 +1,6 @@
+# FEAT-266: the new-issue chooser. Blank issues stay open for cards and anything the forms don't fit.
+blank_issues_enabled: true
+contact_links:
+  - name: Gameplay bug or idea (SnowboardAnywhere)
+    url: https://github.com/drewkeriazes/SnowboardAnywhere/issues/new
+    about: Riding, controls, menus, cameras, sound and anything else the game does go to the game repo.

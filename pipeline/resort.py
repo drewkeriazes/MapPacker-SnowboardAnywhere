@@ -28,7 +28,7 @@ TNM Access, the 3DEP elevation index (lidar work units), usgs.entwine.io, the EP
 Geofabrik and the Internet Archive. The big index files are cached in `<raw root>/_index/` (`--cache`, `SBA_INDEX_DIR`)
 and re-downloaded after 30 days or with `--refresh`. Pure helpers, tested offline in tests/test_resort_plan.py.
 """
-import argparse, contextlib, copy, datetime, difflib, io, json, math, os, re, subprocess, sys, tempfile, unicodedata
+import argparse, copy, contextlib, copy, csv, datetime, difflib, io, json, math, os, re, subprocess, sys, tempfile, unicodedata
 import urllib.error, urllib.parse, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -47,6 +47,8 @@ INDEXES = {  # cached name: url
     "entwine_resources.geojson": "https://usgs.entwine.io/boundaries/resources.geojson",
     "geofabrik_index.json": "https://download.geofabrik.de/index-v1-nogeom.json",
     "mapterhorn_attribution.json": "https://download.mapterhorn.com/attribution.json",
+    # USGS's daily list of 3DEP lidar work units (WESM); the 3DEPElevationIndex query service broke (BUG-117)
+    "wesm.csv": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/metadata/WESM.csv",
 }
 MAPTERHORN_TILE = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp"
 MAPTERHORN_COVERAGE = "https://single-archive-tiles.mapterhorn.com/coverage/{z}/{x}/{y}.mvt"
@@ -923,13 +925,19 @@ class Hosts:
         return fetch_json("https://tnmaccess.nationalmap.gov/api/v1/products?" + q).get("items", [])
 
     def workunits(self, box_ll):
-        """3DEP lidar work units (WESM) over the box, with flight dates and quality level"""
-        q = urllib.parse.urlencode({
-            "geometry": ",".join(f"{v:.6f}" for v in box_ll), "geometryType": "esriGeometryEnvelope", "inSR": 4326,
-            "spatialRel": "esriSpatialRelIntersects", "returnGeometry": "false", "f": "json",
-            "outFields": "workunit,project,collect_start,collect_end,ql,lpc_category,onemeter_category"})
-        d = fetch_json("https://index.nationalmap.gov/arcgis/rest/services/3DEPElevationIndex/MapServer/8/query?" + q)
-        return [f["attributes"] for f in d.get("features", [])]
+        """3DEP lidar work units (WESM) with flight dates (epoch ms, UTC, for season()) and quality level, from
+        USGS's WESM.csv. Every unit in the country: box_ll is unused, match_workunit() picks one by dataset name"""
+        def ms(v):
+            try:
+                d = datetime.datetime.strptime((v or "").strip(), "%Y/%m/%d").replace(tzinfo=datetime.timezone.utc)
+            except ValueError:
+                return None
+            return int(d.timestamp() * 1000)
+        with open(self.index("wesm.csv"), encoding="utf-8-sig", newline="") as f:
+            return [{"workunit": r.get("workunit"), "project": r.get("project"), "ql": r.get("ql"),
+                     "lpc_category": r.get("lpc_category"), "onemeter_category": r.get("onemeter_category"),
+                     "collect_start": ms(r.get("collect_start")), "collect_end": ms(r.get("collect_end"))}
+                    for r in csv.DictReader(f)]
 
     def ept(self, url):
         return fetch_json(url)

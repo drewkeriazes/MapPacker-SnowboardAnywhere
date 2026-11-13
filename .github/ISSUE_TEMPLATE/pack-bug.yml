@@ -1,0 +1,49 @@
+# FEAT-266: something wrong in a published pack (trees in a lift line, a missing run, a cliff where the slope is
+# smooth). Gameplay bugs go to the game repo instead (config.yml links it).
+name: Pack bug
+description: Something looks wrong in a published resort pack (terrain, trees, runs, lifts, buildings).
+title: "Pack bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For what the pack draws or holds: trees standing in a lift line or on a groomer, a run or lift missing or in the wrong place, odd terrain, the wrong snow or forest. Riding, controls, menus and cameras are game bugs: [report those in SnowboardAnywhere](https://github.com/drewkeriazes/SnowboardAnywhere/issues/new).
+  - type: input
+    id: slug
+    attributes:
+      label: Resort slug
+      description: The pack's short name, as in `npm run get <slug>` or the game's `?pack=` (`vail`, `boston-mills`).
+      placeholder: vail
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Pack version
+      description: The release tag, `<slug>/v<N>` (`vail/v4`). [RELEASES.md](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/blob/main/RELEASES.md) lists every version; a pack you downloaded recently is the one marked latest. Not sure? Give the `build` value from `packs/<slug>/meta.json`.
+      placeholder: vail/v4
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What looks wrong
+      description: What you see, and what is there in real life if you know (a photo, a trail map or a satellite view link helps).
+    validations:
+      required: true
+  - type: upload
+    id: screenshot
+    attributes:
+      label: Screenshot or clip
+      description: Drag in a screenshot or a short clip of the spot.
+    validations:
+      accept: ".png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.webm"
+  - type: textarea
+    id: where
+    attributes:
+      label: Where in the game
+      description: The run or lift (the Esc menu shows the run you are on, or "Near <run>"), or a game link with the spot if you have one (`?pack=vail&x=1200&y=-340&h=90`).
+      placeholder: Under the lift from the base, about halfway up
+    validations:
+      required: true

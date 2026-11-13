@@ -157,15 +157,13 @@ def probes() -> list:
     box_ll = "-106.40,39.60,-106.39,39.61"
     tnm = "https://tnmaccess.nationalmap.gov/api/v1/products?" + urlencode(
         {"datasets": "Digital Elevation Model (DEM) 1 meter", "bbox": box_ll, "max": 1})
-    wesm = ("https://index.nationalmap.gov/arcgis/rest/services/3DEPElevationIndex/MapServer/8/query?" + urlencode(
-        {"geometry": box_ll, "geometryType": "esriGeometryEnvelope", "inSR": 4326, "spatialRel": "esriSpatialRelIntersects",
-         "returnGeometry": "false", "f": "json", "outFields": "workunit"}))
     cdx_url = "https://web.archive.org/cdx/search/cdx?" + urlencode(
         {"url": "vail.com", "output": "json", "filter": "statuscode:200", "limit": 1})
     return [
         Probe("3DEP ImageServer exportImage", "elevation.nationalmap.gov", export, tiff),
         Probe("TNM Access products", "tnmaccess.nationalmap.gov", tnm, json_with("items")),
-        Probe("3DEP elevation index (WESM)", "index.nationalmap.gov", wesm, json_with("features")),
+        Probe("3DEP work units (WESM.csv)", "prd-tnm.s3.amazonaws.com", resort.INDEXES["wesm.csv"], range_ok,
+              range=True),
         Probe("usgs-lidar-public EPT", "s3-us-west-2.amazonaws.com", cfg["lidar"]["ept"] + "ept.json",
               json_with("bounds", "schema")),
         Probe("Entwine boundaries", "usgs.entwine.io", resort.INDEXES["entwine_resources.geojson"], range_ok, range=True),

@@ -1,0 +1,50 @@
+# FEAT-266: the front door for "please build this resort". The ids name, osm_id and slug are the build-pack.yml
+# inputs of the same names (FEAT-245), so a filled request is a ready `gh workflow run build-pack.yml` line; the
+# shapes below are the ones tools/ci/build_pack_ci.py accepts (pipeline/tests/test_workflows.py checks the ids).
+name: Request a resort
+description: Ask for a resort to be built into a pack you can ride in SnowboardAnywhere.
+title: "Resort request: "
+labels: ["type: resort-request", "status: backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A request becomes one run of the build-pack workflow, which needs the resort's name and the OpenStreetMap id of its ski area. Check [RELEASES.md](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/blob/main/RELEASES.md) first: a resort already there is a rebuild, so ask with a pack bug instead if something in it looks wrong.
+
+        **Two-area resorts** (Boston Mills with Brandywine) are built one area at a time for now: a new resort is built alone, and a pack over both areas needs a hand config. Ask for one area here and name the other under "Other areas to merge".
+  - type: input
+    id: name
+    attributes:
+      label: Resort name
+      description: As the resort calls itself. At most 100 characters, and not starting with `-`.
+      placeholder: Boston Mills
+    validations:
+      required: true
+  - type: input
+    id: osm_id
+    attributes:
+      label: OpenStreetMap id or OpenSkiMap link
+      description: |
+        The ski area's OSM id: `123456`, `way/123456` or `relation/123456` (a bare number is a way). An openstreetmap.org link to the ski area (`https://www.openstreetmap.org/way/123456`) is fine too, or an OpenSkiMap link to it on [openskimap.org](https://openskimap.org), and the builder reads the OSM id from it. It names the one ski area to build, so nobody has to guess between areas with similar names.
+      placeholder: way/452323654
+    validations:
+      required: true
+  - type: input
+    id: slug
+    attributes:
+      label: Slug (optional)
+      description: The pack's short name, in lower-case letters, digits and single hyphens, at most 60 characters (`boston-mills`). Leave it blank and the builder makes one from the name.
+      placeholder: boston-mills
+  - type: textarea
+    id: with
+    attributes:
+      label: Other areas to merge (optional)
+      description: A neighbour sold with this resort that belongs in the same pack (the pipeline's `--with`), by name or OSM id, one per line. For now it is built as a separate request or by hand, not in the same run (see above).
+      placeholder: Brandywine Ski Resort (way/391698033)
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this resort, and how soon
+      description: What you want to ride there, and whether it is a want-it-this-week or a someday.
+    validations:
+      required: true

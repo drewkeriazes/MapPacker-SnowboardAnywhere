@@ -2,7 +2,7 @@
 
 Resort packs for [SnowboardAnywhere](https://github.com/drewkeriazes/SnowboardAnywhere): the pipeline that builds a pack from a resort's name, the recipe each pack is built from, the catalog of published packs, and the packs themselves as release assets. The game repo just plays them (EPIC-16, #9; plan in [`docs/pipeline-move.md`](docs/pipeline-move.md)).
 
-Issues here go on the game's board, [project 2](https://github.com/users/drewkeriazes/projects/2), by themselves (`.github/workflows/add-to-project.yml`); how the board works is in the game repo's [`docs/BOARD.md`](https://github.com/drewkeriazes/SnowboardAnywhere/blob/main/docs/BOARD.md).
+Issues here go on the game's board, [project 2](https://github.com/users/drewkeriazes/projects/2), by themselves (`.github/workflows/add-to-project.yml`); how the board works is in the game repo's [`docs/BOARD.md`](https://github.com/drewkeriazes/SnowboardAnywhere/blob/main/docs/BOARD.md). New issue offers two forms (FEAT-266, `.github/ISSUE_TEMPLATE/`): **Request a resort** asks for exactly what [build-pack](#build-in-github-actions) needs (the name, the ski area's OSM id and an optional slug, in the shapes it accepts) and is labelled `type: resort-request` and `status: backlog`; **Pack bug** asks for the slug, the release tag (`vail/v4`), what looks wrong, a screenshot and where in the game. Gameplay bugs are linked to the game repo, and blank issues stay open for cards. PRs start from `.github/pull_request_template.md` (card id, `Fixes #`, what you ran, whether it changes what the game draws).
 
 ## Get a resort
 
