@@ -32,19 +32,20 @@
    "country": "US",
    "lonlat": [
     -111.41058147668633,
-    45.28371220009889
+    45.28371220009888
    ],
    "tier": "gold",
    "status": "playable",
    "pack": {
-    "version": 2,
+    "version": 3,
     "formatVersion": 1,
-    "build": "20261112T223031Z-5ce36a",
-    "built": "2026-11-12",
-    "pipeline": "9596769",
-    "bytes": 252378581,
-    "sha256": "18c0d5344c4da4cafff7401137a7bcb79a26d6fcfa15d2e70adb511125defd0d",
-    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/bigsky/v2/bigsky.zip"
+    "build": "20261114T144754Z-a3c8ed",
+    "built": "2026-11-14",
+    "pipeline": "8255205",
+    "bytes": 251996778,
+    "sha256": "17319743a723d1726ea9e21a5008e4c76ba7b7a60bd78cfadcb3076dbea043af",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/bigsky/v3/bigsky.zip",
+    "content": "041a0acf762febae"
    },
    "report": "reports/bigsky.md"
   },
