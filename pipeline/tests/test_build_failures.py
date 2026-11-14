@@ -55,6 +55,17 @@ def test_real_causes_and_cancelled_are_not_retried():
     assert bf.classify("fetch", log)["reason"] == "overpass-busy"
 
 
+def test_an_old_retry_line_never_makes_an_unknown_stop_transient():
+    """review on #132: a fetch full of 502 retries that passed, then a stop no rule knows"""
+    retries = [f"retry osm/ski.json ({k}) after error: HTTP 502 -> overpass.private.coffee" for k in range(5)]
+    log = "\n".join(retries + [f"... {k} done" for k in range(40)] + ["exit status 3", "##[error]Process completed"])
+    assert bf.classify("fetch", log) == {"reason": "unknown", "transient": False, "host": ""}
+    # and only the failed step counts: a 502 in an earlier step's output is not this step's cause
+    log = "\n".join(["##[group]Run earlier", "HTTP 502", "##[group]Run python tools/ci/build_pack_ci.py fetch",
+                     "boom", "##[error]Process completed"])
+    assert bf.classify("fetch", log)["reason"] == "unknown"
+
+
 def job(name, conclusion, step=None, start="2026-11-14T09:00:00Z", end="2026-11-14T09:10:00Z", id=1):
     steps = [{"name": "setup", "conclusion": "success"}] + ([{"name": step, "conclusion": conclusion}] if step else [])
     return {"id": id, "name": name, "conclusion": conclusion, "started_at": start, "completed_at": end, "steps": steps}

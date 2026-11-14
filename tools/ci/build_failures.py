@@ -30,6 +30,8 @@ TUNING = "host-tuning.json"
 BASE = {"timeout": 60, "tries": 2}
 CAP = {"timeout": 180, "tries": 4}
 
+TAIL = 30                      # lines of the failed step's end that classify reads
+
 # (reason, transient, pattern), first match wins; real causes that would also match a transient pattern come first
 RULES = [
     ("out-of-disk", False, r"No space left on device|ENOSPC"),
@@ -67,18 +69,24 @@ def host_of(line: str, step: str) -> str:
 
 
 def classify(step: str, log: str, conclusion: str = "failure") -> dict:
-    """{reason, transient, host} of a failed step from its job's log. The line that decides is the last one any rule
-    matches before the step's `##[error]` (earlier lines are often retries that later passed: aspen-hills' Overpass
-    502s before its real stop); within a line, the first rule wins"""
+    """{reason, transient, host} of a failed step from its job's log. Only the failed step's last TAIL lines before
+    its `##[error]` count: earlier lines are often retries that later passed (aspen-hills' Overpass 502s before its
+    real stop), and an unknown stop must stay unknown, never a stale 502. The last of those lines any rule matches
+    decides; within a line, the first rule wins"""
     if conclusion == "cancelled":
         return {"reason": "cancelled", "transient": False, "host": ""}
     lines = [re.sub(r"^\S+Z ", "", l) for l in log.splitlines()]      # GitHub's timestamps
     ends = [i for i, l in enumerate(lines) if l.startswith("##[error]")]
     if ends:
         lines = lines[:ends[-1]]
+    starts = [i for i, l in enumerate(lines) if l.startswith("##[group]Run ")]
+    if starts:                 # the failed step's own output
+        lines = lines[starts[-1]:]
     unreachable = next((l for l in reversed(lines) if l.startswith("unreachable: ")), "")
     if unreachable:            # probe_hosts.py: only its FAIL rows (an ok row can say "HTTP 500, LFPS JSON")
         lines = [l for l in lines if "FAIL" in l]
+    else:
+        lines = lines[-TAIL:]
     for line in reversed(lines):
         for reason, transient, pat in RULES:
             if re.search(pat, line):
