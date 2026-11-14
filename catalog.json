@@ -26,6 +26,30 @@
    "report": "reports/aspen-snowmass.md"
   },
   {
+   "slug": "beaver-creek-resort-arrowhead-mountain",
+   "name": "Beaver Creek Resort (Arrowhead Mountain)",
+   "region": "Colorado",
+   "country": "US",
+   "lonlat": [
+    -106.5304346571643,
+    39.599716756148624
+   ],
+   "tier": "gold",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261114T160535Z-be6f5c",
+    "built": "2026-11-14",
+    "pipeline": "30c6fb1",
+    "bytes": 181345275,
+    "sha256": "709da81e8196b74f6a463f59b3618c0a155ef68a51fc701883e09105decb1688",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/beaver-creek-resort-arrowhead-mountain/v1/beaver-creek-resort-arrowhead-mountain.zip",
+    "content": "dd3e42362fc68892"
+   },
+   "report": "reports/beaver-creek-resort-arrowhead-mountain.md"
+  },
+  {
    "slug": "bigsky",
    "name": "Big Sky",
    "region": "Montana",

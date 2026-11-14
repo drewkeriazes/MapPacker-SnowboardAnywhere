@@ -1,0 +1,176 @@
+{
+  "slug": "beaver-creek-resort-arrowhead-mountain",
+  "name": "Beaver Creek Resort (Arrowhead Mountain)",
+  "country": "US",
+  "region": "Colorado",
+  "osm_ski_area_way": null,
+  "crs": "EPSG:26913",
+  "utm_zone": "13N",
+  "lonlat_bbox": [
+    -106.5642354,
+    39.5660805,
+    -106.4967683,
+    39.633593
+  ],
+  "buffer_m": 1000,
+  "utm_bbox": [
+    364600,
+    4379600,
+    372600,
+    4389300
+  ],
+  "origin": [
+    368600,
+    4384450
+  ],
+  "elevation_range_m": [
+    2200,
+    3650
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "3DEP ImageServer",
+    "res_m": 1,
+    "chunk_px": 1500
+  },
+  "naip": {
+    "source": "Planetary Computer naip 2023 30cm",
+    "res_m": 1,
+    "max_px": 4000,
+    "items": [
+      "co_m_3910620_se_13_030_20230907_20240104",
+      "co_m_3910620_sw_13_030_20230907_20240104",
+      "co_m_3910621_sw_13_030_20230907_20240104",
+      "co_m_3910628_ne_13_030_20230907_20240104",
+      "co_m_3910628_nw_13_030_20230907_20240104",
+      "co_m_3910628_se_13_030_20230907_20240104",
+      "co_m_3910628_sw_13_030_20230907_20240104",
+      "co_m_3910629_nw_13_030_20230907_20240104",
+      "co_m_3910629_sw_13_030_20230907_20240104"
+    ],
+    "item_bboxes_ll": {
+      "co_m_3910620_se_13_030_20230907_20240104": [
+        -106.567,
+        39.621,
+        -106.495,
+        39.691
+      ],
+      "co_m_3910620_sw_13_030_20230907_20240104": [
+        -106.63,
+        39.621,
+        -106.558,
+        39.691
+      ],
+      "co_m_3910621_sw_13_030_20230907_20240104": [
+        -106.505,
+        39.621,
+        -106.433,
+        39.691
+      ],
+      "co_m_3910628_ne_13_030_20230907_20240104": [
+        -106.567,
+        39.559,
+        -106.495,
+        39.629
+      ],
+      "co_m_3910628_nw_13_030_20230907_20240104": [
+        -106.63,
+        39.559,
+        -106.558,
+        39.629
+      ],
+      "co_m_3910628_se_13_030_20230907_20240104": [
+        -106.567,
+        39.496,
+        -106.495,
+        39.566
+      ],
+      "co_m_3910628_sw_13_030_20230907_20240104": [
+        -106.63,
+        39.496,
+        -106.558,
+        39.566
+      ],
+      "co_m_3910629_nw_13_030_20230907_20240104": [
+        -106.505,
+        39.559,
+        -106.433,
+        39.629
+      ],
+      "co_m_3910629_sw_13_030_20230907_20240104": [
+        -106.505,
+        39.496,
+        -106.433,
+        39.566
+      ]
+    }
+  },
+  "lidar": {
+    "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/USGS_LPC_CO_Central_Western_2016_LAS_2018/",
+    "dataset": "USGS_LPC_CO_Central_Western_2016_LAS_2018",
+    "max_depth_resort": 9,
+    "max_depth_outside": 8,
+    "nodes_file": "beaver-creek-resort-arrowhead-mountain_ept_nodes.txt",
+    "far": {
+      "pad_m": 5000,
+      "max_depth": 9,
+      "nodes_file": "beaver-creek-resort-arrowhead-mountain_ept_far_nodes.txt"
+    }
+  },
+  "attribution": [
+    "Elevation: USGS 3DEP 1 m lidar DEM (CO_Central_Western_2016), public domain",
+    "Canopy: USGS 3DEP lidar point cloud USGS_LPC_CO_Central_Western_2016_LAS_2018 via AWS usgs-lidar-public, public domain",
+    "Imagery: USDA NAIP 2023 via Microsoft Planetary Computer, public domain",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "terrain_status_url": "https://www.beavercreek.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+  "osm": {
+    "geofabrik": "us/colorado",
+    "pbf": "https://download.geofabrik.de/north-america/us/colorado-latest.osm.pbf"
+  },
+  "openskidata": {
+    "ids": [
+      "1185f0916cf0cbf03f6b75c9d1449b86afb1516d"
+    ],
+    "names": [
+      "Beaver Creek Resort (Arrowhead Mountain)"
+    ],
+    "iso3166_2": "US-CO",
+    "websites": [
+      "https://www.beavercreek.com/"
+    ],
+    "lifts": 25,
+    "runs": 247
+  },
+  "names": {
+    "states": [
+      "CO"
+    ],
+    "source": "USGS GNIS",
+    "towns": "US Census 2024 Gazetteer and population estimates"
+  },
+  "tier": "gold",
+  "sources": {
+    "terrain": {
+      "source": "3DEP 1 m",
+      "tier": "gold"
+    },
+    "trees": {
+      "source": "lidar crowns + stands",
+      "tier": "gold"
+    },
+    "surface": {
+      "source": "NAIP",
+      "tier": "gold"
+    }
+  }
+}

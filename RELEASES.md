@@ -6,6 +6,10 @@ Every published pack, grouped by resort, newest version first. The game download
 
 - [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/aspen-snowmass/v1) (latest) 120 MB, 2026-11-14
 
+## Beaver Creek Resort (Arrowhead Mountain)
+
+- [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/beaver-creek-resort-arrowhead-mountain/v1) (latest) 181 MB, 2026-11-14
+
 ## Big Sky
 
 - [v3](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/bigsky/v3) (latest) 252 MB, 2026-11-14

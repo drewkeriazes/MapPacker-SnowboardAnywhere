@@ -1,0 +1,934 @@
+{
+ "version": 2,
+ "slug": "beaver-creek-resort-arrowhead-mountain",
+ "fetched": "2026-11-14",
+ "areas": [
+  {
+   "openskidata_id": "1185f0916cf0cbf03f6b75c9d1449b86afb1516d",
+   "name": "Beaver Creek Resort (Arrowhead Mountain)",
+   "wikidata": null,
+   "found_by": null,
+   "wikipedia": null,
+   "infobox": false
+  }
+ ],
+ "figures": {},
+ "trails": {
+  "source": "beavercreek.com terrain status, 2026-04-18",
+  "list": [
+   {
+    "name": "1876",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "4 Get About It",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Addy's",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Affinity",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Anderson's Alley",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Assay",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "BC Expressway - Lower",
+    "area": "Larkspur",
+    "difficulty": "easy"
+   },
+   {
+    "name": "BC Expressway - Upper",
+    "area": "Larkspur",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Bald Eagle",
+    "area": "Grouse Mountain",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Barrel Stave",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bear Paw",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Bear Trap",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bedstraw",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Beginner Area Ch. #2",
+    "area": "Beaver Creek Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Big Bark/Little Bark",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bitterroot",
+    "area": "Strawberry Park",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bliss",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Blue Bell",
+    "area": "Larkspur",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Booth Gardens",
+    "area": "Beaver Creek Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Bootleg",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Borders",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Borders Loop",
+    "area": "Elkhorn",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bridle",
+    "area": "Rose Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Buckboard",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "C - Prime",
+    "area": "Rose Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cabin Fever Lower",
+    "area": "Bachelor Gulch",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cabin Fever Upper",
+    "area": "Bachelor Gulch",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Camp Robber RD",
+    "area": "Grouse Mountain",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Cataract",
+    "area": "Rose Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Centennial - Finish Face",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Centennial - Flats",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Centennial - Hohum",
+    "area": "Beaver Creek Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Centennial - Spruce Face",
+    "area": "Beaver Creek Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Centennial - Willy's Face",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Charter Skiway",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Cinch - Lower",
+    "area": "Beaver Creek Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Cinch - Upper",
+    "area": "Beaver Creek Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Cold Snap",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Corkscrew",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Coyote Glade",
+    "area": "Bachelor Gulch",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Creekside",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Cresta",
+    "area": "Arrowhead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cross Bow",
+    "area": "Arrowhead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Dakota Skiway",
+    "area": "Arrowhead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Dally - Lower",
+    "area": "Beaver Creek Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Dally - Upper",
+    "area": "Beaver Creek Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Dally Alley",
+    "area": "Birds of Prey",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Discovery",
+    "area": "McCoy Park",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Easy Come Easy Go",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Elkhorn Skiway",
+    "area": "Resort Skiways",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Enchantment",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Endeavor",
+    "area": "McCoy Park",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Everkrisp",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Exploration",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Falcon Park",
+    "area": "Grouse Mountain",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Flint",
+    "area": "Arrowhead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Fools Gold",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ford's Way",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Freedom",
+    "area": "McCoy Park",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gallagher Glade",
+    "area": "Arrowhead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gary’s",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Gee",
+    "area": "Elkhorn",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gold Dust",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gold Rush",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Golden Bear",
+    "area": "Arrowhead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Golden Eagle - Lower",
+    "area": "Birds of Prey",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Golden Eagle - Upper",
+    "area": "Birds of Prey",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Golden Eagle Connector",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Golden Eagle Flyway",
+    "area": "Birds of Prey",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Gosawk Connector",
+    "area": "Beaver Creek Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Goshawk Lower",
+    "area": "Birds of Prey",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Goshawk Upper",
+    "area": "Birds of Prey",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Grubstake",
+    "area": "Bachelor Gulch",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gunder's Lower",
+    "area": "Bachelor Gulch",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gunder's Upper",
+    "area": "Bachelor Gulch",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Harmony",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Harrier - Lower",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Harrier - Upper",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Haw",
+    "area": "Elkhorn",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Haymeadow",
+    "area": "Beaver Creek Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Heads Up",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Helmut's",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Highlands Skiway",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Holden SKiway",
+    "area": "Resort Skiways",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Home Run",
+    "area": "Elkhorn",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Homefire",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Intertwine - Lower",
+    "area": "Strawberry Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Intertwine - Upper",
+    "area": "Bachelor Gulch",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Jack Rabbit Alley",
+    "area": "Beaver Creek Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Journey",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Kestrel  Lower",
+    "area": "Birds of Prey",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Kestrel  Middle",
+    "area": "Birds of Prey",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Kestrel  Upper",
+    "area": "Birds of Prey",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Kinship",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Lamplighter",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Larkspur - Lower",
+    "area": "Larkspur",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Larkspur - Upper",
+    "area": "Larkspur",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Latigo Flats",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Leav the Beav",
+    "area": "Beaver Creek Landing",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Legacy",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Little Brave Lower",
+    "area": "Arrowhead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Little Brave Upper",
+    "area": "Arrowhead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Loco",
+    "area": "Larkspur",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lower Latigo",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lumber Yard",
+    "area": "Beaver Creek Lower",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Lupine",
+    "area": "Larkspur",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Maverick",
+    "area": "Bachelor Gulch",
+    "difficulty": "easy"
+   },
+   {
+    "name": "McCoy Skiway",
+    "area": "Resort Skiways",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Meander",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Middle Golden Eagle",
+    "area": "Birds of Prey",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Moonshine",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Mystic Island",
+    "area": "Beaver Creek Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Mystic Maze",
+    "area": "Beaver Creek Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Osprey",
+    "area": "Grouse Mountain",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Overshot",
+    "area": "Strawberry Park",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Paintbrush",
+    "area": "Larkspur",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Park 101",
+    "area": "Beaver Creek Upper",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Peregrine - Lower",
+    "area": "Birds of Prey",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Peregrine - Middle",
+    "area": "Birds of Prey",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Peregrine - Upper",
+    "area": "Birds of Prey",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Piece O' Cake",
+    "area": "Arrowhead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Pines/Chateau",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Piney",
+    "area": "Beaver Creek Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Pow Wow",
+    "area": "Arrowhead",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Powell",
+    "area": "Beaver Creek Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "President Ford's - Lower",
+    "area": "Strawberry Park",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "President Ford's - Upper",
+    "area": "Strawberry Park",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Primrose- BG to AH",
+    "area": "Larkspur",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Primrose- Straw. Park to BG",
+    "area": "Strawberry Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Primrose-Larkspur to Straw",
+    "area": "Strawberry Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Ptarmigan",
+    "area": "Grouse Mountain",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Raven Ridge - Lower",
+    "area": "Grouse Mountain",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Raven Ridge - Upper",
+    "area": "Grouse Mountain",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Red Buffalo",
+    "area": "Beaver Creek Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Redtail",
+    "area": "Birds of Prey",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Reflection",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Rhubarb",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Ridge Rider",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Ridgepoint",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Ripperoo's Retreat",
+    "area": "Rose Bowl",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Ripsaw",
+    "area": "Rose Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Roughlock",
+    "area": "Bachelor Gulch",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Royal Elk Glade",
+    "area": "Grouse Mountain",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ruffed Grouse",
+    "area": "Grouse Mountain",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Saddleridge Skiway",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Sanctuary",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Sawbuck",
+    "area": "Bachelor Gulch",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Screech Owl",
+    "area": "Grouse Mountain",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Second Chance",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Serenity",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Settlers Way",
+    "area": "Elkhorn",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sheephorn",
+    "area": "Beaver Creek Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sheephorn - Escape",
+    "area": "Beaver Creek Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sheephorn - Upper",
+    "area": "Beaver Creek Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Shooting Star",
+    "area": "Larkspur",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Solitaire",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Solitude",
+    "area": "Beaver Creek Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Sourdough’s Slide",
+    "area": "Bachelor Gulch",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Spider",
+    "area": "Rose Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Splendor",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Springtooth",
+    "area": "Bachelor Gulch",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Stacker - Lower",
+    "area": "Strawberry Park",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Stacker - Upper",
+    "area": "Strawberry Park",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Stickline",
+    "area": "Beaver Creek Lower",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Stirrup",
+    "area": "Arrowhead",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Stone Creek Chutes",
+    "area": "Rose Bowl",
+    "difficulty": "extreme"
+   },
+   {
+    "name": "Stone Creek Meadows",
+    "area": "Rose Bowl",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Tall Timber",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Three Tree Gully",
+    "area": "Larkspur",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Thresher Glade",
+    "area": "Strawberry Park",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Tomahawk",
+    "area": "Arrowhead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Toyota Race Center",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Tranquility",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Unwind",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Upper Latigo",
+    "area": "Beaver Creek Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Venture",
+    "area": "McCoy Park",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Wampum",
+    "area": "Resort Skiways",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Wapiti",
+    "area": "Arrowhead",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Web",
+    "area": "Rose Bowl",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Yarrow",
+    "area": "Larkspur",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Zoom Room",
+    "area": "Beaver Creek Upper",
+    "difficulty": "terrain park"
+   }
+  ]
+ },
+ "why": "no English Wikipedia article with an Infobox ski area for Beaver Creek Resort (Arrowhead Mountain)",
+ "outside": [],
+ "box": [
+  364600,
+  4379600,
+  372600,
+  4389300
+ ]
+}
