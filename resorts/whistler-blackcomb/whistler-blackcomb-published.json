@@ -1,0 +1,1544 @@
+{
+ "version": 2,
+ "slug": "whistler-blackcomb",
+ "fetched": "2026-11-14",
+ "areas": [
+  {
+   "openskidata_id": "19291bcc85a3b6bda5a0817e6a20bf8b8b71a5c0",
+   "name": "Whistler Blackcomb",
+   "wikidata": "Q1206060",
+   "found_by": "OpenSkiData wikidataID",
+   "wikipedia": null,
+   "infobox": false
+  }
+ ],
+ "figures": {},
+ "trails": {
+  "source": "whistlerblackcomb.com terrain status, 2026-04-02",
+  "list": [
+   {
+    "name": "7th Avenue",
+    "area": "7th Heaven",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Adagio - Lower",
+    "area": "Symphony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Adagio - Mid",
+    "area": "Symphony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Adagio - Upper",
+    "area": "Symphony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Adult Learning",
+    "area": "Learning Areas",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Angel Dust",
+    "area": "7th Heaven",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Animal Adventure Trail",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Arthur's Choice",
+    "area": "Crystal Ridge",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Backstage Pass",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bagel Bowl",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Banana Peel",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Bark Sandwich",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Base 2 Carpet",
+    "area": "Learning Areas",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Bean Bowl",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Bean Sprout",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bear Cub - Lower",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Bear Cub - Upper",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Bear Paw",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Bernie's Bumps",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Big Easy",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Black Magic",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Blackcomb Base - Whistler Kids Only",
+    "area": "Learning Areas",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Blackcomb Glacier",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Blackcomb Race Centre",
+    "area": "Jersey Cream",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Blow Hole",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Blowdown",
+    "area": "Jersey Cream",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Blue Line",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Blue Road",
+    "area": "Harmony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bobcat",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Bobcat Park",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Boomer Bowl",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Brownlie Basin",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Burnt Stew Trail - Lower",
+    "area": "Symphony",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Burnt Stew Trail - Upper",
+    "area": "Symphony",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Buzz Cut",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "CLC - Whistler Kids Only",
+    "area": "Learning Areas",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Camel Humps",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Catskinner",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Catskinner Traverse",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Chipmunk Park",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Choker",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Chunky's Choice",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Closed Captions",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Cloud 9 - Lower",
+    "area": "7th Heaven",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cloud 9 - Upper",
+    "area": "7th Heaven",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cockalorum",
+    "area": "Peak / T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Come-a-long",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Cougar",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cougar Chutes",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Cougar Milk",
+    "area": "Jersey Cream",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Countdown",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Coyote",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Crabapple - Lower",
+    "area": "Fitzsimmons / Whistler Village Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Crabapple - Mid",
+    "area": "Fitzsimmons / Whistler Village Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Crabapple - Upper",
+    "area": "Fitzsimmons / Whistler Village Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Creekside Base - Whistler Kids Only",
+    "area": "Learning Areas",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Crescendo",
+    "area": "Symphony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Crosscut",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Crossroads",
+    "area": "Creekside",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cruiser - Bumps",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Cruiser - Bypass",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cruiser - Grub",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cruiser - Lower",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cruiser - Rolls",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cruiser - Snoozer",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Cruiser - Upper",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Crystal Glide",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Crystal Road",
+    "area": "Crystal Ridge",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Crystal Traverse",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Dakine",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Dale's Way",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Dave Murray Downhill - Fallaway",
+    "area": "Creekside",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Dave Murray Downhill - Lower",
+    "area": "Creekside",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Dave Murray Downhill - Upper",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Dave Murray Downhill - Weasel",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Dave's Day Off",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Davies Dervish",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Diamond Bowl",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Die Hard",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Doom",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Download Road",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Dusty's Descent",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Easy Out",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Ego Bowl - Lower",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Ego Bowl - Upper",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Emerald Forest - Lower Entrance",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Emerald Forest - Upper Entrance",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Enchanted Forest - Adventure Trail",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Encore Ridge",
+    "area": "Symphony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Entrance to Blackcomb Glacier",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Entrance to Grey Zone",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Espresso",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Everglades",
+    "area": "7th Heaven",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Expressway",
+    "area": "7th Heaven",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Fantastic",
+    "area": "Learning Areas",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Fisheye - Lower",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Fisheye - Upper",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Flute Bowl",
+    "area": "Symphony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Flute Road",
+    "area": "Symphony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Foxy Hollow",
+    "area": "Learning Areas",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Franz's - Lower",
+    "area": "Creekside",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Franz's - Mid",
+    "area": "Creekside",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Franz's - Upper",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Franz's Meadows",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Freefall",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Frondola",
+    "area": "Creekside",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "G.S. - Lower",
+    "area": "Harmony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "GS - Upper",
+    "area": "Harmony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Garnet Bowl",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Gear Jammer - Lower",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gear Jammer - Upper",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Glacier Bowl",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Glacier Drive - Lower",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Glacier Drive - Upper",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Glacier Road - Lower",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Glacier Road - Mid",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Glacier Road - Upper",
+    "area": "Crystal Ridge",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Glissando",
+    "area": "Symphony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Glissando Glades",
+    "area": "Symphony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gloom",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Gnarly Knots",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Goat's Gully",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Grand Finale",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Green Acres - Main",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Green Acres - Right",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Greenline - Lower",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Greenline - Mid",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Greenline - Upper",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Grey Line",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Grey Zone",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Grubstake",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Gun Barrels",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Harmony Horseshoes",
+    "area": "Harmony",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Harmony Piste",
+    "area": "Harmony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Harmony Ridge",
+    "area": "Harmony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Harvey's",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Headwall",
+    "area": "Peak / T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Highest Level",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Highway 86 - Lower",
+    "area": "Peak / T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Highway 86 - Mid",
+    "area": "Peak / T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Highway 86 - Upper",
+    "area": "Peak / T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Honeycomb - Lower",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Honeycomb - Upper",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Horstman Face",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Hugh's Heaven - Lower",
+    "area": "7th Heaven",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Hugh's Heaven - Upper",
+    "area": "7th Heaven",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Jackpot",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "James Brown",
+    "area": "Symphony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Jeff's Ode to Joy - Lower",
+    "area": "Symphony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Jeff's Ode to Joy - Upper",
+    "area": "Symphony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Jersey Cream - Lower",
+    "area": "Jersey Cream",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Jersey Cream - Upper",
+    "area": "Jersey Cream",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Jersey Cream Bowl",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Jersey Cream Wall",
+    "area": "Jersey Cream",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Jimmy's Joker",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Jolly Green Giant",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Kadenwood Trail",
+    "area": "Creekside",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Kaleidoscope",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Krummholz",
+    "area": "Harmony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Lakeside Bowl",
+    "area": "7th Heaven",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lakeside Traverse",
+    "area": "7th Heaven",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Last Resort",
+    "area": "7th Heaven",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Little Cub",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Little Red Run - Lower",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Little Red Run - Upper",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Little Whistler",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Log Jam",
+    "area": "Crystal Ridge",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Lot 8 Access",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Low Roll",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Magic Castle",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Magic Castle - Blue",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Magic Castle - Green",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Mainline - Lower",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Mainline - Upper",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Marmot",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Mathews' Traverse",
+    "area": "Peak / T-bar",
+    "difficulty": "easy"
+   },
+   {
+    "name": "McConkey's - Lower",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "McKonkey's - Upper",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Merlin",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Mini Pipe",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "terrain park"
+   },
+   {
+    "name": "Monday's",
+    "area": "Peak / T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "North Flute Bowl",
+    "area": "Symphony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Northern Lights - Lower",
+    "area": "Fitzsimmons / Whistler Village Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Old Crow",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Old Man",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Olympic - Lower",
+    "area": "Fitzsimmons / Whistler Village Gondola - Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Olympic - Upper",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Orange Peel",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Outer Limits",
+    "area": "Crystal Ridge",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Over Easy",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Overbite",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Pakalolo",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Pale Face",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Panorama - Lower",
+    "area": "7th Heaven",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Panorama - Mid",
+    "area": "7th Heaven",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Panorama - Upper",
+    "area": "7th Heaven",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Papoose",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Peak Traverse",
+    "area": "Peak / T-bar",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Peak to Creek - Lower",
+    "area": "Peak / T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Peak to Creek - Upper",
+    "area": "Peak / T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Piccolo Face",
+    "area": "Symphony",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Pig Alley",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Pika's Traverse",
+    "area": "Harmony",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Pony Trail - Bypass",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Pony Trail - Cat Track",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Pony Trail - Mid",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Pony Trail - Upper",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Porcupine",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Ptarmigan",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ptarmigan - Upper",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Quasar",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Rabbit Tracks",
+    "area": "Harmony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Racer Alley",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Raptor's Ride",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ratfink",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ratfink - Lower",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Raven",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Renegade",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Rhapsody Bowl",
+    "area": "Symphony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Rider's Revenge",
+    "area": "Crystal Ridge",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Ridge Run",
+    "area": "Peak / T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ridge Runner - Lower",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ridge Runner - Upper",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Robertson's",
+    "area": "Harmony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Rock & Roll - Lower",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Rock & Roll -Upper",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Rock Alley",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ross' Gold",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Ruby Bowl",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Sapphire Bowl",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Saudan Couloir",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Scampland - Whistler Kids Only",
+    "area": "Learning Areas",
+    "difficulty": "easy"
+   },
+   {
+    "name": "School Marm",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "School Yard",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sea to Sky Railway",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Secret Bassin",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Secret Bowl",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Seppo's",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Seppo's - Lower",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Shale Slope",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Shorthorn",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Showcase",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Showcase Bowl",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Showcase Traverse",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sidewinder",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Slingshot",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Slingshot Connector",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sluiceway",
+    "area": "7th Heaven",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Snowboard Carpet",
+    "area": "Learning Areas",
+    "difficulty": "easy"
+   },
+   {
+    "name": "So Sweet",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Southside Green",
+    "area": "7th Heaven",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Spankys Ladder",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Springboard",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Staccato Glades",
+    "area": "Symphony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Staircase",
+    "area": "Jersey Cream",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Stephan's Chute",
+    "area": "Peak / T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "Stoker",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Stoker - Bumps",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Stoker - Rolls",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Straight Shot - Lower",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Straight Shot - Upper",
+    "area": "Crystal Ridge",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Strawline",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Sun Bowl",
+    "area": "Symphony",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sunburn",
+    "area": "7th Heaven",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sunnyside Up",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Sunset Boulevard",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Super Carpet",
+    "area": "Learning Areas",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Surprise",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Sylvain",
+    "area": "Glacier / Showcase T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "T-Bar Bowl",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "T-Bar Run",
+    "area": "Peak / T-bar",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "The Bite",
+    "area": "Jersey Cream",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "The Cirque",
+    "area": "Peak / T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "The Couloir",
+    "area": "Peak / T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "The Glades",
+    "area": "Harmony",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "The Saddle",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Tokum",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Trapline - Lower",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Trapline - Upper",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Tree Fort",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Twist & Shout",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Undercut",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Village Run",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Wally World",
+    "area": "Jersey Cream",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Watch Out",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "West Bowl",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "West Cirque",
+    "area": "Peak / T-bar",
+    "difficulty": "expert"
+   },
+   {
+    "name": "West Ridge",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Where's Joe",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Whiskey Jack - Lower",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Whiskey Jack - Upper",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Whistler Bowl",
+    "area": "Peak / T-bar",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "White Light - Lower",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "White Light - Upper",
+    "area": "Crystal Ridge",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Wild Card",
+    "area": "Big Red / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Wishbone",
+    "area": "Jersey Cream",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Xhiggy's Meadow",
+    "area": "7th Heaven",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Yard Sale",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "advanced"
+   },
+   {
+    "name": "Yellow Brick Road",
+    "area": "Excalibur / Blackcomb Gondola - Lower",
+    "difficulty": "easy"
+   },
+   {
+    "name": "Zig Zag - Foon Alley",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Zig Zag - Lower",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Zig Zag - Upper",
+    "area": "Excelerator / Catskinner / Blackcomb Gondola - Upper",
+    "difficulty": "intermediate"
+   },
+   {
+    "name": "Zudrell's",
+    "area": "Emerald / Garbanzo / Village Gondola - Upper",
+    "difficulty": "advanced"
+   }
+  ]
+ },
+ "why": "no English Wikipedia article with an Infobox ski area for Whistler Blackcomb",
+ "outside": [],
+ "box": [
+  499400,
+  5541900,
+  511200,
+  5553300
+ ]
+}
