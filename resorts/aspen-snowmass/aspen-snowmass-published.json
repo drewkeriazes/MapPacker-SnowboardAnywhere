@@ -1,0 +1,25 @@
+{
+ "version": 2,
+ "slug": "aspen-snowmass",
+ "fetched": "2026-11-14",
+ "areas": [
+  {
+   "openskidata_id": "03b56bd47b26c384d82474a2fb4b3fbc3a0c4a31",
+   "name": "Aspen Snowmass",
+   "wikidata": "Q4807795",
+   "found_by": "OpenSkiData wikidataID",
+   "wikipedia": null,
+   "infobox": false
+  }
+ ],
+ "figures": {},
+ "trails": null,
+ "why": "no English Wikipedia article with an Infobox ski area for Aspen Snowmass",
+ "outside": [],
+ "box": [
+  327400,
+  4335100,
+  335800,
+  4343300
+ ]
+}

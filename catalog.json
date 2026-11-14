@@ -2,6 +2,30 @@
  "formatVersion": 1,
  "resorts": [
   {
+   "slug": "aspen-snowmass",
+   "name": "Aspen Snowmass",
+   "region": "Colorado",
+   "country": "US",
+   "lonlat": [
+    -106.94978954115872,
+    39.18574452290058
+   ],
+   "tier": "silver",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261114T074849Z-d30ffa",
+    "built": "2026-11-14",
+    "pipeline": "50b0207",
+    "bytes": 119710949,
+    "sha256": "e6bef4ae3787898c1a83075cdcce795b0a15c626a9ebde934019dba1251275f9",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/aspen-snowmass/v1/aspen-snowmass.zip",
+    "content": "d6fd572ad78e4dc4"
+   },
+   "report": "reports/aspen-snowmass.md"
+  },
+  {
    "slug": "bigsky",
    "name": "Big Sky",
    "region": "Montana",
