@@ -124,16 +124,16 @@ def test_the_summary_counts_hosts_reasons_and_retry_success():
              "transient": True, "outcome": "retrying"}]
     assert bf.retry_stats(rows) == (2, 1)
     tune = bf.tuning(rows)
-    assert tune == {"a.org": {"timeout": 135, "tries": 3}}           # 3 timeouts: 60 s * 1.5 ** 2, one more try
+    assert tune == {"a.org": {"timeout": 135, "tries": 4}}           # 3 timeouts: 60 s * 1.5 ** 2, one more try
     text = bf.summary_md(rows, tune)
-    assert "| a.org | 3 |" in text and "timeout (transient)" in text and "50%" in text and "| a.org | 135 s | 3 |" in text
+    assert "| a.org | 3 |" in text and "timeout (transient)" in text and "50%" in text and "| a.org | 135 s | 4 |" in text
 
 
 def test_tuning_grows_with_the_failures_and_stops_at_the_cap():
     def rows(n):
         return [{"host": "h", "reason": "timeout", "job": "probe"} for _ in range(n)]
     assert bf.tuning(rows(1)) == {}
-    assert bf.tuning(rows(2)) == {"h": {"timeout": 90, "tries": 3}}
+    assert bf.tuning(rows(2)) == {"h": {"timeout": 90, "tries": 4}}
     assert bf.tuning(rows(10)) == {"h": {"timeout": bf.CAP["timeout"], "tries": bf.CAP["tries"]}}
     assert bf.tuning([{"host": "h", "reason": "timeout", "job": "build"}] * 5) == {}    # the fetch has its own retries
 
@@ -181,10 +181,41 @@ def test_save_row_appends_to_the_metrics_branch(tmp_path):
            "reason": "timeout", "transient": True, "duration_s": 5, "outcome": "retrying"}
     bf.save_row(row, str(work))
     rows, tune = bf.save_row(dict(row, attempt=2), str(work))
-    assert [r["attempt"] for r in rows] == [1, 2] and tune == {"h": {"timeout": 90, "tries": 3}}
+    assert [r["attempt"] for r in rows] == [1, 2] and tune == {"h": {"timeout": 90, "tries": 4}}
     out = subprocess.run(["git", "--git-dir", str(origin), "show", "metrics:build-failures.jsonl"],
                          capture_output=True, text=True).stdout
     assert len(out.splitlines()) == 2 and json.loads(out.splitlines()[1])["attempt"] == 2
     files = subprocess.run(["git", "--git-dir", str(origin), "ls-tree", "--name-only", "metrics"],
                            capture_output=True, text=True).stdout.split()
     assert sorted(files) == ["README.md", "build-failures.jsonl", "host-tuning.json"]     # nothing from main
+
+
+def test_a_4xx_is_real_at_every_layer():
+    """FEAT-314 refinement: the probe and the fetch say a 4xx was not retried, and the job is not re-run either"""
+    probe = "\n".join(T + l for l in ["FAIL Geofabrik index: HTTP 404 (a 4xx: not retried)",
+                                       "unreachable: download.geofabrik.de", "##[error]Process completed with exit code 1."])
+    assert bf.classify("data hosts", probe) == {"reason": "http-4xx", "transient": False, "host": "download.geofabrik.de"}
+    fetch = "\n".join(T + l for l in [
+        "08:16:51    FAILED naip1m/x.tif: HTTP 403 (a 4xx: not retried)",
+        "stopped: a download was refused (a 4xx: not retried; /raw/x/fetch_log.txt lists it): fix the manifest",
+        "| fetch | **failed** (exit 1) | 724 s |", "##[error]Process completed with exit code 1."])
+    assert bf.classify("fetch", fetch)["reason"] == "http-4xx" and not bf.classify("fetch", fetch)["transient"]
+    assert bf.classify("x", T + "HTTP 429\n##[error]x")["reason"] == "rate-limit"       # 429 stays transient
+
+
+def test_inline_retries_are_counted_per_host_and_summarised(tmp_path):
+    (tmp_path / "inline-retries-probe-1").mkdir()
+    (tmp_path / "inline-retries-probe-1" / "inline-retries.jsonl").write_text(
+        json.dumps({"tool": "probe", "host": "a.org", "calls": 1, "retried": 1, "recovered": 1, "failed": 0}) + "\n")
+    (tmp_path / "b.jsonl").write_text(
+        json.dumps({"tool": "fetch", "host": "a.org", "calls": 40, "retried": 3, "recovered": 2, "failed": 1}) + "\nnot json\n")
+    inline = bf.inline_counts(str(tmp_path))
+    assert inline == {"a.org": {"calls": 41, "retried": 4, "recovered": 3, "failed": 1}}
+    assert bf.inline_counts(None) == {}
+    rows = [{"run_id": 1, "attempt": 1, "job": "build", "step": "fetch", "host": "", "reason": "", "transient": False,
+             "outcome": "passed", "inline": inline},
+            {"run_id": 2, "attempt": 1, "job": "probe", "step": "data hosts", "host": "b.org", "reason": "http-4xx",
+             "transient": False, "outcome": "stopped"}]
+    text = bf.summary_md(rows, {})
+    assert "Recovered inline: 3 calls; job re-runs: 0; real failures: 1" in text
+    assert "| a.org | 41 | 4 | 3 | 1 |" in text

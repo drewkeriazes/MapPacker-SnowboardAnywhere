@@ -5,8 +5,10 @@
 Each probe fetches one small item from a host the pipeline uses, with the URL the pipeline itself builds where it
 can (constants imported from pipeline/, Vail's dataset and NAIP item for the per-resort ones), and checks what came
 back (a TIFF, a WebP tile, JSON with the fields the pipeline reads, a 200 or 206 on a byte range of a big file).
-Every probe is tried twice; FEAT-314: --tuning (the metrics branch's host-tuning.json, build_failures.py) raises the
-timeout and tries of a host that keeps timing out, within build_failures.CAP. A host with mirrors (Overpass) passes when any mirror passes, tried in order: the next mirror
+FEAT-314: a probe that got no answer, a 429 or 5xx, or a bad body is retried inline by pipeline/retry.json's rules
+(3 tries, waits 10 then 30 s, at most 300 s of waiting per run); a 4xx is not, unless retry.json lists it for the
+host. --tuning (the metrics branch's host-tuning.json, build_failures.py) raises the timeout and tries of a host that
+keeps timing out, within build_failures.CAP. The tries per host go to $SBA_RETRY_LOG (retry.Tally). A host with mirrors (Overpass) passes when any mirror passes, tried in order: the next mirror
 only when the ones before it failed (each gets its own row). web.archive.org is only for grooming (fetch_grooming.py), so it warns instead of failing.
 
 Prints a table, appends it to $GITHUB_STEP_SUMMARY as Markdown when that is set, and exits 1 when a required host
@@ -16,7 +18,7 @@ curl_json).
 import argparse, json, os, subprocess, sys, tempfile, time
 from dataclasses import dataclass
 from typing import Callable
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -24,6 +26,7 @@ sys.path.insert(0, os.path.join(REPO, "pipeline"))
 import paths  # noqa: E402
 import placenames  # noqa: E402
 import resort  # noqa: E402
+import retry  # noqa: E402
 
 UA = resort.UA
 MAX_BODY = 64 * 1024           # bytes of the reply kept for the check
@@ -197,39 +200,56 @@ def probes() -> list:
 
 
 def curl(url: str, timeout: int, byte_range: bool) -> tuple:
-    """(http code, first MAX_BODY bytes) by curl; code 0 when curl itself failed (DNS, TLS, timeout)"""
+    """(http code, first MAX_BODY bytes, Retry-After seconds or None) by curl; code 0 when curl itself failed (DNS,
+    TLS, timeout). %header{} needs curl 7.84; an older one prints it as is, which reads as no Retry-After"""
     fd, tmp = tempfile.mkstemp(prefix="probe-")
     os.close(fd)
     try:
-        cmd = ["curl", "-sS", "-L", "-m", str(timeout), "-A", UA, "-o", tmp, "-w", "%{http_code}"]
+        cmd = ["curl", "-sS", "-L", "-m", str(timeout), "-A", UA, "-o", tmp, "-w", "%{http_code}\n%header{retry-after}"]
         if byte_range:
             # a server that ignores the range would send the whole file (hundreds of MB): stop at 1 MB
             cmd += ["-r", RANGE, "--max-filesize", str(1 << 20)]
         p = subprocess.run(cmd + [url], capture_output=True, text=True)
-        code = int(p.stdout.strip() or 0) if p.stdout.strip().isdigit() else 0
+        out = (p.stdout.strip().splitlines() or [""]) + [""]
+        code = int(out[0]) if out[0].strip().isdigit() else 0
+        after = int(out[1]) if out[1].strip().isdigit() else None
         with open(tmp, "rb") as f:
             body = f.read(MAX_BODY)
         if p.returncode and not code:
-            return 0, (p.stderr.strip() or f"curl exited {p.returncode}").encode()
+            return 0, (p.stderr.strip() or f"curl exited {p.returncode}").encode(), None
         if p.returncode == 63:   # --max-filesize: the server ignored the range, but it answered
-            return code or 200, body or b"(range ignored)"
-        return code, body
+            return code or 200, body or b"(range ignored)", None
+        return code, body, after
     finally:
         os.remove(tmp)
 
 
-def run_probe(p: Probe, fetch: Callable, tries: int = 2) -> tuple:
-    """(ok, detail, seconds) of one probe, tried up to `tries` times"""
-    detail = ""
+def run_probe(p: Probe, fetch: Callable, tries: int = 0, budget: list | None = None) -> tuple:
+    """(ok, detail, seconds, tries used) of one probe: retried while the answer is transient (retry.transient), up to
+    `tries` times (retry.json's), and only while `budget` ([seconds of waiting left in this run]) lasts"""
+    tries = tries or retry.RULES["probe"]["tries"]
+    budget = budget if budget is not None else [retry.RULES["probe"]["budget_s"]]
+    host = urlparse(p.url).hostname or ""
     t0 = time.time()
-    for k in range(tries):
-        code, body = fetch(p.url, p.range)
+    k = 0
+    while True:
+        k += 1
+        r = fetch(p.url, p.range)
+        code, body, after = r[0], r[1], (r[2] if len(r) > 2 else None)
         ok, detail = p.check(code, body) if code else (False, snippet(body, 160))
-        if ok:
+        if ok or k >= tries:
             break
-        if k + 1 < tries:
-            time.sleep(20)     # Overpass "at capacity" and the like often pass in seconds
-    return ok, detail, time.time() - t0
+        if not retry.transient(code, host):
+            detail += " (a 4xx: not retried)"
+            break
+        s = retry.wait("probe", k, after)
+        if s > budget[0]:
+            detail += " (retry budget used up)"
+            break
+        budget[0] -= s
+        print(f"  retry {p.name} ({k}) in {s:.0f} s after: {detail}", flush=True)
+        time.sleep(s)
+    return ok, detail, time.time() - t0, k
 
 
 def verdicts(results: list) -> dict:
@@ -300,21 +320,26 @@ def main(argv=None, fetch: Callable | None = None) -> int:
             print(f"no probe matches {a.only}")
             return 2
     results = []
+    tally, budget = retry.Tally(), [retry.RULES["probe"]["budget_s"]]
     for p in todo:
         if verdicts(results).get(p.host):     # a mirror of a host that already answered: not needed
             results.append((p, None, "", 0.0))
             continue
         t = tune.get(p.host, {})
         f = fetch or (lambda url, rng, sec=t.get("timeout", a.timeout): curl(url, sec, rng))
-        ok, detail, s = run_probe(p, f, tries=t.get("tries", 2))
+        ok, detail, s, k = run_probe(p, f, tries=t.get("tries", 0), budget=budget)
+        tally.add(urlparse(p.url).hostname or p.host, k, ok)
         results.append((p, ok, detail, s))
         print(f"{'ok  ' if ok else 'FAIL'} {p.name}: {detail}", flush=True)
     bad, warn = failed_hosts(results)
-    print("\n" + table(results))
+    tally.save("probe")
+    rec = sorted(h for h, t in tally.hosts.items() if t["recovered"])
+    inline = (f"Recovered inline: {', '.join(rec)}. " if rec else "") + retry.caps_md()
+    print("\n" + table(results) + "\n\n" + inline)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as f:
-            f.write("### Data hosts\n\n" + table(results, markdown=True) + "\n\n")
+            f.write("### Data hosts\n\n" + table(results, markdown=True) + "\n\n" + inline + "\n\n")
             if bad:
                 f.write(f"**Unreachable:** {', '.join(bad)}. The build needs every one of them.\n\n")
             if warn:
