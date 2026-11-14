@@ -81,16 +81,17 @@
     39.47501338028009
    ],
    "tier": "gold",
-   "status": "playable",
+   "status": "preview",
    "pack": {
-    "version": 2,
+    "version": 3,
     "formatVersion": 1,
-    "build": "20261112T222950Z-db9d1a",
-    "built": "2026-11-12",
-    "pipeline": "9596769",
-    "bytes": 223158871,
-    "sha256": "171118d48591e86a61f31c089788df8ca4d89035ccb6165c45a41fafe7b298d5",
-    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/breckenridge/v2/breckenridge.zip"
+    "build": "20261114T080847Z-9b5502",
+    "built": "2026-11-14",
+    "pipeline": "2dbc3d3",
+    "bytes": 224303359,
+    "sha256": "7b760a9e73b99710f0e1980af79385d99f9ffff3ce65c91e71a453c6bfc38dc8",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/breckenridge/v3/breckenridge.zip",
+    "content": "37c0a5fb07972a5a"
    },
    "report": "reports/breckenridge.md"
   },
