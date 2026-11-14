@@ -50,6 +50,10 @@ Every published pack, grouped by resort, newest version first. The game download
 
 - [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/park-city-mountain/v1) (latest) 245 MB, 2026-11-12
 
+## Snowbird
+
+- [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/snowbird/v1) (latest) 122 MB, 2026-11-14
+
 ## Vail
 
 - [v7](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/vail/v7) (latest) 288 MB, 2026-11-14
