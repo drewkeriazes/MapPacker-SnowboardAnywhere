@@ -54,6 +54,48 @@ def test_stem_chance():
     assert (pc[:, :n // 4] == 0).all() and np.allclose(pc[:, n // 2:], pt5[:, n // 2:]) and np.allclose(pc[:, n // 4:n // 2], pt5[:, n // 4:n // 2] * 0.5)
 
 
+def test_lidar_share_undoes_the_gap_closing():
+    # BUG-131: a 6 m square of canopy on the 2 m grid, fattened by one cell each way by the build's closing, reads
+    # as its true 3 x 3 cells; canopy under 3 m and cells off the canopy mask do not count
+    chm = np.zeros((40, 40), np.float32); can = np.ones((40, 40), bool)
+    chm[10:15, 10:15] = 12.0                                           # 5 x 5 cells after the closing
+    chm[30:35, 30:35] = 2.0
+    s = stands.lidar_share(chm, can)
+    assert s.shape == (20, 20) and abs(s.sum() * 4 - 9) < 1e-5         # 9 of the 2 m cells are left
+    can[:, :] = False
+    assert stands.lidar_share(chm, can).sum() == 0
+
+
+def test_stem_chance_to_share_fills_the_lidar_canopy():
+    n = 120
+    tall = np.full((n, n), 25.0, np.float32); spruce = np.zeros((n, n), np.int64)
+    none = np.zeros((n, n), np.float32); canopy = np.ones((n, n), np.float32)
+    share = np.full((n, n), 0.25, np.float32)
+    # 25 m spruce: one stem covers 1.59 of a cell, so no cell is full and the drawn crowns are the share exactly
+    p = stands.stem_chance_to_share(share, canopy, tall, spruce, none)
+    assert p.max() < 1
+    ratio, q = stands.cover_ratio(p, share, tall, spruce, none, block=40)
+    assert abs(ratio - 1) < 0.01 and abs(q[1] - 1) < 0.02
+    # the detected crowns count against it, as drawn: half the share already there, half the stems
+    det = np.full((n, n), 0.125, np.float32)
+    pd = stands.stem_chance_to_share(share, canopy, tall, spruce, det)
+    assert np.allclose(pd, p * 0.5, atol=2e-3)
+    assert abs(stands.cover_ratio(pd, share, tall, spruce, det, block=40)[0] - 1) < 0.01
+    # no stems where none may stand, and none where the lidar sees no canopy
+    off = canopy.copy(); off[:, :20] = 0
+    assert (stands.stem_chance_to_share(share, off, tall, spruce, none)[:, :20] == 0).all()
+    assert stands.stem_chance_to_share(none, canopy, tall, spruce, none).max() == 0
+    # short fir (9 m: one stem covers 0.12 of a cell) cannot hold a 0.5 share: its cells fill, and the taller stand
+    # beside it takes what they cannot, so the whole block still draws more than the cells' own cap allows
+    h = tall.copy(); h[:, :60] = 9.0; sp = spruce.copy(); sp[:, :60] = 3
+    dense = np.full((n, n), 0.25, np.float32); dense[:, :60] = 0.5
+    pc = stands.stem_chance_to_share(dense, canopy, h, sp, none)
+    assert (pc[:, :50] > 0.999).all()
+    assert pc[:, 62:70].mean() > p[:, 62:70].mean() * 1.2             # the neighbours carry the overflow
+    capped = np.minimum(dense, stands.stem_area(h, sp)).mean() / dense.mean()
+    assert stands.cover_ratio(pc, dense, h, sp, none, block=40)[0] > capped + 0.03
+
+
 def test_write_splits_cells_south_up(tmp_path):
     # two 1 km cells across, one up: 4 m grid 250 x 500, the south edge at min_y
     H, W = 250, 500

@@ -34,7 +34,8 @@ DETECTED_SIGMA = 6.0
 
 
 def stem_chance(canopy4, height4, species4, detected4, closed4=None):
-    """chance (0..1) of one generated stem per 4 m cell.
+    """chance (0..1) of one generated stem per 4 m cell, from the canopy mask: packs without lidar (FEAT-225) and the
+    synthetic pack. A lidar pack fills to the lidar canopy share instead (`stem_chance_to_share`, BUG-131).
 
     canopy4: share of the cell under canopy 0..1; height4: stand height (m); species4: species id per cell;
     detected4: detected crowns per cell; closed4 (BUG-120): 0..1 weight of a closed stand per cell, or None.
@@ -48,6 +49,67 @@ def stem_chance(canopy4, height4, species4, detected4, closed4=None):
     if closed4 is not None:
         p = p * np.clip(closed4, 0, 1)
     return p.astype(np.float32)
+
+
+# BUG-131: the lidar canopy share the stems fill to is read over SHARE_SIGMA m, and what a full cell cannot hold (one
+# stem per 4 m cell, at the species' crown width) is passed to the cells within about SPILL_SIGMA m, SPILL_ITERS times
+SHARE_SIGMA = 8.0
+SPILL_SIGMA = 40.0
+SPILL_ITERS = 12
+# a generated stem's mean height is this share of the stand's (the client draws 0.75 to 1 of it; expected_crowns)
+STEM_H = 0.875
+
+
+def lidar_share(chm2, canopy2):
+    """BUG-131: the share of each 4 m cell truly under canopy, from the 2 m canopy height and canopy mask.
+
+    Canopy 3 m or taller, eroded by one 2 m cell: build_pack closes the canopy height over 3 cells (6 m) to bridge
+    the lidar's empty cells, which fattens every crown by a cell. Without the erosion the share reads 0.28 and 0.35
+    within 250 m and 600 m of Vail's Back Bowls sign; with it 0.181 and 0.257, against 0.178 and 0.258 measured on
+    the raw 1 m lidar there (canopy 3 m or taller)."""
+    core = ndimage.binary_erosion((chm2 >= 3.0) & canopy2, np.ones((3, 3), bool))
+    h4, w4 = core.shape[0] // 2, core.shape[1] // 2
+    return core[:h4 * 2, :w4 * 2].reshape(h4, 2, w4, 2).mean(axis=(1, 3)).astype(np.float32)
+
+
+def stem_area(height4, species4):
+    """the crown share of a 4 m cell one drawn stem adds (the client's crown radius at the stems' mean height)"""
+    r = CROWN_RATIO[np.clip(species4, 0, len(CROWN_RATIO) - 1).astype(np.int64)] * np.maximum(height4, 1.0) * STEM_H
+    return (np.pi * np.maximum(r, 0.5 * STEM_H) ** 2 / RES ** 2).astype(np.float32)
+
+
+def stem_chance_to_share(share4, canopy4, height4, species4, detected_area4):
+    """BUG-131: chance (0..1) of one generated stem per 4 m cell, so that the drawn crowns cover what the lidar does.
+
+    share4: the lidar canopy share per cell (`lidar_share`); canopy4: where a stem may stand (> 0); detected_area4:
+    the detected crowns' drawn disc area per cell, as a share of the cell. The stems owe each cell the canopy share
+    round it less the detected crowns' round it. A cell holds one stem at most, so a closed stand of narrow trees
+    cannot hold its share; what it cannot hold goes to the stand's cells round it. (FEAT-074's rule filled the canopy
+    mask's share instead, which over-reads a sparse stand by about half and was cut to closed stands in BUG-120,
+    leaving Vail 30 to 40% under the lidar by the Back Bowls sign.)"""
+    area = stem_area(height4, species4)
+    cap = np.where(canopy4 > 0, area, 0).astype(np.float32)
+    want = np.clip(ndimage.gaussian_filter(share4.astype(np.float32), SHARE_SIGMA / RES)
+                   - ndimage.gaussian_filter(detected_area4.astype(np.float32), SHARE_SIGMA / RES), 0, None)
+    add = np.minimum(want, cap)
+    for _ in range(SPILL_ITERS):
+        want = add + ndimage.gaussian_filter(want - add, SPILL_SIGMA / RES)
+        add = np.minimum(want, cap)
+    return np.clip(np.where(cap > 0, add / np.maximum(area, 1e-6), 0), 0, 1).astype(np.float32)
+
+
+def cover_ratio(p4, share4, height4, species4, detected_area4, block=250):
+    """BUG-131: drawn crown cover (detected crowns plus the stems in expectation) over the lidar canopy share: for the
+    whole grid, and the 10th, 50th and 90th percentile over `block` x `block` cell blocks (1 km) with any forest"""
+    drawn = detected_area4 + p4 * stem_area(height4, species4)
+    rat = []
+    for i in range(0, share4.shape[0] - block + 1, block):
+        for j in range(0, share4.shape[1] - block + 1, block):
+            s = float(share4[i:i + block, j:j + block].mean())
+            if s > 0.05:
+                rat.append(float(drawn[i:i + block, j:j + block].mean()) / s)
+    q = [float(np.percentile(rat, k)) for k in (10, 50, 90)] if rat else [float("nan")] * 3
+    return float(drawn.mean() / max(float(share4.mean()), 1e-9)), q
 
 
 def encode(p, height, species, z, z_base):
