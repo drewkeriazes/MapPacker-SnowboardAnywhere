@@ -1,6 +1,6 @@
 # Pack report: Breckenridge (`breckenridge`)
 
-Build `20261114T080847Z-9b5502`, pipeline `2dbc3d3`, format 1. Report 2026-11-14T08:09:27Z by `pipeline/pack_report.py` (FEAT-175).
+Build `20261114T151850Z-9cb882`, pipeline `473ba6f`, format 1. Report 2026-11-14T15:19:22Z by `pipeline/pack_report.py` (FEAT-175).
 
 **Tier: gold** (FEAT-225: the weakest layer's)
 
@@ -24,15 +24,15 @@ Build `20261114T080847Z-9b5502`, pipeline `2dbc3d3`, format 1. Report 2026-11-14
 | 7 | Trees and shrubs with species | ✅ | 0.32 M crowns + 2.47 M stems = 26.3 k per km2 (67% of the reference) |
 | 8 | Far terrain: cover levels pack, mid, far | ✅ | three levels |
 | 8b | Far tree ring (lidar crowns round the resort) | ✅ | 1.01 M crowns in 332 cells |
-| 9 | features.json | ✅ | 37 lifts, 375 runs, 5461 buildings, 2533 roads, 163 water, 1341 peaks, 168 labels |
+| 9 | features.json | ✅ | 37 lifts, 375 runs, 5461 buildings, 2533 roads, 163 water, 1340 peaks, 168 labels |
 | 10 | Default start on a run, on snow, clear of trees | ❌ | Starts at the top of Imperial Bowl (placed, resorts/breckenridge/start.json); 20 m off the nearest run (Imperial Ridge) |
 | 11 | In the resort picker | ✅ | in packs/index.json, in the catalog |
 | 12 | Time trial courses | ✅ | 155 runs of 300 m and 60 m drop or more |
 | 13 | Attribution for every data set | ✅ | 9 lines |
 | 14 | Validated | ⚠️ | 13 advanced+ runs never over 15 deg; ride from the start and views from the top not checked here (shoot.mjs) |
 | | **Polish (not gated)** | | |
-| 15 | Grooming history | ✅ | 32% of runs with a grooming record, 36 reports in raw |
-| 16 | Place names | ✅ | GNIS CO; 1341 peaks, 168 town labels |
+| 15 | Grooming history | ✅ | 32% of runs with a grooming record, 34 reports in raw |
+| 16 | Place names | ✅ | GNIS CO; 1340 peaks, 168 town labels |
 | 17 | Main menu shot and ghosts | ⚠️ | generated (gen_content.py): 5 shots, no still of this build, 0 ghost takes (the game's tools/auto_attract.mjs makes them) |
 | 18 | Landmark | ❌ | none (optional: resorts/breckenridge/landmarks.json) |
 | 19 | Compare spots against photos | ➖ | no SnowboardAnywhere checkout at /home/runner/work/MapPacker-SnowboardAnywhere/SnowboardAnywhere (--game-repo or SBA_GAME_REPO) |
@@ -84,8 +84,8 @@ Build `20261114T080847Z-9b5502`, pipeline `2dbc3d3`, format 1. Report 2026-11-14
 
 | Band, m | Area, km2 | Crowns | Stems | Per km2 |
 |---|---:|---:|---:|---:|
-| 2800 | 3.69 | 7,633 | 37,365 | 12,193 |
-| 2900 | 14.56 | 42,715 | 307,574 | 24,050 |
+| 2800 | 3.69 | 7,633 | 37,357 | 12,191 |
+| 2900 | 14.56 | 42,715 | 307,553 | 24,049 |
 | 3000 | 17.84 | 67,583 | 584,615 | 36,549 |
 | 3100 | 12.27 | 56,957 | 500,147 | 45,414 |
 | 3200 | 9.58 | 48,182 | 408,533 | 47,677 |
@@ -114,5 +114,5 @@ Build `20261114T080847Z-9b5502`, pipeline `2dbc3d3`, format 1. Report 2026-11-14
 | trees (crowns) | yes | 120 | 7.6 | 2026-11-14 |
 | stands (stems) | yes | 111 | 12.7 | 2026-11-14 |
 | far tree ring | yes | 332 | 24.3 | 2026-11-14 |
-| shrubs | yes | 120 | 0.6 | 2026-11-14 |
+| shrubs | yes | 120 | 0.7 | 2026-11-14 |
 | rocks | yes | 106 | 1.5 | 2026-11-14 |

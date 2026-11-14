@@ -19,7 +19,8 @@ Every published pack, grouped by resort, newest version first. The game download
 
 ## Breckenridge
 
-- [v3](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/breckenridge/v3) (latest) 224 MB, 2026-11-14
+- [v4](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/breckenridge/v4) (latest) 224 MB, 2026-11-14
+- [v3](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/breckenridge/v3) 224 MB, 2026-11-14
 - [v2](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/breckenridge/v2) 223 MB, 2026-11-12
 - [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/breckenridge/v1) 179 MB, 2026-11-11
 
