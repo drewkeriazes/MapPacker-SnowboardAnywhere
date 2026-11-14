@@ -36,10 +36,15 @@ def gh_runs(repo: str, workflow: str) -> list:
     """this workflow's runs in every not-completed status"""
     out = []
     for st in ACTIVE:
-        p = subprocess.run(["gh", "api", "--paginate",
-                            f"repos/{repo}/actions/workflows/{workflow}/runs?status={st}&per_page=100",
-                            "--jq", ".workflow_runs[] | {id, status, run_number, html_url, run_started_at}"],
-                           capture_output=True, text=True)
+        for k in range(3):     # FEAT-314: GitHub's API answers 502 at times (bigsky, run 43573684184)
+            p = subprocess.run(["gh", "api", "--paginate",
+                                f"repos/{repo}/actions/workflows/{workflow}/runs?status={st}&per_page=100",
+                                "--jq", ".workflow_runs[] | {id, status, run_number, html_url, run_started_at}"],
+                               capture_output=True, text=True)
+            if not p.returncode or k == 2:
+                break
+            print(f"gh api failed, trying again in 15 s: {p.stderr.strip()}", flush=True)
+            time.sleep(15)
         if p.returncode:
             raise RuntimeError(f"gh api failed: {p.stderr.strip()}")
         out += [json.loads(line) for line in p.stdout.splitlines() if line.strip()]

@@ -468,3 +468,12 @@ def test_get_pack_installs_a_published_zip(tmp_path, game_file):
     catalog.write_text(json.dumps(update_catalog({}, entry)))
     assert "--force" in run().stderr
     assert run("--force").returncode == 0
+
+
+def test_a_run_the_retry_workflow_reran_is_still_the_persons(monkeypatch):
+    """FEAT-314: build-pack-retry.yml re-runs as github-actions[bot]; the publisher is who started attempt 1"""
+    monkeypatch.setenv("GITHUB_TRIGGERING_ACTOR", "github-actions[bot]")
+    monkeypatch.setenv("GITHUB_ACTOR", "drewkeriazes")
+    assert publish_pack.publisher_login() == "drewkeriazes"
+    monkeypatch.setenv("GITHUB_TRIGGERING_ACTOR", "someone")          # a person's own re-run stays that person's
+    assert publish_pack.publisher_login() == "someone"

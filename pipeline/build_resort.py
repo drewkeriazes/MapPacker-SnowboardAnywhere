@@ -283,6 +283,20 @@ def fetch_run(r, ctx):
     check_raw(r)
 
 
+def no_pistes_anywhere(r, d):
+    """FEAT-314: an empty pistes_wide is a real answer, not an Overpass error, when it carries no remark and the
+    resort's own OSM data has no downhill piste either (Aspen Hills, skimap/18287: no OSM runs in the whole box).
+    cover.py reads an empty list as no strips to burn in."""
+    if d.get("remark") or not isinstance(d.get("elements"), list):
+        return False
+    try:
+        with open(os.path.join(r.raw, "osm", "ski.json"), encoding="utf-8") as fh:
+            own = json.load(fh).get("elements") or []
+    except (OSError, ValueError):
+        return False
+    return not any((e.get("tags") or {}).get("piste:type") == "downhill" for e in own)
+
+
 def check_raw(r):
     """the pack-build skill's raw checks: every layer there, the OSM files real JSON (an Overpass error page is
     HTML or a JSON "remark" with no elements). Land cover and pistes_wide are required unless the config turns
@@ -313,7 +327,7 @@ def check_raw(r):
         try:
             with open(p, encoding="utf-8") as fh:
                 d = json.load(fh)
-            if not d.get("elements"):
+            if not d.get("elements") and not (q == "pistes_wide" and no_pistes_anywhere(r, d)):
                 miss.append(f"OSM {q} (no elements{': ' + d['remark'][:80] if d.get('remark') else ''})")
         except (OSError, ValueError):
             miss.append(f"OSM {q} (missing or not JSON)")

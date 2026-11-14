@@ -209,8 +209,12 @@ def test_rebuild_choices_writes_the_list_in_place():
 def test_build_pack_queues_then_probes_then_builds_on_hosted_runners():
     wf = load(BUILD)
     jobs = wf["jobs"]
-    assert list(jobs) == ["queue", "probe", "build"]
+    assert list(jobs) == ["queue", "probe", "build", "outcome"]
     assert jobs["probe"]["needs"] == "queue" and jobs["build"]["needs"] == "probe"
+    # FEAT-314: every attempt is judged and logged, and that job never turns the run red
+    assert jobs["outcome"]["needs"] == ["queue", "probe", "build"] and jobs["outcome"]["if"] == "always()"
+    (rec,) = [s for s in jobs["outcome"]["steps"] if "build_failures.py" in s.get("run", "")]
+    assert rec["continue-on-error"] is True and rec["run"].strip().endswith("build_failures.py record")
     assert all(j["runs-on"] == "ubuntu-latest" for j in jobs.values())
     assert "concurrency" not in wf and not any("concurrency" in j for j in jobs.values())   # wait_turn.py queues
     assert any("wait_turn.py" in s.get("run", "") for s in jobs["queue"]["steps"])
@@ -245,6 +249,20 @@ def test_build_pack_gives_the_secrets_only_to_the_steps_that_need_them():
 def test_build_pack_narrows_the_app_token_to_publishing():
     (app,) = [s for s in all_steps(load(BUILD)) if "create-github-app-token" in s.get("uses", "")]
     assert {k for k in app["with"] if k.startswith("permission-")} == {"permission-contents", "permission-pull-requests"}
+
+
+def test_build_pack_retry_reruns_a_run_from_env_only():
+    """FEAT-314: the retry workflow is a workflow_dispatch (the one event the workflow token may start), its inputs
+    reach the step as env, and it can re-run runs but not push"""
+    wf = load(".github/workflows/build-pack-retry.yml")
+    assert set(triggers(wf)["workflow_dispatch"]["inputs"]) == {"run_id", "attempt"}
+    assert wf["permissions"] == {"actions": "write", "contents": "read"}
+    for step in all_steps(wf):
+        assert "${{" not in step.get("run", "")
+        if step.get("uses", "").startswith("actions/checkout"):
+            assert step["with"]["ref"] == "main" and step["with"]["persist-credentials"] is False
+    (run,) = [s for s in all_steps(wf) if "run" in s]
+    assert run["env"]["RETRY_RUN_ID"] == "${{ inputs.run_id }}" and run["run"] == "python tools/ci/build_failures.py retry"
 
 
 # ------------------------------------------------------------------------------------------------ issue forms (FEAT-266)

@@ -19,6 +19,10 @@
 #            App token, labelled automerge when the run's triggering actor is in .github/maintainers.txt, and
 #            publishes nothing when the pack's content equals the published version's or an open publish PR's.
 #            Never a push to main.
+#   outcome  every attempt, pass or fail (FEAT-314): tools/ci/build_failures.py record sorts a failure into a reason
+#            code, logs the attempt on the `metrics` branch (build-failures.jsonl, README.md, host-tuning.json) and,
+#            for a transient cause on attempt 1 or 2, starts build-pack-retry.yml, which re-runs the failed jobs
+#            after 5, then 15 minutes. A real cause stops with its reason. Never fails the run itself.
 #
 # Security: the inputs are untrusted text. They reach steps only as environment variables, never in a `run:`
 # line (pipeline/tests/test_workflows.py checks), and build_pack_ci.py inputs refuses any outside their shapes
@@ -115,8 +119,13 @@ jobs:
           python-version: '3.13'
       - name: inputs
         run: python tools/ci/build_pack_ci.py check
+      # FEAT-314: the timeouts build_failures.py raised for hosts that keep timing out (none yet: the defaults)
+      - name: learned timeouts
+        run: |
+          if git fetch -q --depth 1 origin metrics; then git show FETCH_HEAD:host-tuning.json > "$RUNNER_TEMP/host-tuning.json" || true; fi
+          cat "$RUNNER_TEMP/host-tuning.json" 2>/dev/null || echo "no host-tuning.json: the defaults"
       - name: data hosts
-        run: python tools/ci/probe_hosts.py
+        run: python tools/ci/probe_hosts.py --tuning "$RUNNER_TEMP/host-tuning.json"
 
   build:
     needs: probe
@@ -224,3 +233,28 @@ jobs:
           git config user.name "$APP_LOGIN"
           git config user.email "$id+$APP_LOGIN@users.noreply.github.com"
           python tools/ci/build_pack_ci.py publish
+
+  outcome:
+    needs: [queue, probe, build]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write             # read the jobs and their logs, start build-pack-retry.yml
+      contents: write            # the metrics branch only (never main: build_failures.py pushes HEAD:metrics)
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: classify, log and retry
+        continue-on-error: true  # a metrics hiccup never turns a passed build red
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh auth setup-git
+          python tools/ci/build_failures.py record
