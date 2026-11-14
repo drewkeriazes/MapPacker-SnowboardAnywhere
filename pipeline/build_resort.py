@@ -14,7 +14,8 @@ packs/<slug>). The config is resorts/<slug>/<slug>.json, the manifest manifests/
   landfire  fetch_landfire.mjs EVT, EVC, EVH (US only; the LFPS service wants an email: --email or LANDFIRE_EMAIL)
   grooming  fetch_grooming.py, when the config has a terrain_status_url
   build     build_pack.py (DEM, lidar, NAIP, masks, moguls, piste directions, AO, trees, far trees, cover)
-  content   gen_content.py (FEAT-175 step 4): the default start and the main menu shots, from the pack
+  content   gen_content.py (FEAT-175 step 4): the default start and the main menu shots, from the pack; then
+            pack_content.py (FEAT-243): the hand content in resorts/<slug>/ (landmarks, a placed start, a menu) over them
   attract   the game's tools/auto_attract.mjs: the menu still and ghost takes down the start run (on the GPU; skipped
             without a SnowboardAnywhere checkout that has the tool, paths.game_repo)
   spots     the game's tools/propose_spots.py: 10 proposed compare spots with game stills in the game checkout's
@@ -99,8 +100,10 @@ def file_sha(path) -> str | None:
 # and went back to the game (FEAT-242), so neither shapes a pack
 NOT_BUILD = ("pipeline/tests", "pipeline/resorts", "pipeline/manifests", "pipeline/build_resort.py",
              "pipeline/resort.py", "pipeline/publish_pack.py", "pipeline/pack_report.py", "pipeline/contract.py",
-             "pipeline/prep_textures.py", "pipeline/gen_content.py", "pipeline/published.py")
-# FEAT-175 step 4: gen_content.py is its own stage (content) after the build, with its own fingerprint
+             "pipeline/prep_textures.py", "pipeline/gen_content.py", "pipeline/published.py",
+             "pipeline/pack_content.py")
+# FEAT-175 step 4: gen_content.py is its own stage (content) after the build, with its own fingerprint; FEAT-243:
+# pack_content.py (the hand content) runs in it too
 NOT_BUILD_SPEC = [f":!{p}" for p in NOT_BUILD]
 
 
@@ -441,10 +444,21 @@ def build_run(r, ctx):
     print(f"  built in {time.time() - t:.0f} s, build {m.get('build')}")
 
 
-# FEAT-175 step 4: the generated start, menu shots, still, ghosts and compare spots (gen_content.py, the game's tools)
+# FEAT-175 step 4: the generated start, menu shots, still, ghosts and compare spots (gen_content.py, the game's tools);
+# FEAT-243: the hand content from resorts/<slug>/ over them (pack_content.py)
+def hand_content(r):
+    """FEAT-243: the resort's hand content (pack_content.py copies it into the pack): names and bytes"""
+    files = [paths.landmarks_path(r.slug, r.resorts), paths.start_path(r.slug, r.resorts)]
+    d = paths.attract_dir(r.slug, r.resorts)
+    files += sorted(glob.glob(os.path.join(d, "*")))
+    return [(os.path.relpath(f, paths.resort_dir(r.slug, r.resorts)).replace(os.sep, "/"), file_sha(f))
+            for f in files if os.path.isfile(f)]
+
+
 def content_inputs(r):
     m = meta(r) or {}
-    return sha(m.get("build"), file_sha(os.path.join(HERE, "gen_content.py")), file_sha(r.cfg_path))
+    return sha(m.get("build"), file_sha(os.path.join(HERE, "gen_content.py")), file_sha(r.cfg_path),
+               file_sha(os.path.join(HERE, "pack_content.py")), hand_content(r))
 
 
 def content_present(r):
@@ -456,6 +470,12 @@ def content_present(r):
 def content_run(r, ctx):
     if ctx.run([sys.executable, os.path.join(HERE, "gen_content.py"), r.out, "--config", r.cfg_path]):
         raise Failed("gen_content.py failed: the log above says where")
+    # FEAT-243: then the hand content (landmarks, a placed start, a hand-made menu), which wins over the generated
+    import pack_content       # in process: a copy of a few small files
+    try:
+        pack_content.apply(r.out, r.slug, r.resorts, log=lambda s: print("  " + s))
+    except SystemExit as e:
+        raise Failed(f"pack_content.py: {e}")
 
 
 def game_tool(rel):

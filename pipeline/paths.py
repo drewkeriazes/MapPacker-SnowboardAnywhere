@@ -2,7 +2,9 @@
 
     resorts/<slug>/                                   a folder per resort (FEAT-244): <slug>.json (the config), the
                                                       EPT node lists it names and <slug>-plan.md; resort.py
-                                                      writes them, every stage reads them
+                                                      writes them, every stage reads them. Hand content (FEAT-243,
+                                                      pack_content.py copies it into the pack): landmarks.json,
+                                                      start.json, attract/ (the menu, once the game's tools save here)
     manifests/<slug>.json                             download lists (gen_manifest.py)
     packs/<slug>/                                     built packs (this checkout's; gitignored)
     raw/<slug>/                                       raw data: SBA_RAW_ROOT, else raw/ in the main checkout,
@@ -32,6 +34,21 @@ def resort_dir(slug, resorts=None) -> str:
 def config_path(slug, resorts=None) -> str:
     """resorts/<slug>/<slug>.json"""
     return os.path.join(resort_dir(slug, resorts), f"{slug}.json")
+
+
+def attract_dir(slug, resorts=None) -> str:
+    """resorts/<slug>/attract/, the menu shot, its ghost takes and their index.json (FEAT-243)"""
+    return os.path.join(resort_dir(slug, resorts), "attract")
+
+
+def landmarks_path(slug, resorts=None) -> str:
+    """resorts/<slug>/landmarks.json, the hand-placed landmarks (FEAT-243)"""
+    return os.path.join(resort_dir(slug, resorts), "landmarks.json")
+
+
+def start_path(slug, resorts=None) -> str:
+    """resorts/<slug>/start.json, a hand-placed Free ride start for a resort whose start is not a landmark (FEAT-243)"""
+    return os.path.join(resort_dir(slug, resorts), "start.json")
 
 
 def main_checkout(repo=REPO) -> str:

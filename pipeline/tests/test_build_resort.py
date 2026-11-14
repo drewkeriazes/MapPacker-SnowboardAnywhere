@@ -119,6 +119,19 @@ def test_first_run_runs_every_stage_then_nothing_but_index_and_report(resort):
     assert "[fetch] skip: inputs unchanged" in lines and "[build] skip: inputs unchanged" in lines
 
 
+def test_hand_content_runs_only_the_content_stage_again(resort):
+    """FEAT-243: a landmark added in resorts/<slug>/ reruns gen_content.py and pack_content.py, not the build"""
+    go(resort, Fake(resort))
+    with open(os.path.join(resort.resorts, "demo", "landmarks.json"), "w") as fh:
+        json.dump([{"id": "g", "kind": "gateway", "name": "The Gate", "x": 5, "y": 6, "heading": 90, "start": True}], fh)
+    f = Fake(resort)
+    go(B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests), f)
+    assert f.calls == ["gen_content.py", "pack_report.py"]
+    m = json.load(open(os.path.join(resort.out, "meta.json")))
+    assert m["start"]["label"] == "Starts at The Gate" and m["baseStart"]["source"] == "generated"
+    assert m["landmarks"][0]["id"] == "g" and m["build"] == "b1"
+
+
 def test_a_build_by_uncommitted_code_is_skipped_once_recorded(resort, monkeypatch):
     # build_pack.py stamps "<sha>+dirty" while pipeline/ has changes; the recorded fingerprint still matches
     monkeypatch.setattr(B, "same_code", lambda commit, repo=B.REPO: False)
