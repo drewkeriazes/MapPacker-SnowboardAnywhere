@@ -247,6 +247,16 @@ def main(argv):
     sp = spc.assign_species(tx, ty, tz, hgt, np.zeros(n, np.int8), np.zeros(n, np.float32), np.zeros(n, bool),
                             np.zeros(n, bool), northeast, np.zeros(n, np.float32), ridge, np.ones(n), False, region=region)
     crown = spc.crown_radius(sp, hgt)
+    cw = inst.get("crownWidths")
+    if cw:
+        # FEAT-298: the pack's records hold the radius to draw, so the ring's do too. Out here there are no stems, and
+        # past the stems' reach the game grows every crown by less in a widened pack (STEM_GROW / sqrt(crownArea)), so
+        # the ring's widening crowns take the pack's mean area (their own draw on top), and the ring keeps its canopy.
+        import cover, widths
+        g = np.sqrt(max(1.0, float(cw.get("crownArea", 1.0))) / widths.draw_area())
+        f = np.where(widths.widens(sp), g, 1.0) * widths.own_draw(sp, tx, ty, spc.hash01) * np.asarray(cw.get("k") or [1.0] * spc.N_SPECIES)[sp.astype(np.int64)]
+        crown = (cover.species_radii(sp, hgt) * f).astype(np.float32)
+        log(f"  crown widths (FEAT-298): widening crowns x{g:.2f} (the pack's mean crown area {cw.get('crownArea', 1.0):.2f})")
     recs = np.stack([tx, ty, tz, hgt, crown, sp.astype(np.float32)], axis=1).astype(np.float32)
     cnt = np.bincount(sp.astype(np.int64), minlength=spc.N_SPECIES)
     meta.setdefault("vegetation", {})["farTreeSpecies"] = {spc.SPECIES_NAMES[i]: round(float(cnt[i] / max(n, 1)), 4) for i in range(spc.N_SPECIES) if cnt[i]}

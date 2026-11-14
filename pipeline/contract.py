@@ -11,6 +11,7 @@ game's format PR to check the pair before either lands.
     python pipeline/contract.py [--game-repo DIR]      one line per value; exit 1 on a mismatch, 2 offline
 """
 import argparse, os, re, sys, urllib.error, urllib.request
+import numpy as np
 from functools import lru_cache
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -21,6 +22,7 @@ GAME_MAIN_RAW = GAME_REPO_URL.replace("https://github.com/", "https://raw.github
 FORMAT_TS = "game/src/pack/format.ts"
 SPECIES_TS = "game/src/world/trees/species.ts"
 TREELINE_TS = "game/src/pack/treeline.ts"
+WIDTHS_TS = "game/src/world/trees/widths.ts"
 
 
 class GameUnreachable(Exception):
@@ -72,6 +74,26 @@ def species_radii(species_ts: str) -> list[float]:
     return [float(r) for _, r in rows]
 
 
+def width_step(widths_ts: str) -> int:
+    """FEAT-298: WIDTH_STEP in game/src/world/trees/widths.ts (a stand image's width byte per unit of factor)"""
+    m = re.search(r"export const WIDTH_STEP\s*=\s*(\d+)", widths_ts)
+    if not m:
+        raise ValueError("no `export const WIDTH_STEP = <n>` in widths.ts")
+    return int(m.group(1))
+
+
+def drawn_clamp(species_ts: str) -> tuple[float, float]:
+    """FEAT-298: the multiples of the natural radius crownRadius keeps a pack's drawn radius within (species.ts)"""
+    m = re.search(r"drawn\s*\?\s*nat\s*\*\s*Math\.max\(([\d.]+),\s*Math\.min\(([\d.]+)", species_ts)
+    if not m:
+        raise ValueError("no `drawn ? nat * Math.max(lo, Math.min(hi, k))` in species.ts crownRadius")
+    return float(m.group(1)), float(m.group(2))
+
+
+def value_mismatch(name: str, ours, game) -> str | None:
+    return None if tuple(np.atleast_1d(ours).astype(float)) == tuple(np.atleast_1d(game).astype(float)) else f"{name} {ours} here, {game} in the game"
+
+
 def default_treeline(treeline_ts: str) -> float:
     """DEFAULT_TREELINE in game/src/pack/treeline.ts"""
     m = re.search(r"export const DEFAULT_TREELINE\s*=\s*([\d.]+)", treeline_ts)
@@ -121,8 +143,13 @@ def check(game_repo: str | None = None) -> list[tuple[str, str | None, str]]:
     # the species ids (0..7 since DATA-020) are the table's rows: species_radii checks the ids, these the count
     out.append(("crown radius per species (cover.py)", radii_mismatch(COVER_RATIO, radii), where))
     out.append(("crown radius per species (stands.py)", radii_mismatch(STANDS_RATIO, radii), where))
+    from cover import DRAWN_CLAMP
+    out.append(("drawn crown radius clamp (cover.py)", value_mismatch("clamp", DRAWN_CLAMP, drawn_clamp(src)), where))
     src, where = game_source(TREELINE_TS, game_repo)
     out.append(("default treeline", treeline_mismatch(COLORADO_TREELINE, default_treeline(src)), where))
+    from widths import WIDTH_STEP
+    src, where = game_source(WIDTHS_TS, game_repo)
+    out.append(("stand width factor step (widths.py)", value_mismatch("WIDTH_STEP", WIDTH_STEP, width_step(src)), where))
     return out
 
 

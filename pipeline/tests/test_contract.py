@@ -42,6 +42,14 @@ def test_crown_ratio_matches_the_game_species(game):
     assert C.radii_mismatch(stands_ratio, radii) is None, C.radii_mismatch(stands_ratio, radii)
 
 
+def test_crown_widths_match_the_game(game):
+    """FEAT-298: the stand image's width byte and the drawn radius clamp, as the game reads them"""
+    from cover import DRAWN_CLAMP
+    from widths import WIDTH_STEP
+    assert C.width_step(game(C.WIDTHS_TS)) == WIDTH_STEP
+    assert C.drawn_clamp(game(C.SPECIES_TS)) == tuple(DRAWN_CLAMP)
+
+
 def test_default_treeline_matches_the_game(game):
     from species import COLORADO_TREELINE
     bad = C.treeline_mismatch(COLORADO_TREELINE, C.default_treeline(game(C.TREELINE_TS)))
@@ -86,8 +94,12 @@ def test_game_repo_reads_a_checkout_and_check_reports_each_value(tmp_path):
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(text, encoding="utf-8")
 
+    from cover import DRAWN_CLAMP
+    from widths import WIDTH_STEP
     rows = ",\n".join(f"  {{ id: {i}, name: 's', radius: {r} }}" for i, r in enumerate(CROWN_RATIO))
-    write(C.SPECIES_TS, f"export const SPECIES: Species[] = [\n{rows},\n];\n")
+    write(C.SPECIES_TS, f"export const SPECIES: Species[] = [\n{rows},\n];\n"
+                        f"  return drawn ? nat * Math.max({DRAWN_CLAMP[0]}, Math.min({DRAWN_CLAMP[1]:g}, k)) : 0;\n")
+    write(C.WIDTHS_TS, f"export const WIDTH_STEP = {WIDTH_STEP};\n")
     write(C.TREELINE_TS, f"export const DEFAULT_TREELINE = {COLORADO_TREELINE:g};\n")
     write(C.FORMAT_TS, f"export const PACK_FORMAT = {FORMAT_VERSION};\n")
     assert all(bad is None for _, bad, _ in C.check(str(tmp_path)))

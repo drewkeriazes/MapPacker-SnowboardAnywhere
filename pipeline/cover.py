@@ -78,6 +78,9 @@ SHADOW_H = 12.0
 # natural crown radius / height per species id, as game/src/world/trees/species.ts SPECIES[].radius
 # (tests/test_contract.py parses the game's species.ts and fails if they drift apart; docs/pack-format.md > Contract)
 CROWN_RATIO = np.array([0.13, 0.17, 1.1, 0.1, 0.09, 0.17, 0.35, 0.05, 0.26, 0.16])
+# FEAT-298: in a pack with crown widths the game draws a record's radius within these multiples of the natural one
+# (species.ts crownRadius; tests/test_contract.py)
+DRAWN_CLAMP = (0.5, 3.0)
 HEIGHT_SIGMA = 3.0     # cells: canopy height is averaged over the forested cells around (it only lifts coarse chunks)
 WC_TREE, WC_BUILT, WC_BARE = 10, 50, 60
 ETH_NODATA = 255
@@ -186,15 +189,30 @@ def tree_heights(pack_dir, meta, cell, w, h):
     return np.repeat(np.repeat(mean, k, 0), k, 1)[:h, :w]
 
 
-def crown_radii(species, height, crown):
+def crown_radii(species, height, crown, drawn=False):
     """the crown radius (m) the client draws per record, as game/src/world/trees/species.ts: speciesFor (an id
     outside the table draws as species 0) then crownRadius (the natural radius of the species times the
-    height, pulled 0.85..1.25x toward the crown in the record)"""
+    height, pulled 0.85..1.25x toward the crown in the record). FEAT-298: `drawn` (the pack has
+    instances.crownWidths) reads the record as the radius to draw, kept within 0.5..3x the natural one."""
     s = np.rint(species).astype(int)
     sp = np.where((s >= 0) & (s < len(CROWN_RATIO)), s, 0)
     nat = CROWN_RATIO[sp] * height
     k = np.where((nat > 0) & (crown > 0), crown / np.maximum(nat, 1e-6), 1.0)
-    return nat * np.clip(k, 0.85, 1.25)
+    return nat * (np.clip(k, *DRAWN_CLAMP) if drawn else np.clip(k, 0.85, 1.25))
+
+
+def species_radii(species, height):
+    """FEAT-298: the radius a record drew at before the crown widths (the species formula, species.crown_radius,
+    through crownRadius). The cover's tests (closed stands, the far forest, the ring's fit) were tuned on these, and a
+    widened pack holds the same canopy, so they keep reading them."""
+    import species as spc
+    s = np.clip(np.rint(species).astype(int), 0, len(spc.CROWN_K) - 1)
+    return crown_radii(species, height, spc.CROWN_K[s] * height)
+
+
+def drawn(meta):
+    """FEAT-298: whether a pack's record field 4 is the radius to draw"""
+    return bool((meta.get("instances") or {}).get("crownWidths"))
 
 
 def crown_area(pack_dir, meta, w, h):
@@ -206,13 +224,15 @@ def crown_area(pack_dir, meta, w, h):
     (FEAT-168: what throws a shadow of the length the shader assumes; krummholz mats throw next to none)."""
     b = meta["bounds"]
     area = np.zeros((h, w), np.float64); shade = np.zeros((h, w), np.float64)
+    wide = drawn(meta)
     for t in tree_records(pack_dir, meta):
-        cr = crown_radii(t[:, 5], t[:, 3], t[:, 4])
+        # FEAT-298: the tests read the detected crowns at the species radii; the shadows follow what is drawn
+        cr = species_radii(t[:, 5], t[:, 3]) if wide else crown_radii(t[:, 5], t[:, 3], t[:, 4])
+        cd = crown_radii(t[:, 5], t[:, 3], t[:, 4], True) if wide else cr
         c = ((t[:, 0] - b["minX"]) / PACK_RES).astype(int); r = ((b["maxY"] - t[:, 1]) / PACK_RES).astype(int)
         ok = (c >= 0) & (c < w) & (r >= 0) & (r < h)
-        a = np.pi * cr[ok] ** 2
-        np.add.at(area, (r[ok], c[ok]), a)
-        np.add.at(shade, (r[ok], c[ok]), a * np.clip(t[ok, 3] / SHADOW_H, 0, 1.5))
+        np.add.at(area, (r[ok], c[ok]), np.pi * cr[ok] ** 2)
+        np.add.at(shade, (r[ok], c[ok]), np.pi * cd[ok] ** 2 * np.clip(t[ok, 3] / SHADOW_H, 0, 1.5))
     # FEAT-074: plus the stems the client generates from the stand density, in expectation
     import stands
     sa, ss, _h, _c = stands.expected_crowns(pack_dir, meta, PACK_RES, w, h, SHADOW_H)
@@ -402,11 +422,12 @@ def calibrate(forest, built, south, res, truth, name, log=print):
     return out
 
 
-def crown_grid(recs, res, min_x, max_y, w, h):
-    """the drawn crowns' share of each res-sized cell (row 0 = north), their summed height and count"""
+def crown_grid(recs, res, min_x, max_y, w, h, wide=False):
+    """the drawn crowns' share of each res-sized cell (row 0 = north), their summed height and count; FEAT-298: in a
+    pack with crown widths (`wide`) at the species radii, the ones the ring's fit was tuned on"""
     area = np.zeros((h, w), np.float64); hs = np.zeros((h, w), np.float64); n = np.zeros((h, w), np.float64)
     for t in recs:
-        cr = crown_radii(t[:, 5], t[:, 3], t[:, 4])
+        cr = species_radii(t[:, 5], t[:, 3]) if wide else crown_radii(t[:, 5], t[:, 3], t[:, 4])
         c = np.floor((t[:, 0] - min_x) / res).astype(np.int64); r = np.floor((max_y - t[:, 1]) / res).astype(np.int64)
         ok = (c >= 0) & (c < w) & (r >= 0) & (r < h)
         np.add.at(area, (r[ok], c[ok]), np.pi * cr[ok] ** 2)
@@ -425,8 +446,8 @@ def ring_forest(pack_dir, meta, res, min_x, max_y, w, h, south, pack_truth, name
     p, inside = pack_truth
     if inside.sum() < CAL_MIN_CELLS:
         return None
-    own, ohs, on = crown_grid(tree_records(pack_dir, meta), res, min_x, max_y, w, h)
-    far, fhs, fn = crown_grid(tree_records(pack_dir, meta, "farTrees"), res, min_x, max_y, w, h)
+    own, ohs, on = crown_grid(tree_records(pack_dir, meta), res, min_x, max_y, w, h, drawn(meta))
+    far, fhs, fn = crown_grid(tree_records(pack_dir, meta, "farTrees"), res, min_x, max_y, w, h, drawn(meta))
     sig = FAR_SIGMA / res
     blur = (lambda a: ndimage.gaussian_filter(a, sig)) if sig >= 0.5 else (lambda a: a)
     t_own = np.clip(blur(own) / RING_T_FULL, 0, 1); t_all = np.clip(blur(own + far) / RING_T_FULL, 0, 1)

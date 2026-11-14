@@ -168,6 +168,34 @@ pack and draws its hardwoods and hemlocks as spruce (see [formatVersion](#format
 
 The spruce / fir, group and crest draws are hashes of the tree position, so a rebuild gives each tree the same species.
 
+**Crown widths** (FEAT-298, `pipeline/widths.py`; packs with `instances.crownWidths`): field 4 is the crown radius the
+game draws (m), for every record in `trees/` and `farTrees/`, and the game keeps it within 0.5 to 3 times the species'
+drawn radius (`crownRadius`). Without the block, field 4 is the `CROWN_K` formula above and the game draws the species'
+radius nudged 0.85 to 1.25 toward it. Spruce, subalpine fir, Douglas-fir and hemlock widen with openness: the
+neighbours' crown cover within 10 m at the species radii (the detected crowns and the stems in expectation), from fully
+open at 0.1 to closed at 0.5, moves the crown radius from the species' own toward `open` (0.16 x height, the lidar's
+open-grown conifers; `docs/research/crown-widths.md`), then times the resort's hand multipliers and a per-tree draw of
+1 - `jitter` .. 1 + `jitter` (a position hash, salt 29). Lodgepole, aspen and the other high-crown forms keep the
+species radius (times the multipliers). The stems (Stands, below) are then thinned per 24 m block so the block's crown
+area stays what it was at the species radii: widening redistributes the canopy instead of adding to it. A block with
+no stems keeps its wider crowns. The far tree ring's widening crowns (`far_trees.py`) take the pack's mean crown area
+(`crownArea`) instead, because there are no stems out there and past the stems' reach the game grows every crown by
+`STEM_GROW / sqrt(crownArea)`. `cover.py` keeps its tests (closed stands, the far forest share, the ring's fit) on the
+species radii they were tuned on, and its shadow raster on the drawn widths. The build logs the drawn crown cover
+against the lidar canopy share (3 m or taller) in 250 m, 600 m and 1.5 km discs round the config's
+`crown_cover_spots`, with a warning over 10 %. A config turns it off with `"crown_widths": false`, and sets the
+multipliers with `"crown_widths": {"k": 1.1, "species": {"fir": 1.2}}`. A pack without lidar (no detected crowns)
+has no widths.
+
+| meta `instances.crownWidths` field | |
+|---|---|
+| `open` | the open-grown crown radius / height a widening species moves toward (0.16) |
+| `cover` | the neighbours' crown cover at which a tree is fully open, and fully closed (`[0.1, 0.5]`) |
+| `jitter` | a widened tree's own draw: 1 - jitter .. 1 + jitter (0.35) |
+| `widen` | the species ids that widen (`[0, 3, 5, 9]`) |
+| `k` | the hand multipliers per species id, already in the widths (the game's clump impostors use them) |
+| `crownArea` | the detected crowns' drawn area over their area at the species radii, pack-wide |
+
 **Regions** (FEAT-233, `species.region_for`): a pack centred east of 100 W is in the east. There the eastern LANDFIRE
 classes (told apart by the region in their name: North-Central, Northeastern, Appalachian, Laurentian, Acadian,
 Eastern, Northern & Central, ...) map to the hardwood, hemlock, spruce-fir (red spruce, balsam fir) or pine
@@ -211,7 +239,7 @@ colour where alpha is 0.
 | rows | R | G | B |
 |---|---|---|---|
 | 0 .. size-1 | chance of one stem in the 4 m cell, 0..255 = 0..1 | stand height, `hStep` (0.25) m per step | species id 0..9 |
-| size .. 2*size-1 | ground height high byte | low byte | 0 |
+| size .. 2*size-1 | ground height high byte | low byte | width factor x 100 (FEAT-298, packs with `crownWidths`; 0 = 1) |
 
 Ground height = `(R * 256 + G) / zScale + zBase` m, stored where a stem can stand and one cell round it (0 = none).
 `zBase` is the pack's lowest ground and `zScale` 32, so a pack spans at most 2,048 m of relief.
@@ -233,8 +261,9 @@ the tallest lidar return in the 4 m cell, LANDFIRE EVH (DATA-010) where the lida
 Species come from the same rules as the trees (`species.assign_species`) at the cell centre.
 
 The client keeps a stem where `hash(cell centre) < chance x density` (the Forest setting), jitters it within 90 %
-of the cell, draws it 0.75 to 1 times the stand height with the species' own crown, and reads the ground height
-bilinearly. So a cell gives the same stems every time, and a lower density is a subset of a higher one. The cover
+of the cell, draws it 0.75 to 1 times the stand height with the species' own crown (FEAT-298: times the cell's width
+factor and, for a widening species, the stem's own draw, a hash of its position; the chance counts that draw in
+expectation, `1 + jitter^2 / 3` on the area), and reads the ground height bilinearly. So a cell gives the same stems every time, and a lower density is a subset of a higher one. The cover
 (`cover.py`) counts the stems in expectation (chance x crown area) for the shadow raster.
 
 `shrubs/<tx>_<ty>.bin` (DATA-020, optional): Float32 records of 6: `x, y, z, height, radius, kind` with
@@ -305,7 +334,9 @@ an older game: no format bump.
              "levels": [{ "name": "pack", "res": 4, "minX", "minY", "w", "h", "file": "cover/pack.png", "stands": "cover/pack-stands.png", "crowns": true },
                         { "name": "mid", "res": 16, ... }, { "name": "far", "res": 100, ... }] },
   "instances": { "cellSize": 1000, "minX", "minY", "cellsX", "cellsY", "treeCount", "rockCount", "treeCells", "rockCells",
-                 "shrubCount", "shrubCells" },              // shrub fields optional, DATA-020
+                 "shrubCount", "shrubCells",                // shrub fields optional, DATA-020
+                 "crownWidths": { "open": 0.16, "cover": [0.1, 0.5], "jitter": 0.35, "widen": [0, 3, 5, 9],
+                                  "k": [1, ...], "crownArea": 1.21 } },   // optional, FEAT-298 (Instances)
   "treeSpecies": 3,                                        // optional: 3 (FEAT-233) tree ids 0..9, 2 (DATA-020) 0..7; absent = 0..2
   "vegetation": { "region": "east", "treeSpecies": { "hardwood": 0.82, ... },   // optional (FEAT-233): what the species rules
                   "farTreeSpecies": {...}, "evtUnknown": 0.0,                    // made of the forest, a log for pack_report.py;
@@ -374,6 +405,9 @@ Lines are as of 2026-11-11 (the game at `51efba2`); search for the name if they 
 | Species ids 0..9 (`treeSpecies` 3) | `pipeline/species.py:20` (ids), `:26` `TREE_SPECIES_VERSION` | `game/src/world/trees/species.ts:46` `SPECIES` (one row per id, in order), `:77` `speciesFor` (packs without `treeSpecies`: ids 0..2; an unknown id draws as 0); `game/src/pack/types.ts:106` | `tests/test_contract.py` (the ids are the rows of the crown radius table) |
 | Drawn crown radius / height per id | `pipeline/cover.py:67` and `pipeline/stands.py:31` `CROWN_RATIO` (the crowns the game will draw, for the cover and the stem chance) | `game/src/world/trees/species.ts:47`-`58` `SPECIES[].radius` | `tests/test_contract.py`: must be equal |
 | Record crown radius / height per id | `pipeline/species.py:29` `CROWN_K` (field 4 of `trees/*.bin`, the table under Instances) | `game/src/world/trees/species.ts:92` `crownRadius`: the drawn radius nudged by record / natural, clamped to 0.85..1.25 | not checked: it need not equal `SPECIES[].radius` |
+| Crown widths (FEAT-298): field 4 as the drawn radius, its clamp | `pipeline/build_pack.py` stage 8, `pipeline/far_trees.py`; `pipeline/cover.py` `DRAWN_CLAMP` (0.5, 3) | `game/src/world/trees/species.ts` `crownRadius(..., drawn)` | `tests/test_contract.py`: the clamp must be equal |
+| Stand image width byte (FEAT-298) | `pipeline/widths.py` `WIDTH_STEP` (100), `encode_factor`; `pipeline/stands.py` `encode`, `width_factor` | `game/src/world/trees/widths.ts` `WIDTH_STEP`; `game/src/world/trees/stands.ts` `generateStems` | `tests/test_contract.py`: must be equal |
+| `instances.crownWidths` | `pipeline/widths.py` `meta_block` | `game/src/world/trees/widths.ts` `CrownWidthsMeta`, `crownWidthsOf`; the stems' draw is the game's own (`widthDraw`, `jitter` from the block) | not checked across repos |
 | Default treeline (`treeline` absent; `null` is none, FEAT-234) | `pipeline/species.py:23` `COLORADO_TREELINE` (3,480 m, what the species bands were tuned for) | `game/src/pack/treeline.ts:4` `DEFAULT_TREELINE`; `game/src/pack/types.ts:111` | `tests/test_contract.py`: must be equal |
 | `packs/index.json` `{"packs", "names"}` | `pipeline/packwriter.py:100` `index_packs` | `game/tools/get_pack.mjs:59` `writePackIndex` (rewrites it after an install); `game/src/resorts.ts:14` `PackIndex` | `tests/test_publish_pack.py` round trip through `get_pack.mjs` (needs the game checkout and node) |
 | `catalog.json` | `pipeline/publish_pack.py:141` `catalog_entry`, `:156` `update_catalog` | `game/tools/get_pack.mjs:19` `CATALOG_URL`, `:75` `getPack`; `game/src/ui/ResortPicker.ts:42` | `tests/test_publish_pack.py` round trip |
