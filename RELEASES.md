@@ -42,6 +42,10 @@ Every published pack, grouped by resort, newest version first. The game download
 
 - [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/keystone/v1) (latest) 165 MB, 2026-11-13
 
+## Killington
+
+- [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/killington/v1) (latest) 130 MB, 2026-11-14
+
 ## Mont Tremblant Resort, Station Mont Tremblant
 
 - [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/mont-tremblant-resort-station-mont-tremblant/v1) (latest) 105 MB, 2026-11-14

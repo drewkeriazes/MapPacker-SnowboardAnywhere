@@ -1,0 +1,55 @@
+{
+ "version": 2,
+ "slug": "killington",
+ "fetched": "2026-11-14",
+ "areas": [
+  {
+   "openskidata_id": "ac774efde21231d04a2cd3a7b6cfd380dfcb4bef",
+   "name": "Killington Resort",
+   "wikidata": "Q14711916",
+   "found_by": "OpenSkiData wikidataID",
+   "wikipedia": "Killington Ski Resort",
+   "infobox": true
+  }
+ ],
+ "figures": {
+  "summit": {
+   "value": 1293,
+   "unit": "m",
+   "source": "Wikipedia: Killington Ski Resort",
+   "text": "{{nowrap|4241 ft }}"
+  },
+  "base": {
+   "value": 355,
+   "unit": "m",
+   "source": "Wikipedia: Killington Ski Resort",
+   "text": "1165 ft (Skyeship)"
+  },
+  "vertical": {
+   "value": 938,
+   "unit": "m",
+   "source": "Wikipedia: Killington Ski Resort",
+   "text": "3076 ft"
+  },
+  "runs": {
+   "value": 155,
+   "unit": "",
+   "source": "Wikipedia: Killington Ski Resort",
+   "text": "155; – 28% beginner; – 33% intermediate; – 39% advanced"
+  },
+  "area": {
+   "value": 6.11,
+   "unit": "km2",
+   "source": "Wikipedia: Killington Ski Resort",
+   "text": "1509 acre"
+  }
+ },
+ "trails": null,
+ "outside": [],
+ "box": [
+  674700,
+  4827700,
+  682600,
+  4834400
+ ]
+}
