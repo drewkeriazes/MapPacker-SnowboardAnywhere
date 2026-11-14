@@ -11,9 +11,9 @@ The model, per tree:
   factor   = 1 + (max(OPEN_RATIO, r) - r) / r * openness     (r = the species' crown ratio; species in WIDEN only)
   radius   = the species' radius x factor x the resort's and species' hand multipliers x the tree's own draw
              (1 - JITTER .. 1 + JITTER, mean 1)
-The pack's drawn canopy was already right before the widening (crowns plus stems at the species radii cover
-0.170 / 0.233 of the ground within 250 / 600 m of the sign against the lidar's 0.178 / 0.258), so widening alone
-would overfill: per BLOCK the generated stems are thinned so the block's crown area stays what it was.
+With lidar the stems already fill the drawn canopy to the lidar's canopy share before the widening (BUG-131,
+`stands.stem_chance_to_share`), so widening alone would overfill: per BLOCK the generated stems are thinned so the
+block's crown area stays what it was.
 
 The game (SnowboardAnywhere game/src/world/trees/widths.ts) applies what the pack carries: record field 4 is the
 radius to draw, B of a stand image's lower half the cell's factor x WIDTH_STEP, and the stem's own draw is a hash of
