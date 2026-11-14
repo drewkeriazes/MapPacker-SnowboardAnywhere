@@ -1,0 +1,49 @@
+{
+ "version": 2,
+ "slug": "mount-bohemia",
+ "fetched": "2026-11-14",
+ "areas": [
+  {
+   "openskidata_id": "a37017470cb8131978ddea78ff1b46a02bd5985a",
+   "name": "Mount Bohemia",
+   "wikidata": "Q6919769",
+   "found_by": "Wikidata search 'Mount Bohemia'",
+   "wikipedia": "Mount Bohemia",
+   "infobox": true
+  }
+ ],
+ "figures": {
+  "vertical": {
+   "value": 245,
+   "unit": "m",
+   "source": "Wikipedia: Mount Bohemia",
+   "text": "804 ft"
+  },
+  "lifts": {
+   "value": 1,
+   "unit": "",
+   "source": "Wikipedia: Mount Bohemia",
+   "text": "1 triple chair, 1 double chair."
+  },
+  "runs": {
+   "value": 95,
+   "unit": "",
+   "source": "Wikipedia: Mount Bohemia",
+   "text": "95"
+  },
+  "area": {
+   "value": 2.23,
+   "unit": "km2",
+   "source": "Wikipedia: Mount Bohemia",
+   "text": "550 acre"
+  }
+ },
+ "trails": null,
+ "outside": [],
+ "box": [
+  421800,
+  5247500,
+  425700,
+  5250500
+ ]
+}

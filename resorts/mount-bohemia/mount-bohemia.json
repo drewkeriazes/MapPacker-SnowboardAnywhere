@@ -1,0 +1,134 @@
+{
+  "slug": "mount-bohemia",
+  "name": "Mount Bohemia",
+  "country": "US",
+  "region": "Michigan",
+  "osm_ski_area_way": null,
+  "crs": "EPSG:26916",
+  "utm_zone": "16N",
+  "lonlat_bbox": [
+    -88.0253075,
+    47.3846244,
+    -87.995722,
+    47.3955237
+  ],
+  "buffer_m": 800,
+  "utm_bbox": [
+    421800,
+    5247500,
+    425700,
+    5250500
+  ],
+  "origin": [
+    423750,
+    5249000
+  ],
+  "elevation_range_m": [
+    150,
+    450
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "3DEP ImageServer",
+    "res_m": 1,
+    "chunk_px": 1500
+  },
+  "naip": {
+    "source": "Planetary Computer naip 2022 60cm (1 quarter quad from 2024 where 2022 has none)",
+    "res_m": 1,
+    "max_px": 4000,
+    "items": [
+      "mi_m_4708733_sw_16_060_20240726",
+      "mi_m_4708840_se_16_060_20220906",
+      "mi_m_4708848_ne_16_060_20220906"
+    ],
+    "item_bboxes_ll": {
+      "mi_m_4708733_sw_16_060_20240726": [
+        -88.001,
+        47.374,
+        -87.936,
+        47.438
+      ],
+      "mi_m_4708840_se_16_060_20220906": [
+        -88.066,
+        47.373,
+        -87.996,
+        47.44
+      ],
+      "mi_m_4708848_ne_16_060_20220906": [
+        -88.066,
+        47.31,
+        -87.996,
+        47.377
+      ]
+    }
+  },
+  "lidar": {
+    "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MI_FEMA_Houghton_Keweenaw_Ontonagon_2019/",
+    "dataset": "MI_FEMA_Houghton_Keweenaw_Ontonagon_2019",
+    "max_depth_resort": 9,
+    "max_depth_outside": 8,
+    "nodes_file": "mount-bohemia_ept_nodes.txt",
+    "far": {
+      "pad_m": 5000,
+      "max_depth": 9,
+      "nodes_file": "mount-bohemia_ept_far_nodes.txt"
+    }
+  },
+  "attribution": [
+    "Elevation: USGS 3DEP 1 m lidar DEM (MI_FEMA_2019_C19), public domain",
+    "Canopy: USGS 3DEP lidar point cloud MI_FEMA_Houghton_Keweenaw_Ontonagon_2019 via AWS usgs-lidar-public, public domain",
+    "Imagery: USDA NAIP 2024 (2022 where 2024 has none) via Microsoft Planetary Computer, public domain",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "osm": {
+    "geofabrik": "us/michigan",
+    "pbf": "https://download.geofabrik.de/north-america/us/michigan-latest.osm.pbf"
+  },
+  "openskidata": {
+    "ids": [
+      "a37017470cb8131978ddea78ff1b46a02bd5985a"
+    ],
+    "names": [
+      "Mount Bohemia"
+    ],
+    "iso3166_2": "US-MI",
+    "websites": [
+      "https://www.mtbohemia.com/"
+    ],
+    "lifts": 2,
+    "runs": 21
+  },
+  "names": {
+    "states": [
+      "MI",
+      "WI"
+    ],
+    "source": "USGS GNIS",
+    "towns": "US Census 2024 Gazetteer and population estimates"
+  },
+  "tier": "gold",
+  "sources": {
+    "terrain": {
+      "source": "3DEP 1 m",
+      "tier": "gold"
+    },
+    "trees": {
+      "source": "lidar crowns + stands",
+      "tier": "gold"
+    },
+    "surface": {
+      "source": "NAIP",
+      "tier": "gold"
+    }
+  }
+}
