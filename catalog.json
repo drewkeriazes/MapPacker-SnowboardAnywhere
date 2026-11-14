@@ -145,6 +145,30 @@
    "report": "reports/crystal-mountain.md"
   },
   {
+   "slug": "deer-valley",
+   "name": "Deer Valley",
+   "region": "Utah",
+   "country": "US",
+   "lonlat": [
+    -111.48230664997293,
+    40.61156202831117
+   ],
+   "tier": "gold",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261114T154440Z-bf8262",
+    "built": "2026-11-14",
+    "pipeline": "30c6fb1",
+    "bytes": 192600571,
+    "sha256": "43b90805181a528b5367ffeb5e1b7d02246d2ced87f0df9d3740f7857923aa04",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/deer-valley/v1/deer-valley.zip",
+    "content": "0e7fc49ef96a6150"
+   },
+   "report": "reports/deer-valley.md"
+  },
+  {
    "slug": "heavenly",
    "name": "Heavenly Mountain",
    "region": "Nevada",

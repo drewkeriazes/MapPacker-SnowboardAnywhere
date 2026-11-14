@@ -1,0 +1,25 @@
+{
+ "version": 2,
+ "slug": "deer-valley",
+ "fetched": "2026-11-14",
+ "areas": [
+  {
+   "openskidata_id": "b7a200210f3dac1b9a5ca7b71429e6205c8c413e",
+   "name": "Deer Valley Resort",
+   "wikidata": "Q3021172",
+   "found_by": "OpenSkiData wikidataID",
+   "wikipedia": null,
+   "infobox": false
+  }
+ ],
+ "figures": {},
+ "trails": null,
+ "why": "no English Wikipedia article with an Infobox ski area for Deer Valley Resort",
+ "outside": [],
+ "box": [
+  454200,
+  4491200,
+  464200,
+  4500300
+ ]
+}
