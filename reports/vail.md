@@ -1,6 +1,6 @@
 # Pack report: Vail (`vail`)
 
-Build `20261114T040023Z-55568f`, pipeline `19927b7`, format 1. Report 2026-11-14T04:00:55Z by `pipeline/pack_report.py` (FEAT-175).
+Build `20261114T043305Z-5c2cb0`, pipeline `7e36e31`, format 1. Report 2026-11-14T04:33:39Z by `pipeline/pack_report.py` (FEAT-175).
 
 **Tier: gold** (FEAT-225: the weakest layer's)
 
@@ -21,11 +21,11 @@ Build `20261114T040023Z-55568f`, pipeline `19927b7`, format 1. Report 2026-11-14
 | 4 | Raw: LANDFIRE | ✅ | EVT, EVC and EVH; 0.0% of the forest in EVT classes the species rules don't name (west rules) |
 | 5 | Heights fine, mid, far | ✅ | 2409 to 3603 m, void 0.00% inside the bounds |
 | 6 | Surface: mask, AO, directions, moguls, rocks | ✅ | rock 1.1% (reference 1.1%), canopy 66% |
-| 7 | Trees and shrubs with species | ✅ | 0.52 M crowns + 4.52 M stems = 37.2 k per km2 (95% of the reference) |
+| 7 | Trees and shrubs with species | ✅ | 0.52 M crowns + 3.85 M stems = 32.2 k per km2 (82% of the reference) |
 | 8 | Far terrain: cover levels pack, mid, far | ✅ | three levels |
 | 8b | Far tree ring (lidar crowns round the resort) | ✅ | 1.31 M crowns in 363 cells |
 | 9 | features.json | ✅ | 33 lifts, 356 runs, 2000 buildings, 1408 roads, 42 water, 1321 peaks, 116 labels |
-| 10 | Default start on a run, on snow, clear of trees | ✅ | generated (gen_content.py) on Born Free, top of Born Free Express Lift |
+| 10 | Default start on a run, on snow, clear of trees | ✅ | Starts at The Legendary Back Bowls (landmark, resorts/vail/landmarks.json), on Timberline Catwalk |
 | 11 | In the resort picker | ✅ | in packs/index.json, in the catalog |
 | 12 | Time trial courses | ✅ | 184 runs of 300 m and 60 m drop or more |
 | 13 | Attribution for every data set | ✅ | 9 lines |
@@ -34,7 +34,7 @@ Build `20261114T040023Z-55568f`, pipeline `19927b7`, format 1. Report 2026-11-14
 | 15 | Grooming history | ✅ | 52% of runs with a grooming record, 41 reports in raw |
 | 16 | Place names | ✅ | GNIS CO; 1321 peaks, 116 town labels |
 | 17 | Main menu shot and ghosts | ⚠️ | generated (gen_content.py): 5 shots, no still of this build, 0 ghost takes (the game's tools/auto_attract.mjs makes them) |
-| 18 | Landmark | ➖ | no SnowboardAnywhere checkout at /home/runner/work/MapPacker-SnowboardAnywhere/SnowboardAnywhere (--game-repo or SBA_GAME_REPO) |
+| 18 | Landmark | ✅ | 1 in the pack (The Legendary Back Bowls) |
 | 19 | Compare spots against photos | ➖ | no SnowboardAnywhere checkout at /home/runner/work/MapPacker-SnowboardAnywhere/SnowboardAnywhere (--game-repo or SBA_GAME_REPO) |
 | 20 | Values derived for the resort, not copied from Vail | ✅ | treeline 3550 m measured; canopy.grow_ndvi 0.15; canopy.leaf_ndvi 0.45; canopy.veg_ndvi 0.3; rock.bare_ndvi 0.3; rock.dark 60.0; rock.grey_sat 0.2; rock.ndvi 0.18; treeline 3550 |
 | 21 | Published figures | ✅ | 6 figures match (Wikipedia: Vail Ski Resort; vail.com terrain status, 2026-04-01; table below) |
@@ -44,12 +44,12 @@ Build `20261114T040023Z-55568f`, pipeline `19927b7`, format 1. Report 2026-11-14
 | Measure | This pack | Reference |
 |---|---:|---:|
 | Area, km2 | 135.7 |  |
-| Trees (crowns + stems) per km2 | 37,160 | 39,201 |
+| Trees (crowns + stems) per km2 | 32,172 | 39,201 |
 | Rock share | 1.1% | 1.1% |
 | Canopy share | 66% | 66% |
 | Canopy on run centre lines | 3.7% | 3.7% |
 | Groomed share | 3.1% |  |
-| Crowns per km within 5 m of lift lines | 13.2 |  |
+| Crowns per km within 5 m of lift lines | 13.3 |  |
 | Stems per km within 5 m of lift lines | 0.0 |  |
 | Runs with a grooming record | 52% |  |
 | Runs groomed in OSM | 52% |  |
@@ -58,7 +58,7 @@ Build `20261114T040023Z-55568f`, pipeline `19927b7`, format 1. Report 2026-11-14
 
 **Advanced or harder runs never over 15 deg:** Windows Road (advanced, 5 deg), Resolution (advanced, 8 deg), Windows Road (advanced, 12 deg), Ptarmigan Ridge (advanced, 14 deg)
 
-**Lifts with the most crowns on the line:** Orient Express Lift (106), Riva Bahn Express Lift (57), Skyline Express Lift (43), High Noon Express Lift (38), Northwoods Express Lift (37)
+**Lifts with the most crowns on the line:** Orient Express Lift (107), Riva Bahn Express Lift (57), Skyline Express Lift (43), High Noon Express Lift (38), Northwoods Express Lift (37)
 
 ## Published figures (gathered 2026-11-13 by published.py)
 
@@ -111,18 +111,18 @@ Build `20261114T040023Z-55568f`, pipeline `19927b7`, format 1. Report 2026-11-14
 
 | Band, m | Area, km2 | Crowns | Stems | Per km2 |
 |---|---:|---:|---:|---:|
-| 2400 | 6.34 | 11,812 | 81,114 | 14,656 |
-| 2500 | 10.0 | 24,562 | 180,766 | 20,541 |
-| 2600 | 8.35 | 28,540 | 198,739 | 27,210 |
-| 2700 | 10.03 | 41,517 | 304,055 | 34,463 |
-| 2800 | 11.94 | 53,340 | 416,012 | 39,322 |
-| 2900 | 13.43 | 59,398 | 498,759 | 41,565 |
-| 3000 | 15.39 | 64,063 | 579,573 | 41,817 |
-| 3100 | 18.2 | 71,541 | 690,845 | 41,888 |
-| 3200 | 17.8 | 72,097 | 703,160 | 43,564 |
-| 3300 | 15.26 | 61,041 | 553,295 | 40,253 |
-| 3400 | 7.54 | 29,037 | 274,265 | 40,205 |
-| 3500 | 1.39 | 4,274 | 41,545 | 32,910 |
+| 2400 | 6.34 | 11,812 | 61,156 | 11,508 |
+| 2500 | 10.0 | 24,562 | 157,223 | 18,185 |
+| 2600 | 8.35 | 28,540 | 173,559 | 24,195 |
+| 2700 | 10.03 | 41,517 | 271,476 | 31,214 |
+| 2800 | 11.94 | 53,340 | 376,102 | 35,978 |
+| 2900 | 13.43 | 59,398 | 445,602 | 37,606 |
+| 3000 | 15.39 | 64,063 | 504,232 | 36,922 |
+| 3100 | 18.2 | 71,544 | 581,135 | 35,861 |
+| 3200 | 17.8 | 72,094 | 569,277 | 36,040 |
+| 3300 | 15.26 | 61,041 | 452,220 | 33,630 |
+| 3400 | 7.54 | 29,037 | 221,368 | 33,193 |
+| 3500 | 1.39 | 4,274 | 31,829 | 25,932 |
 
 ## Layers
 
@@ -137,7 +137,7 @@ Build `20261114T040023Z-55568f`, pipeline `19927b7`, format 1. Report 2026-11-14
 | moguls | yes | 144 | 0.3 | 2026-11-14 |
 | cover | yes | 4 | 23.2 | 2026-11-14 |
 | trees (crowns) | yes | 144 | 12.5 | 2026-11-14 |
-| stands (stems) | yes | 144 | 19.4 | 2026-11-14 |
+| stands (stems) | yes | 144 | 22.0 | 2026-11-14 |
 | far tree ring | yes | 363 | 31.4 | 2026-11-14 |
 | shrubs | yes | 144 | 1.1 | 2026-11-14 |
-| rocks | yes | 142 | 0.7 | 2026-11-14 |
+| rocks | yes | 140 | 0.7 | 2026-11-14 |
