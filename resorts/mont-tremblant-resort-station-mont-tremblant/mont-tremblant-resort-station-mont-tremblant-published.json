@@ -1,0 +1,25 @@
+{
+ "version": 2,
+ "slug": "mont-tremblant-resort-station-mont-tremblant",
+ "fetched": "2026-11-14",
+ "areas": [
+  {
+   "openskidata_id": "b7cad93e857de92335debf15f4d0bfe9a04f4d1b",
+   "name": "Mont Tremblant Resort, Station Mont Tremblant",
+   "wikidata": "Q3497349",
+   "found_by": "OpenSkiData wikidataID",
+   "wikipedia": null,
+   "infobox": false
+  }
+ ],
+ "figures": {},
+ "trails": null,
+ "why": "no English Wikipedia article with an Infobox ski area for Mont Tremblant Resort, Station Mont Tremblant",
+ "outside": [],
+ "box": [
+  530400,
+  5115100,
+  538100,
+  5123200
+ ]
+}

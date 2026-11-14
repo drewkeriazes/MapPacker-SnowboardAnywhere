@@ -216,6 +216,30 @@
    "report": "reports/keystone.md"
   },
   {
+   "slug": "mont-tremblant-resort-station-mont-tremblant",
+   "name": "Mont Tremblant Resort, Station Mont Tremblant",
+   "region": "Quebec",
+   "country": "CA",
+   "lonlat": [
+    -74.55587387119668,
+    46.22506408239066
+   ],
+   "tier": "bronze",
+   "status": "preview",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261114T092110Z-4c76de",
+    "built": "2026-11-14",
+    "pipeline": "71570e8",
+    "bytes": 105481561,
+    "sha256": "e91ed442909963ce4e743560159975ef54a7d8e0c182555db8eed9eb6e140193",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/mont-tremblant-resort-station-mont-tremblant/v1/mont-tremblant-resort-station-mont-tremblant.zip",
+    "content": "19576d737eaf045f"
+   },
+   "report": "reports/mont-tremblant-resort-station-mont-tremblant.md"
+  },
+  {
    "slug": "ohio-hills",
    "name": "Ohio Hills (custom mashup)",
    "region": "Ohio",
