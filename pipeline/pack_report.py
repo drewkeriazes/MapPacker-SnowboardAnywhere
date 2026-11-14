@@ -8,11 +8,11 @@ raw-data lines). The pack is **playable** when no MVP line (F and 1 to 14) is fa
 `publish_pack.py` reads that. `--gate` exits 1 when it is not.
 
 Reads only the pack, the resort config, the raw folder when given (file presence, no decoding), the catalog, the
-resort's published figures (`resorts/<slug>/<slug>-published.json`, published.py, FEAT-293: line 21), and
-the hand content in the game checkout (`docs/compare/<slug>/`, `game/public/attract/<slug>/` or else the pack's
-generated `attract/` (gen_content.py, FEAT-175 step 4),
-`game/src/world/Landmarks.ts`, `game/src/resorts.ts`; ../SnowboardAnywhere, or --game-repo / SBA_GAME_REPO, until
-FEAT-243 moves that content into the pack). Without the game those lines say so and skip. About a minute on Vail. The numbers it measures, besides the checklist:
+resort's published figures (`resorts/<slug>/<slug>-published.json`, published.py, FEAT-293: line 21), and the
+two pieces of hand content still in the game checkout (../SnowboardAnywhere, or --game-repo / SBA_GAME_REPO): the
+compare spots (`docs/compare/<slug>/`, line 19) and a hand-made menu in `game/public/attract/<slug>/` (line 17, which
+else reads the pack's `attract/`). The landmarks, the start and the picker (lines 10, 11, 18) are the pack's own
+(FEAT-243: pack_content.py). Without the game line 19 says so and skips. About a minute on Vail. The numbers it measures, besides the checklist:
 - surface: rock share (mask R at least half), canopy share, canopy left on run centre lines (trail cuts should
   be near 0), groomed share;
 - trees: crowns + stems per km2 over the bounds and per 100 m elevation band, crowns and stems on lift lines,
@@ -28,7 +28,6 @@ import glob
 import json
 import math
 import os
-import re
 import sys
 
 import numpy as np
@@ -645,14 +644,12 @@ class Report:
         self.line("10", "Default start on a run, on snow, clear of trees", *self.check_start())
 
         # 11 picker: the menu lists every pack in packs/index.json (FEAT-175, #534); without an index next to the
-        # pack (a pack outside packs/), the game's own list or the catalog
+        # pack (a pack outside packs/), the catalog (FEAT-243: the game has no list of its own)
         idx = os.path.join(os.path.dirname(os.path.normpath(self.pack)), "index.json")
         listed = self.slug in load_json(idx).get("packs", []) if os.path.isfile(idx) else None
-        resorts_ts = os.path.join(self.game, "game", "src", "resorts.ts")
-        in_ts = os.path.isfile(resorts_ts) and bool(re.search(rf"slug:\s*'{re.escape(self.slug)}'", open(resorts_ts, encoding="utf-8").read()))
         catalog = os.path.join(self.repo, "catalog.json")
         in_cat = os.path.isfile(catalog) and any(r.get("slug") == self.slug for r in load_json(catalog).get("resorts", []))
-        where = [w for w, on in (("in packs/index.json", listed), ("in game/src/resorts.ts", in_ts), ("in the catalog", in_cat)) if on]
+        where = [w for w, on in (("in packs/index.json", listed), ("in the catalog", in_cat)) if on]
         if listed is False:
             st, where = FAIL, ["not in packs/index.json (python pipeline/packwriter.py <pack_dir> rewrites it)"] + where
         else:
@@ -720,10 +717,11 @@ class Report:
         else:
             self.line("16", "Place names", SKIP, "pass --raw", mvp=False)
         self.line("17", "Main menu shot and ghosts", *self.check_menu(), mvp=False)
+        lms = meta.get("landmarks") or []          # FEAT-243: resorts/<slug>/landmarks.json, by pack_content.py
+        self.line("18", "Landmark", PASS if lms else FAIL,
+                  f"{len(lms)} in the pack ({', '.join(m.get('name') or m.get('id', '?') for m in lms)})" if lms else
+                  f"none (optional: resorts/{self.slug}/landmarks.json)", mvp=False)
         if self.has_game:
-            lm = os.path.join(self.game, "game", "src", "world", "Landmarks.ts")
-            has_lm = os.path.isfile(lm) and bool(re.search(rf"^\s*'?{re.escape(self.slug)}'?\s*:\s*\[", open(lm, encoding="utf-8").read(), re.M))
-            self.line("18", "Landmark", PASS if has_lm else FAIL, "in Landmarks.ts" if has_lm else "none (optional)", mvp=False)
             paired = sum(1 for sp in self.spots if sp["paired"])
             proposed = len(self.spots) - paired
             self.line("19", "Compare spots against photos", PASS if paired else WARN if proposed else FAIL,
@@ -731,8 +729,7 @@ class Report:
                       (f", {proposed} proposed waiting for a Street View link (propose_spots.py)" if proposed else ""), mvp=False)
         else:
             why = f"no SnowboardAnywhere checkout at {self.game} (--game-repo or SBA_GAME_REPO)"
-            for i, item in (("18", "Landmark"), ("19", "Compare spots against photos")):
-                self.line(i, item, SKIP, why, mvp=False)
+            self.line("19", "Compare spots against photos", SKIP, why, mvp=False)
         derived = meta.get("derived") or {}
         tl = meta.get("treeline")
         tl_none = "treeline" in meta and tl is None   # FEAT-234: measured, the box is forest to the top
@@ -787,7 +784,7 @@ class Report:
             detail = f"generated (gen_content.py): {n} shots, " + ("a still of this build" if still else "no still of this build") +                 f", {ghosts} ghost takes" + ("" if still and ghosts else " (the game's tools/auto_attract.mjs makes them)")
             return (PASS if still and ghosts else WARN), detail
         if idx:
-            return PASS, "the pack's own attract/"
+            return PASS, f"hand-made, in the pack's attract/ (resorts/{self.slug}/attract/)" if idx.get("hand") else                 "the pack's own attract/"
         return FAIL, "none: no hand-made menu in the game" + ("" if self.has_game else " (no game checkout to look in)") +             " and no attract/ in the pack (gen_content.py)"
 
     def check_start(self):
@@ -799,6 +796,8 @@ class Report:
         where = f"on {s['run']}" if s.get("run") else "start"
         if s.get("source") == "generated":
             where = f"generated (gen_content.py) {where}" + (f", top of {s['lift']}" if s.get("lift") else "")
+        elif s.get("source") in ("landmark", "placed"):      # FEAT-243: resolved by pack_content.py
+            where = f"{s.get('label') or 'start'} ({s['source']}, resorts/{self.slug}/" +                 ("landmarks.json)" if s["source"] == "landmark" else "start.json)")
         if not (b["minX"] <= x < b["maxX"] and b["minY"] <= y < b["maxY"]):
             return FAIL, f"{where} is outside the bounds"
         probs = []

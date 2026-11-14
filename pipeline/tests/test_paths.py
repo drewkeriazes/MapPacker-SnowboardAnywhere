@@ -68,3 +68,12 @@ def test_every_resort_has_its_own_folder_with_the_node_lists_it_names():
             if src.get("nodes_file"):     # FEAT-268: a raw_from config's lists are that resort's
                 home = paths.resort_dir(cfg.get("raw_from") or slug)
                 assert os.path.isfile(os.path.join(home, src["nodes_file"])), (slug, src["nodes_file"])
+
+
+def test_resort_content_paths(tmp_path):
+    """FEAT-243: the hand content of a resort lives in its folder"""
+    r = str(tmp_path / "resorts")
+    base = os.path.join(r, "vail")
+    assert paths.attract_dir("vail", r) == os.path.join(base, "attract")
+    assert paths.landmarks_path("vail", r) == os.path.join(base, "landmarks.json")
+    assert paths.start_path("vail", r) == os.path.join(base, "start.json")
