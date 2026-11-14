@@ -143,6 +143,30 @@
    "report": "reports/heavenly.md"
   },
   {
+   "slug": "jackson-hole-mountain",
+   "name": "Jackson Hole Mountain",
+   "region": "Wyoming",
+   "country": "US",
+   "lonlat": [
+    -110.84947390286234,
+    43.595423298152696
+   ],
+   "tier": "gold",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261114T072547Z-bf74a1",
+    "built": "2026-11-14",
+    "pipeline": "50b0207",
+    "bytes": 92352302,
+    "sha256": "24a1f54d5e5f2748a66cac5edb2dd249fd4e2bd36ffcc8358a4d59651af3e29c",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/jackson-hole-mountain/v1/jackson-hole-mountain.zip",
+    "content": "ccb21a51f5e12cea"
+   },
+   "report": "reports/jackson-hole-mountain.md"
+  },
+  {
    "slug": "keystone",
    "name": "Keystone",
    "region": "Colorado",
