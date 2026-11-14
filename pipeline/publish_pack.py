@@ -260,8 +260,13 @@ def maintainers(repo_dir: str = REPO) -> set[str]:
 
 
 def publisher_login() -> str:
-    """who started this publish: the workflow's triggering actor, else gh's signed-in user"""
-    return os.environ.get("GITHUB_TRIGGERING_ACTOR") or run(["gh", "api", "user", "--jq", ".login"])
+    """who started this publish: the workflow's triggering actor, else gh's signed-in user. FEAT-314: a Build pack run
+    the retry workflow re-ran has github-actions[bot] as its triggering actor; the person is then GITHUB_ACTOR, who
+    started the first attempt (a person's own re-run keeps that person)"""
+    who = os.environ.get("GITHUB_TRIGGERING_ACTOR")
+    if who == "github-actions[bot]" and os.environ.get("GITHUB_ACTOR"):
+        who = os.environ["GITHUB_ACTOR"]
+    return who or run(["gh", "api", "user", "--jq", ".login"])
 
 
 def publish_branch(slug: str, version: int) -> str:

@@ -1,11 +1,12 @@
 """Probe every data host a pack build calls (FEAT-245): one small request each, before the build job spends hours.
 
-    python tools/ci/probe_hosts.py [--only NAME] [--timeout SECONDS]
+    python tools/ci/probe_hosts.py [--only NAME] [--timeout SECONDS] [--tuning host-tuning.json]
 
 Each probe fetches one small item from a host the pipeline uses, with the URL the pipeline itself builds where it
 can (constants imported from pipeline/, Vail's dataset and NAIP item for the per-resort ones), and checks what came
 back (a TIFF, a WebP tile, JSON with the fields the pipeline reads, a 200 or 206 on a byte range of a big file).
-Every probe is tried twice. A host with mirrors (Overpass) passes when any mirror passes, tried in order: the next mirror
+Every probe is tried twice; FEAT-314: --tuning (the metrics branch's host-tuning.json, build_failures.py) raises the
+timeout and tries of a host that keeps timing out, within build_failures.CAP. A host with mirrors (Overpass) passes when any mirror passes, tried in order: the next mirror
 only when the ones before it failed (each gets its own row). web.archive.org is only for grooming (fetch_grooming.py), so it warns instead of failing.
 
 Prints a table, appends it to $GITHUB_STEP_SUMMARY as Markdown when that is set, and exits 1 when a required host
@@ -269,12 +270,28 @@ def table(results: list, markdown: bool = False) -> str:
     return "\n".join(f"{r[0]:<{w[0]}}  {r[1]:<{w[1]}}  {r[2]:>{w[2]}}  {r[3]}" for r in rows)
 
 
+def load_tuning(path) -> dict:
+    """{host: {timeout, tries}} from build_failures.py's host-tuning.json, each value clamped to its cap"""
+    if not path:
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        return {h: {"timeout": max(1, min(180, int(t["timeout"]))), "tries": max(1, min(4, int(t["tries"])))}
+                for h, t in d.items()}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}
+
+
 def main(argv=None, fetch: Callable | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--only", action="append", help="probe only rows or hosts whose name contains this (repeatable)")
     ap.add_argument("--timeout", type=int, default=60, help="seconds per request (default 60)")
+    ap.add_argument("--tuning", help="JSON {host: {timeout, tries}} (FEAT-314); a missing or bad file is ignored")
     a = ap.parse_args(argv)
-    fetch = fetch or (lambda url, rng: curl(url, a.timeout, rng))
+    tune = load_tuning(a.tuning)
+    for h, t in tune.items():
+        print(f"tuned: {h} {t['timeout']} s, {t['tries']} tries (build_failures.py host-tuning.json)")
     todo = probes()
     if a.only:
         keys = [o.lower() for o in a.only]
@@ -287,7 +304,9 @@ def main(argv=None, fetch: Callable | None = None) -> int:
         if verdicts(results).get(p.host):     # a mirror of a host that already answered: not needed
             results.append((p, None, "", 0.0))
             continue
-        ok, detail, s = run_probe(p, fetch)
+        t = tune.get(p.host, {})
+        f = fetch or (lambda url, rng, sec=t.get("timeout", a.timeout): curl(url, sec, rng))
+        ok, detail, s = run_probe(p, f, tries=t.get("tries", 2))
         results.append((p, ok, detail, s))
         print(f"{'ok  ' if ok else 'FAIL'} {p.name}: {detail}", flush=True)
     bad, warn = failed_hosts(results)

@@ -131,3 +131,24 @@ def test_a_mirror_is_not_tried_once_its_host_answered():
     assert len(over) == 3
     ph.main(["--only", "Overpass"], fetch=fetch)
     assert seen == [over[0].url]
+
+
+def test_tuning_raises_one_hosts_tries_within_the_caps(monkeypatch, tmp_path, capsys):
+    """FEAT-314: host-tuning.json from the metrics branch; a bad file is the defaults"""
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    monkeypatch.setattr(ph.time, "sleep", lambda s: None)
+    t = tmp_path / "host-tuning.json"
+    t.write_text(json.dumps({"lfps.usgs.gov": {"timeout": 9999, "tries": 99}}))
+    assert ph.load_tuning(str(t)) == {"lfps.usgs.gov": {"timeout": 180, "tries": 4}}
+    assert ph.load_tuning(str(tmp_path / "missing.json")) == {} and ph.load_tuning(None) == {}
+    (tmp_path / "bad.json").write_text("not json")
+    assert ph.load_tuning(str(tmp_path / "bad.json")) == {}
+    calls = []
+
+    def fetch(url, rng):
+        if "lfps" in url:
+            calls.append(url)
+            return 0, b"curl: (28) Operation timed out"
+        return fake({})(url, rng)
+    assert ph.main(["--tuning", str(t)], fetch=fetch) == 1
+    assert len(calls) == 4 and "tuned: lfps.usgs.gov 180 s, 4 tries" in capsys.readouterr().out

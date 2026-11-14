@@ -1,0 +1,46 @@
+# Build pack retry (FEAT-314): started by build-pack.yml's outcome job (tools/ci/build_failures.py record) when a run
+# failed for a transient cause (a host that did not connect or timed out, an HTTP 5xx, GitHub's API, Overpass busy).
+# Waits for that run to finish, then 5 minutes after attempt 1 and 15 after attempt 2, and re-runs its failed jobs
+# (`gh run rerun --failed`), unless someone re-ran it by hand meanwhile. A workflow_dispatch: the one event the
+# workflow token may start, and Build pack's own outcome job then judges the new attempt. By hand, rarely needed:
+#   gh workflow run build-pack-retry.yml -f run_id=<Build pack run id> -f attempt=<its latest attempt>
+
+name: Build pack retry
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: The Build pack run to re-run
+        required: true
+        type: string
+      attempt:
+        description: Its attempt that failed (1 or 2)
+        required: true
+        type: string
+
+run-name: Retry Build pack run ${{ inputs.run_id }}
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: wait, then re-run the failed jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RETRY_RUN_ID: ${{ inputs.run_id }}
+          RETRY_ATTEMPT: ${{ inputs.attempt }}
+        run: python tools/ci/build_failures.py retry

@@ -222,6 +222,22 @@ def test_land_cover_and_the_far_ring_are_required(resort):
     B.check_raw(r)
 
 
+def test_an_empty_pistes_wide_passes_only_when_the_resort_has_no_pistes_either(resort):
+    """FEAT-314: Aspen Hills (skimap only) has no OSM runs anywhere, so Overpass's empty answer is real"""
+    go(resort, Fake(resort))
+    osm = os.path.join(resort.raw, "osm")
+    json.dump({"version": 0.6, "elements": []}, open(os.path.join(osm, "pistes_wide.json"), "w"))
+    r = B.Resort("demo", resort.raw, resort.out, resort.resorts, resort.manifests)
+    B.check_raw(r)                                      # ski.json has no downhill piste: fine
+    json.dump({"elements": [{"id": 1, "tags": {"piste:type": "downhill"}}]}, open(os.path.join(osm, "ski.json"), "w"))
+    with pytest.raises(B.Failed, match=r"OSM pistes_wide \(no elements"):
+        B.check_raw(r)                                  # the resort has runs, so the wide box can't be empty
+    json.dump({"elements": [{"id": 1}]}, open(os.path.join(osm, "ski.json"), "w"))
+    json.dump({"remark": "runtime error: Query timed out", "elements": []}, open(os.path.join(osm, "pistes_wide.json"), "w"))
+    with pytest.raises(B.Failed, match=r"OSM pistes_wide \(no elements: runtime error"):
+        B.check_raw(r)                                  # an Overpass error is never a real empty answer
+
+
 def test_an_old_manifest_is_made_again_but_the_same_items_fetch_nothing(resort):
     go(resort, Fake(resort))
     m = json.load(open(resort.man_path))
