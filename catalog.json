@@ -264,6 +264,30 @@
    "report": "reports/mont-tremblant-resort-station-mont-tremblant.md"
   },
   {
+   "slug": "mount-bohemia",
+   "name": "Mount Bohemia",
+   "region": "Michigan",
+   "country": "US",
+   "lonlat": [
+    -88.01033154756794,
+    47.390002810243494
+   ],
+   "tier": "gold",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261114T131518Z-5695db",
+    "built": "2026-11-14",
+    "pipeline": "fea5f82",
+    "bytes": 37000261,
+    "sha256": "f48dde5146fc8086ce7adac192fb3a528980c67650520e9885c57f1e6b78fb8d",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/mount-bohemia/v1/mount-bohemia.zip",
+    "content": "4da99d26f53268f7"
+   },
+   "report": "reports/mount-bohemia.md"
+  },
+  {
    "slug": "ohio-hills",
    "name": "Ohio Hills (custom mashup)",
    "region": "Ohio",
