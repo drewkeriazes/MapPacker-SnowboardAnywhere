@@ -204,15 +204,15 @@
    "tier": "gold",
    "status": "playable",
    "pack": {
-    "version": 1,
+    "version": 2,
     "formatVersion": 1,
-    "build": "20261113T080524Z-de30c9",
-    "built": "2026-11-13",
-    "pipeline": "6d6c981",
-    "bytes": 150487839,
-    "sha256": "50b264773f82c9fd361fed81b0c4c355c44143ee36f0cb5c3b61f94b9e419ee5",
-    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/heavenly/v1/heavenly.zip",
-    "content": "d584f2ca6fdc3d74"
+    "build": "20261114T163913Z-95ccb6",
+    "built": "2026-11-14",
+    "pipeline": "b991867",
+    "bytes": 151058239,
+    "sha256": "2da55239eebb0d5cf0265b5012b548b1ac481680d0bcff98514e1c62095e6899",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/heavenly/v2/heavenly.zip",
+    "content": "7a3cf8df8f97f586"
    },
    "report": "reports/heavenly.md"
   },
