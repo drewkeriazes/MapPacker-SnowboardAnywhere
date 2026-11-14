@@ -1,0 +1,221 @@
+{
+  "slug": "aspen-snowmass",
+  "name": "Aspen Snowmass",
+  "country": "US",
+  "region": "Colorado",
+  "osm_ski_area_way": 1144096092,
+  "crs": "EPSG:26913",
+  "utm_zone": "13N",
+  "lonlat_bbox": [
+    -106.9850432,
+    39.1589275,
+    -106.9139325,
+    39.2129596
+  ],
+  "buffer_m": 1000,
+  "utm_bbox": [
+    327400,
+    4335100,
+    335800,
+    4343300
+  ],
+  "origin": [
+    331600,
+    4339200
+  ],
+  "elevation_range_m": [
+    2400,
+    4050
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "3DEP ImageServer",
+    "res_m": 1,
+    "chunk_px": 1500
+  },
+  "naip": {
+    "source": "Planetary Computer naip 2023 30cm",
+    "res_m": 1,
+    "max_px": 4000,
+    "items": [
+      "co_m_3910649_ne_13_030_20230907_20240104",
+      "co_m_3910649_nw_13_030_20230907_20240104",
+      "co_m_3910649_se_13_030_20230907_20240104",
+      "co_m_3910649_sw_13_030_20230907_20240104",
+      "co_m_3910756_ne_13_030_20230831_20240104",
+      "co_m_3910756_se_13_030_20230831_20240104"
+    ],
+    "item_bboxes_ll": {
+      "co_m_3910649_ne_13_030_20230907_20240104": [
+        -106.943,
+        39.184,
+        -106.87,
+        39.254
+      ],
+      "co_m_3910649_nw_13_030_20230907_20240104": [
+        -107.005,
+        39.184,
+        -106.932,
+        39.254
+      ],
+      "co_m_3910649_se_13_030_20230907_20240104": [
+        -106.943,
+        39.121,
+        -106.87,
+        39.191
+      ],
+      "co_m_3910649_sw_13_030_20230907_20240104": [
+        -107.005,
+        39.121,
+        -106.932,
+        39.191
+      ],
+      "co_m_3910756_ne_13_030_20230831_20240104": [
+        -107.068,
+        39.184,
+        -106.995,
+        39.254
+      ],
+      "co_m_3910756_se_13_030_20230831_20240104": [
+        -107.068,
+        39.121,
+        -106.995,
+        39.191
+      ]
+    }
+  },
+  "lidar": {
+    "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/CO_SanLuisJuanMiguel_2_2020/",
+    "dataset": "CO_SanLuisJuanMiguel_2_2020",
+    "max_depth_resort": 9,
+    "max_depth_outside": 8,
+    "nodes_file": "aspen-snowmass_ept_nodes.txt",
+    "far": {
+      "pad_m": 5000,
+      "max_depth": 8,
+      "nodes_file": "aspen-snowmass_ept_far_nodes.txt"
+    }
+  },
+  "attribution": [
+    "Elevation: USGS 3DEP 1 m lidar DEM (CO_CONMGaps_D24, CO_SanLuisJuanMiguel_2020_D20, CO_WestCentral_2019_A19), public domain",
+    "Canopy: USGS 3DEP lidar point cloud CO_SanLuisJuanMiguel_2_2020 via AWS usgs-lidar-public, public domain",
+    "Imagery: USDA NAIP 2023 via Microsoft Planetary Computer, public domain",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "osm": {
+    "geofabrik": "us/colorado",
+    "pbf": "https://download.geofabrik.de/north-america/us/colorado-latest.osm.pbf"
+  },
+  "exclude": [
+    {
+      "name": "Buttermilk",
+      "openskidata_id": "aecc514c89c8ea9a6b3b8bac5e7468ef23917b60",
+      "osm_ways": [
+        40233623,
+        40233630,
+        99948692,
+        99948694,
+        99948697,
+        99948700,
+        99957793,
+        99957805,
+        99957811,
+        99957812,
+        99957814,
+        99957819,
+        99957821,
+        99957824,
+        99957828,
+        99957832,
+        99957836,
+        99957838,
+        99957843,
+        99957848,
+        99957851,
+        99957858,
+        99957861,
+        99957867,
+        99961330,
+        99961331,
+        99961332,
+        99961333,
+        99961334,
+        99961335,
+        99961336,
+        99961337,
+        99961338,
+        99961339,
+        99961340,
+        99962996,
+        99962997,
+        99962999,
+        258702586,
+        772491592,
+        772491593,
+        772491594,
+        772491595,
+        772491596,
+        772491597,
+        772491598,
+        772491599,
+        772491600,
+        772491601,
+        772491602,
+        1049113755,
+        1049113756,
+        1049113757,
+        1049113758,
+        1049113762,
+        1049113763,
+        1049113765,
+        1049113766,
+        1211521065
+      ]
+    }
+  ],
+  "openskidata": {
+    "ids": [
+      "03b56bd47b26c384d82474a2fb4b3fbc3a0c4a31"
+    ],
+    "names": [
+      "Aspen Snowmass"
+    ],
+    "iso3166_2": "US-CO",
+    "websites": [
+      "https://www.aspensnowmass.com/four-mountains/snowmass"
+    ],
+    "lifts": 20,
+    "runs": 109
+  },
+  "names": {
+    "states": [
+      "CO"
+    ],
+    "source": "USGS GNIS",
+    "towns": "US Census 2024 Gazetteer and population estimates"
+  },
+  "tier": "silver",
+  "sources": {
+    "terrain": {
+      "source": "3DEP 1 m",
+      "tier": "gold"
+    },
+    "trees": {
+      "source": "lidar crowns + stands",
+      "tier": "silver"
+    },
+    "surface": {
+      "source": "NAIP",
+      "tier": "gold"
+    }
+  }
+}

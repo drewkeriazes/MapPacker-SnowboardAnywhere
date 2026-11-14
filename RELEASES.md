@@ -2,6 +2,10 @@
 
 Every published pack, grouped by resort, newest version first. The game downloads the version marked latest, the one `catalog.json` names. Release tags are `<slug>/v<N>`: type `vail/` in the Releases page's search to see one resort. Written by `pipeline/releases.py` in each publish PR (FEAT-271); do not edit it by hand.
 
+## Aspen Snowmass
+
+- [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/aspen-snowmass/v1) (latest) 120 MB, 2026-11-14
+
 ## Big Sky
 
 - [v2](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/bigsky/v2) (latest) 252 MB, 2026-11-12
