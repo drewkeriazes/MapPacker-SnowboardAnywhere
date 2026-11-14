@@ -84,15 +84,15 @@
    "tier": "gold",
    "status": "preview",
    "pack": {
-    "version": 3,
+    "version": 4,
     "formatVersion": 1,
-    "build": "20261114T080847Z-9b5502",
+    "build": "20261114T151850Z-9cb882",
     "built": "2026-11-14",
-    "pipeline": "2dbc3d3",
-    "bytes": 224303359,
-    "sha256": "7b760a9e73b99710f0e1980af79385d99f9ffff3ce65c91e71a453c6bfc38dc8",
-    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/breckenridge/v3/breckenridge.zip",
-    "content": "37c0a5fb07972a5a"
+    "pipeline": "473ba6f",
+    "bytes": 224314628,
+    "sha256": "b372a91369645bd1a24cc591cce8209a1332798c71ba6b213d42919b3447c83a",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/breckenridge/v4/breckenridge.zip",
+    "content": "0aa38de11785c773"
    },
    "report": "reports/breckenridge.md"
   },
