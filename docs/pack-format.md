@@ -161,7 +161,7 @@ pack and draws its hardwoods and hemlocks as spruce (see [formatVersion](#format
 | 3 | subalpine fir | the rest of spruce-fir: 50 % below 3,200 m, 40 % above, more on north and east aspects and near streams | 0.10 h |
 | 4 | lodgepole pine | lodgepole (and ponderosa) classes, 85 %; without LANDFIRE, the lower slopes below 3,250 m | 0.09 h |
 | 5 | Douglas-fir | Douglas-fir and montane mixed conifer classes below about 3,200 m | 0.17 h |
-| 6 | limber pine | limber-bristlecone and pinyon-juniper classes; half the short (< 10 m) trees on exposed crests above 3,200 m | 0.35 h |
+| 6 | limber pine | the trees under 12 m in limber-bristlecone and pinyon-juniper classes (BUG-129: a taller one is spruce or fir); half the short (< 10 m) trees on exposed crests above 3,200 m | 0.35 h |
 | 7 | snag | standing dead: CHM peak over 6 m with NAIP NDVI under 0.15 inside forest, at most 3 % of trees | 0.05 h |
 | 8 | bare hardwood | FEAT-233: eastern broadleaf classes (oak, beech-maple, ruderal, floodplain and swamp forest), the class's `hardwood` share (88 % in beech-maple to 96 % in dry oak), less on cool north and east aspects and near water; the broadleaf share of eastern spruce-fir-hardwood and oak-pine classes; in the east the no-LANDFIRE and no-group fallback below the boreal line | 0.28 h |
 | 9 | eastern hemlock | FEAT-233: the rest of an eastern hardwood or hemlock class (hemlock-hardwood 60 %), up to 1.5 times more on north and east aspects and near water; 12 % of the eastern fallback on flat dry ground | 0.17 h |
