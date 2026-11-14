@@ -216,6 +216,30 @@
    "report": "reports/keystone.md"
   },
   {
+   "slug": "killington",
+   "name": "Killington",
+   "region": "Vermont",
+   "country": "US",
+   "lonlat": [
+    -72.78616527262324,
+    43.610998299574064
+   ],
+   "tier": "gold",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261114T093553Z-209651",
+    "built": "2026-11-14",
+    "pipeline": "25f28a7",
+    "bytes": 129666251,
+    "sha256": "d20c0c743fa13fcb76398e2054e9c56e90106e2524a1e3734bfd0c6fb184e9b2",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/killington/v1/killington.zip",
+    "content": "3405d4c874f95f64"
+   },
+   "report": "reports/killington.md"
+  },
+  {
    "slug": "mont-tremblant-resort-station-mont-tremblant",
    "name": "Mont Tremblant Resort, Station Mont Tremblant",
    "region": "Quebec",

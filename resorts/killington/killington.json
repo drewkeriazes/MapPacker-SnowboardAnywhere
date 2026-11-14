@@ -1,0 +1,253 @@
+{
+  "slug": "killington",
+  "name": "Killington",
+  "country": "US",
+  "region": "Vermont",
+  "osm_ski_area_way": 1228774360,
+  "crs": "EPSG:26918",
+  "utm_zone": "18N",
+  "lonlat_bbox": [
+    -72.8213314,
+    43.5910043,
+    -72.751285,
+    43.6313092
+  ],
+  "buffer_m": 1000,
+  "utm_bbox": [
+    674700,
+    4827700,
+    682600,
+    4834400
+  ],
+  "origin": [
+    678650,
+    4831050
+  ],
+  "elevation_range_m": [
+    300,
+    1300
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "3DEP ImageServer",
+    "res_m": 1,
+    "chunk_px": 1500
+  },
+  "naip": {
+    "source": "Planetary Computer naip 2023 30cm",
+    "res_m": 1,
+    "max_px": 4000,
+    "items": [
+      "vt_m_4307218_se_18_030_20230622_20230927",
+      "vt_m_4307218_sw_18_030_20230622_20230927",
+      "vt_m_4307219_sw_18_030_20230622_20230927",
+      "vt_m_4307226_ne_18_030_20230622_20230927",
+      "vt_m_4307226_nw_18_030_20230622_20230927",
+      "vt_m_4307227_nw_18_030_20230622_20230927"
+    ],
+    "item_bboxes_ll": {
+      "vt_m_4307218_se_18_030_20230622_20230927": [
+        -72.819,
+        43.621,
+        -72.744,
+        43.691
+      ],
+      "vt_m_4307218_sw_18_030_20230622_20230927": [
+        -72.881,
+        43.621,
+        -72.806,
+        43.691
+      ],
+      "vt_m_4307219_sw_18_030_20230622_20230927": [
+        -72.756,
+        43.621,
+        -72.681,
+        43.692
+      ],
+      "vt_m_4307226_ne_18_030_20230622_20230927": [
+        -72.819,
+        43.559,
+        -72.744,
+        43.629
+      ],
+      "vt_m_4307226_nw_18_030_20230622_20230927": [
+        -72.881,
+        43.559,
+        -72.806,
+        43.629
+      ],
+      "vt_m_4307227_nw_18_030_20230622_20230927": [
+        -72.756,
+        43.558,
+        -72.681,
+        43.629
+      ]
+    }
+  },
+  "lidar": {
+    "ept": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/USGS_LPC_VT_Rutland_Lot8_2013_LAS_2016/",
+    "dataset": "USGS_LPC_VT_Rutland_Lot8_2013_LAS_2016",
+    "max_depth_resort": 7,
+    "max_depth_outside": 6,
+    "nodes_file": "killington_ept_nodes.txt",
+    "far": {
+      "pad_m": 5000,
+      "max_depth": 7,
+      "nodes_file": "killington_ept_far_nodes.txt"
+    }
+  },
+  "attribution": [
+    "Elevation: USGS 3DEP 1 m lidar DEM (VT_Connecticut_River_2016, VT_Rutland-Lot8_2013, VT_Statewide_A23), public domain",
+    "Canopy: USGS 3DEP lidar point cloud USGS_LPC_VT_Rutland_Lot8_2013_LAS_2016 via AWS usgs-lidar-public, public domain",
+    "Imagery: USDA NAIP 2023 via Microsoft Planetary Computer, public domain",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "osm": {
+    "geofabrik": "us/vermont",
+    "pbf": "https://download.geofabrik.de/north-america/us/vermont-latest.osm.pbf"
+  },
+  "exclude": [
+    {
+      "name": "Pico Mountain Resort",
+      "openskidata_id": "5263141e47dd13bf5e7529ecdeb1d1f61aecb0ae",
+      "osm_ways": [
+        159736786,
+        159736787,
+        159736788,
+        159736792,
+        159736793,
+        255729081,
+        255729082,
+        267910959,
+        267910960,
+        267910961,
+        267910962,
+        267910964,
+        267910965,
+        267910966,
+        273715148,
+        273715149,
+        273715150,
+        273715153,
+        273715155,
+        273715157,
+        273715159,
+        273715165,
+        273715167,
+        273715444,
+        273715445,
+        273715446,
+        273716416,
+        273716417,
+        273716419,
+        273716420,
+        273716422,
+        273716425,
+        273716426,
+        273716427,
+        273716428,
+        273716430,
+        273716431,
+        273716432,
+        273716434,
+        273716435,
+        273716436,
+        273716437,
+        273716438,
+        273716439,
+        273716441,
+        273716810,
+        273716811,
+        273716813,
+        273716814,
+        273716815,
+        273716816,
+        273716818,
+        273716820,
+        273716821,
+        556878761,
+        556882196,
+        907937060,
+        907937061,
+        907937062,
+        907937063,
+        907947826,
+        907947827,
+        907947828,
+        907947829,
+        907947831,
+        907947832,
+        907947833,
+        1100861928,
+        1100861929,
+        1100861933,
+        1100861934,
+        1100861935,
+        1100861952,
+        1100861954,
+        1105838826,
+        1105838827,
+        1105838828,
+        1105838830,
+        1105838835,
+        1105838856,
+        1105838865,
+        1105838867,
+        1106892770,
+        1107164672,
+        1107164676,
+        1107164681,
+        1107164682,
+        1107164683
+      ]
+    }
+  ],
+  "openskidata": {
+    "ids": [
+      "ac774efde21231d04a2cd3a7b6cfd380dfcb4bef"
+    ],
+    "names": [
+      "Killington Resort"
+    ],
+    "iso3166_2": "US-VT",
+    "websites": [
+      "https://www.killington.com/"
+    ],
+    "lifts": 24,
+    "runs": 184
+  },
+  "names": {
+    "states": [
+      "VT",
+      "MA",
+      "NH",
+      "NY"
+    ],
+    "source": "USGS GNIS",
+    "towns": "US Census 2024 Gazetteer and population estimates"
+  },
+  "tier": "gold",
+  "sources": {
+    "terrain": {
+      "source": "3DEP 1 m",
+      "tier": "gold"
+    },
+    "trees": {
+      "source": "lidar crowns + stands",
+      "tier": "gold"
+    },
+    "surface": {
+      "source": "NAIP",
+      "tier": "gold"
+    }
+  }
+}
