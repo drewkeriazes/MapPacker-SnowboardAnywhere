@@ -262,6 +262,30 @@
    "report": "reports/park-city-mountain.md"
   },
   {
+   "slug": "snowbird",
+   "name": "Snowbird",
+   "region": "Utah",
+   "country": "US",
+   "lonlat": [
+    -111.65031388708113,
+    40.565694279012526
+   ],
+   "tier": "silver",
+   "status": "playable",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261114T083908Z-5cf65f",
+    "built": "2026-11-14",
+    "pipeline": "2dbc3d3",
+    "bytes": 122247443,
+    "sha256": "5ca4d0295b0fae6135b282aaa87e63e88404e4bd5bdb4cf862e3db3596df86ab",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/snowbird/v1/snowbird.zip",
+    "content": "a5ce510d7eb162a0"
+   },
+   "report": "reports/snowbird.md"
+  },
+  {
    "slug": "vail",
    "name": "Vail",
    "region": "Colorado",

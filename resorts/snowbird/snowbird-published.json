@@ -1,0 +1,61 @@
+{
+ "version": 2,
+ "slug": "snowbird",
+ "fetched": "2026-11-14",
+ "areas": [
+  {
+   "openskidata_id": "8cbbb46cdace32e91492bfe6abd8014ed16328e6",
+   "name": "Snowbird",
+   "wikidata": "Q3487194",
+   "found_by": "Wikidata search 'Snowbird'",
+   "wikipedia": "Snowbird, Utah",
+   "infobox": true
+  }
+ ],
+ "figures": {
+  "summit": {
+   "value": 3353,
+   "unit": "m",
+   "source": "Wikipedia: Snowbird, Utah",
+   "text": "11000 ft"
+  },
+  "base": {
+   "value": 2365,
+   "unit": "m",
+   "source": "Wikipedia: Snowbird, Utah",
+   "text": "7760 ft; lowest chairlift; 8100 ft; main base area"
+  },
+  "vertical": {
+   "value": 988,
+   "unit": "m",
+   "source": "Wikipedia: Snowbird, Utah",
+   "text": "3240 ft"
+  },
+  "lifts": {
+   "value": 13,
+   "unit": "",
+   "source": "Wikipedia: Snowbird, Utah",
+   "text": "13 lifts:; 1 tram; 6 hi-speed quad chairs; 4 double chairs; 2 surface lifts"
+  },
+  "runs": {
+   "value": 169,
+   "unit": "",
+   "source": "Wikipedia: Snowbird, Utah",
+   "text": "169; 27% easiest; 38% more difficult; 35% most difficult"
+  },
+  "area": {
+   "value": 10.12,
+   "unit": "km2",
+   "source": "Wikipedia: Snowbird, Utah",
+   "text": "2500 acre"
+  }
+ },
+ "trails": null,
+ "outside": [],
+ "box": [
+  441300,
+  4487200,
+  448600,
+  4494300
+ ]
+}
