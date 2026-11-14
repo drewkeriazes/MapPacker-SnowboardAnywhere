@@ -1,6 +1,10 @@
 # Snowboard sim data fetcher. Downloads everything listed in manifests/<slug>.json
 # into <raw root>/<slug>/ (-RawDir, else SBA_RAW_ROOT, else raw\ in this checkout). Safe to re-run: finished files are skipped, partial files are retried.
 # Works on Windows PowerShell 5.1 and PowerShell 7, on Windows and on Linux (pwsh, the FEAT-245 build runner). No installs needed.
+# FEAT-314: retries follow pipeline/retry.json (shared with the probe, pipeline/retry.py): a download that got no answer,
+# a 408, 429 or 5xx, or a bad body is retried up to fetch.tries times after the listed waits (Retry-After respected,
+# with jitter; other downloads go on meanwhile). A 4xx is not retried (unless listed for its host) and ends the fetch
+# with exit 3 instead of 2. Per host calls / retried / recovered / failed go to $env:SBA_RETRY_LOG when it is set.
 param(
     [string]$Slug = "vail",
     [int]$Concurrency = 6,
@@ -20,6 +24,17 @@ $rawDir = Join-Path $RawDir $Slug
 if (-not (Test-Path $manifestPath)) { Write-Host "Manifest not found: $manifestPath" -ForegroundColor Red; exit 1 }
 New-Item -ItemType Directory -Force -Path $rawDir | Out-Null
 $log = Join-Path $rawDir "fetch_log.txt"
+$rules = Get-Content -Raw -Path (Join-Path $PSScriptRoot "retry.json") | ConvertFrom-Json
+function IsTransient($code, $h) {
+    if ($code -lt 400 -or $code -ge 500 -or @($rules.transient_status) -contains $code) { return $true }
+    $one = $rules.one_off_4xx.PSObject.Properties[$h]
+    return ($one -and @($one.Value) -contains $code)
+}
+function RetryWait($k, $after) {
+    $w = @($rules.fetch.waits_s); $s = [double]$w[[Math]::Min($k, $w.Count) - 1]
+    if ($after) { $s = [Math]::Max($s, [Math]::Min([double]$after, [double]$rules.max_retry_after_s)) }
+    return $s * (1 + [double]$rules.jitter * (2 * (Get-Random -Minimum 0.0 -Maximum 1.0) - 1))
+}
 function Log($msg) { $line = "{0}  {1}" -f (Get-Date -Format "HH:mm:ss"), $msg; Write-Host $line; Add-Content -Path $log -Value $line }
 
 # Environment notes for the processing side
@@ -64,13 +79,21 @@ foreach ($it in $items) {
     $dest = Join-Path $rawDir ($it.path -replace "/", [System.IO.Path]::DirectorySeparatorChar)
     if ((Test-Path $dest) -and ((Get-Item $dest).Length -gt 0)) { $skipped++; continue }
     $alts = @(); if ($it.alts) { $alts = @($it.alts) }
-    $work.Add([pscustomobject]@{ url = $it.url; path = $it.path; dest = $dest; method = $it.method; body = $it.body; tries = 0; alts = $alts })
+    $work.Add([pscustomobject]@{ url = $it.url; path = $it.path; dest = $dest; method = $it.method; body = $it.body; tries = 0; alts = $alts; due = [datetime]::MinValue; host0 = ([Uri]$it.url).Host })
 }
 Log "Skipping $skipped already downloaded; $($work.Count) to fetch"
 
 $inflight = @{}      # task -> item
 $hostCounts = @{}
-$done = 0; $failed = New-Object System.Collections.Generic.List[object]; $bytes = 0L
+$done = 0; $failed = New-Object System.Collections.Generic.List[object]; $bytes = 0L; $refused = 0
+$tally = @{}     # host -> calls, retried, recovered, failed (FEAT-314)
+function Count($it, $ok, $retries) {     # $retries: how many times it was retried
+    $h = $it.host0
+    if (-not $script:tally.ContainsKey($h)) { $script:tally[$h] = [ordered]@{ calls = 0; retried = 0; recovered = 0; failed = 0 } }
+    $t = $script:tally[$h]; $t.calls++
+    if ($retries -gt 0) { $t.retried++; if ($ok) { $t.recovered++ } }
+    if (-not $ok) { $t.failed++ }
+}
 $queue = New-Object System.Collections.Generic.Queue[object]
 foreach ($w in $work) { $queue.Enqueue($w) }
 $deferred = New-Object System.Collections.Generic.List[object]
@@ -98,6 +121,7 @@ while ($queue.Count -gt 0 -or $inflight.Count -gt 0 -or $deferred.Count -gt 0) {
     $n = $queue.Count
     for ($k = 0; $k -lt $n -and $inflight.Count -lt $Concurrency; $k++) {
         $it = $queue.Dequeue()
+        if ((Get-Date) -lt $it.due) { $deferred.Add($it); continue }    # waiting before its retry
         $h = ([Uri]$it.url).Host
         $cur = 0; if ($hostCounts.ContainsKey($h)) { $cur = $hostCounts[$h] }
         if ($cur -ge (HostLimit $it.url)) { $deferred.Add($it); continue }
@@ -106,7 +130,7 @@ while ($queue.Count -gt 0 -or $inflight.Count -gt 0 -or $deferred.Count -gt 0) {
     foreach ($d in $deferred) { $queue.Enqueue($d) }
     $deferred.Clear()
 
-    if ($inflight.Count -eq 0) { Start-Sleep -Milliseconds 100; continue }
+    if ($inflight.Count -eq 0) { Start-Sleep -Milliseconds 200; continue }
 
     $tasks = [System.Threading.Tasks.Task[]]@($inflight.Keys)
     $idx = [System.Threading.Tasks.Task]::WaitAny($tasks, 2000)
@@ -120,11 +144,17 @@ while ($queue.Count -gt 0 -or $inflight.Count -gt 0 -or $deferred.Count -gt 0) {
     $it = $inflight[$task]
     $inflight.Remove($task)
     $h = ([Uri]$it.url).Host; $hostCounts[$h]--
-    $ok = $false; $err = ""
+    $ok = $false; $err = ""; $code = 0; $after = $null
     try {
         if ($task.IsFaulted) { throw $task.Exception.InnerException }
+        if ($task.IsCanceled) { throw "timed out" }
         $resp = $task.Result
-        if (-not $resp.IsSuccessStatusCode) { throw ("HTTP " + [int]$resp.StatusCode) }
+        $code = [int]$resp.StatusCode
+        if (-not $resp.IsSuccessStatusCode) {
+            if ($resp.Headers.RetryAfter -and $resp.Headers.RetryAfter.Delta) { $after = $resp.Headers.RetryAfter.Delta.TotalSeconds }
+            $resp.Dispose()
+            throw ("HTTP " + $code)
+        }
         $tmp = $it.dest + ".part"
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $it.dest) | Out-Null
         $fs = [System.IO.File]::Create($tmp)
@@ -144,18 +174,23 @@ while ($queue.Count -gt 0 -or $inflight.Count -gt 0 -or $deferred.Count -gt 0) {
         $err = $_.Exception.Message
         if (Test-Path ($it.dest + ".part")) { Remove-Item ($it.dest + ".part") -Force }
     }
-    if (-not $ok) {
+    if ($ok) { Count $it $true $it.tries }
+    else {
         $it.tries++
-        if ($it.alts.Count -gt 0) {
+        $retry = IsTransient $code $h
+        if ($retry -and $it.alts.Count -gt 0) {
             # rotate to the next mirror
             $next = $it.alts[0]; $it.alts = @($it.alts | Select-Object -Skip 1) + @($it.url); $it.url = $next
         }
-        if ($it.tries -lt 6) {
-            Log ("  retry {0} ({1}) after error: {2} -> {3}" -f $it.path, $it.tries, $err, ([Uri]$it.url).Host)
-            Start-Sleep -Seconds (3 * $it.tries)
+        if ($retry -and $it.tries -lt [int]$rules.fetch.tries) {
+            $s = RetryWait $it.tries $after
+            Log ("  retry {0} ({1}) in {2:N0} s after error: {3} -> {4}" -f $it.path, $it.tries, $s, $err, ([Uri]$it.url).Host)
+            $it.due = (Get-Date).AddSeconds($s)
             $queue.Enqueue($it)
         } else {
+            if (-not $retry) { $refused++; $err += " (a 4xx: not retried)" }
             Log ("  FAILED {0}: {1}" -f $it.path, $err)
+            Count $it $false ($it.tries - 1)
             $failed.Add($it)
         }
     }
@@ -165,9 +200,18 @@ while ($queue.Count -gt 0 -or $inflight.Count -gt 0 -or $deferred.Count -gt 0) {
 }
 
 Log ("Finished: {0} downloaded ({1:N0} MB), {2} skipped, {3} failed" -f $done, ($bytes / 1MB), $skipped, $failed.Count)
+foreach ($h in $tally.Keys) {
+    $t = $tally[$h]
+    if ($t.retried) { Log ("  {0}: {1} downloads, {2} retried, {3} recovered, {4} failed" -f $h, $t.calls, $t.retried, $t.recovered, $t.failed) }
+    if ($env:SBA_RETRY_LOG) {
+        $line = [ordered]@{ tool = "fetch"; host = $h; calls = $t.calls; retried = $t.retried; recovered = $t.recovered; failed = $t.failed }
+        Add-Content -Path $env:SBA_RETRY_LOG -Value ($line | ConvertTo-Json -Compress)
+    }
+}
 if ($failed.Count -gt 0) {
     Log "Failed items (re-run this script to retry them):"
     foreach ($f in $failed) { Log ("  " + $f.path) }
+    if ($refused -gt 0) { exit 3 }
     exit 2
 }
 "complete $(Get-Date -Format o)" | Set-Content -Path (Join-Path $rawDir "FETCH_COMPLETE.txt")

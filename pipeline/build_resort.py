@@ -10,7 +10,7 @@ packs/<slug>). The config is resorts/<slug>/<slug>.json, the manifest manifests/
 
   nodes     ept_select.py: the EPT node lists (resort.py plan writes them too)
   manifest  gen_manifest.py: the download list
-  fetch     fetch.ps1: everything in the manifest (resumable; stops when an item failed)
+  fetch     fetch.ps1: everything in the manifest (resumable; retries by retry.json; stops when an item failed)
   landfire  fetch_landfire.mjs EVT, EVC, EVH (US only; the LFPS service wants an email: --email or LANDFIRE_EMAIL)
   grooming  fetch_grooming.py, when the config has a terrain_status_url
   build     build_pack.py (DEM, lidar, NAIP, masks, moguls, piste directions, AO, trees, far trees, cover)
@@ -275,6 +275,9 @@ def fetch_run(r, ctx):
         raise Failed(f"fetch.ps1 writes <RawDir>\\{r.slug}; the raw folder {r.raw} is not named {r.slug}")
     code = ctx.run([powershell(), "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(HERE, "fetch.ps1"),
                     "-Slug", r.slug, "-RawDir", os.path.dirname(os.path.normpath(r.raw))])
+    if code == 3:     # FEAT-314: a 4xx, never retried (retry.json)
+        raise Failed(f"a download was refused (a 4xx: not retried; {os.path.join(r.raw, 'fetch_log.txt')} lists "
+                     "it): fix the manifest or the config, then run again")
     if code == 2:
         raise Failed(f"some downloads failed ({os.path.join(r.raw, 'fetch_log.txt')} lists them): run again, "
                      "it resumes")

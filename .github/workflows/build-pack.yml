@@ -19,6 +19,9 @@
 #            App token, labelled automerge when the run's triggering actor is in .github/maintainers.txt, and
 #            publishes nothing when the pack's content equals the published version's or an open publish PR's.
 #            Never a push to main.
+#   retries  FEAT-314, in layers: the probe and the fetch first retry a flaky call inline (pipeline/retry.json: no
+#            answer, 429, 5xx; never a 4xx), each with its own caps, and log the tries per host to SBA_RETRY_LOG
+#            (an artifact per job, read by the outcome job); only a host down for minutes fails the job.
 #   outcome  every attempt, pass or fail (FEAT-314): tools/ci/build_failures.py record sorts a failure into a reason
 #            code, logs the attempt on the `metrics` branch (build-failures.jsonl, README.md, host-tuning.json) and,
 #            for a transient cause on attempt 1 or 2, starts build-pack-retry.yml, which re-runs the failed jobs
@@ -109,6 +112,8 @@ jobs:
     needs: queue
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      SBA_RETRY_LOG: /home/runner/inline-retries.jsonl
     steps:
       - uses: actions/checkout@v6
         with:
@@ -126,6 +131,13 @@ jobs:
           cat "$RUNNER_TEMP/host-tuning.json" 2>/dev/null || echo "no host-tuning.json: the defaults"
       - name: data hosts
         run: python tools/ci/probe_hosts.py --tuning "$RUNNER_TEMP/host-tuning.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inline-retries-probe-${{ github.run_attempt }}
+          path: /home/runner/inline-retries.jsonl
+          if-no-files-found: ignore
+          retention-days: 7
 
   build:
     needs: probe
@@ -137,6 +149,7 @@ jobs:
     env:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       SBA_INDEX_DIR: /home/runner/osd-index
+      SBA_RETRY_LOG: /home/runner/inline-retries.jsonl
     steps:
       - name: disk
         run: |
@@ -233,6 +246,13 @@ jobs:
           git config user.name "$APP_LOGIN"
           git config user.email "$id+$APP_LOGIN@users.noreply.github.com"
           python tools/ci/build_pack_ci.py publish
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inline-retries-build-${{ github.run_attempt }}
+          path: /home/runner/inline-retries.jsonl
+          if-no-files-found: ignore
+          retention-days: 7
 
   outcome:
     needs: [queue, probe, build]
@@ -250,11 +270,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      # this attempt's inline retries (the jobs that ran in it)
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: inline-retries-*-${{ github.run_attempt }}
+          path: /home/runner/inline
       - name: classify, log and retry
         continue-on-error: true  # a metrics hiccup never turns a passed build red
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          INLINE_DIR: /home/runner/inline
         run: |
           gh auth setup-git
           python tools/ci/build_failures.py record

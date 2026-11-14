@@ -1,0 +1,12 @@
+{
+  "_doc": "FEAT-314: inline retry rules, shared by tools/ci/probe_hosts.py (pipeline/retry.py) and pipeline/fetch.ps1. Retry only a call that got no answer (connect failure, timeout), HTTP 408, 429 or 5xx, or a 2xx with a bad body (Overpass busy). Never a 4xx, unless one_off_4xx lists it for that host. Wait waits_s[k] (the last one again past the end), at least Retry-After up to max_retry_after_s, plus or minus jitter. Every number is a cap: no layer retries without a bound.",
+  "transient_status": [408, 429],
+  "one_off_4xx": {
+    "elevation.nationalmap.gov": [400],
+    "index.nationalmap.gov": [400]
+  },
+  "max_retry_after_s": 120,
+  "jitter": 0.2,
+  "probe": {"tries": 3, "waits_s": [10, 30], "budget_s": 300},
+  "fetch": {"tries": 6, "waits_s": [3, 6, 12, 24, 48]}
+}

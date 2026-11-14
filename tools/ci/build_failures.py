@@ -12,14 +12,18 @@ build-pack-retry.yml (a workflow_dispatch: the one event the workflow token may 
 has finished, 5 minutes after attempt 1 and 15 after attempt 2, and re-runs the failed jobs (`gh run rerun --failed`;
 their dependents, this job among them, run again too). A real failure stops with its reason as an error annotation.
 
-Rows: {time, run_id, pack, attempt, job, step, host, reason, transient, duration_s, outcome}; outcome is passed,
-retrying, stopped (real) or gave up (transient, out of retries).
+Rows: {time, run_id, pack, attempt, job, step, host, reason, transient, duration_s, outcome, inline}; outcome is
+passed, retrying, stopped (real) or gave up (transient, out of retries). The job re-run is the second layer: the probe
+and the fetch first retry a flaky call inline (pipeline/retry.json), and `inline` is what they logged this attempt
+({host: {calls, retried, recovered, failed}}, from the *.jsonl files in $INLINE_DIR: the jobs' SBA_RETRY_LOG).
 """
 import argparse, json, os, re, subprocess, sys, tempfile, time
 from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
+sys.path.insert(0, os.path.join(ROOT, "pipeline"))
+import retry as inline  # noqa: E402  (this module has its own retry())
 
 MAX_ATTEMPTS = 3               # the first try and 2 retries
 WAITS = {1: 5, 2: 15}          # minutes before re-running after attempt N
@@ -27,7 +31,7 @@ BRANCH = "metrics"
 LOG = "build-failures.jsonl"
 TUNING = "host-tuning.json"
 # probe_hosts.py defaults and the most the tuning may raise them to: never unlimited
-BASE = {"timeout": 60, "tries": 2}
+BASE = {"timeout": 60, "tries": inline.RULES["probe"]["tries"]}
 CAP = {"timeout": 180, "tries": 4}
 
 TAIL = 30                      # lines of the failed step's end that classify reads
@@ -48,6 +52,8 @@ RULES = [
     ("arcgis-400", True, r'"code":\s*400,\s*"message":\s*"Failed to execute query'),
     ("lfps-queue", True, r"LFPS jobs queue"),
     ("archive-slow", True, r"Internet Archive is slow"),
+    # a 4xx is never retried at any layer (retry.json): probe_hosts.py and fetch.ps1 say so on the line
+    ("http-4xx", False, r"a 4xx: not retried|a download was refused|HTTP 4(?!08|29)\d\d"),
     ("fetch-incomplete", True, r"some downloads failed"),
     ("raw-incomplete", False, r"raw data incomplete"),
     ("build-error", False, r"build_pack\.py failed|gen_content\.py failed|pack_report\.py exited"),
@@ -143,6 +149,25 @@ def verdict(jobs: list, own: str, log_of) -> dict:
 # ---------------------------------------------------------------- the metrics
 
 
+def inline_counts(folder) -> dict:
+    """{host: {calls, retried, recovered, failed}} summed over the retry.Tally lines in folder/**/*.jsonl"""
+    out = {}
+    for dirpath, _, files in os.walk(folder or ""):
+        for name in files:
+            if not name.endswith(".jsonl"):
+                continue
+            with open(os.path.join(dirpath, name), encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        d = json.loads(line)
+                        t = out.setdefault(d["host"], {"calls": 0, "retried": 0, "recovered": 0, "failed": 0})
+                        for k in t:
+                            t[k] += int(d.get(k, 0))
+                    except (ValueError, KeyError, TypeError):
+                        pass
+    return out
+
+
 def read_rows(path: str) -> list:
     if not os.path.isfile(path):
         return []
@@ -183,8 +208,23 @@ def table(title: str, counts: Counter, head: str) -> str:
 def summary_md(rows: list, tune: dict) -> str:
     fails = [r for r in rows if r["outcome"] != "passed"]
     n, ok = retry_stats(rows)
-    out = (f"{len(rows)} attempts logged, {len(fails)} failed. Retried runs: {n}, of them passed in the end: {ok}"
+    hosts = {}
+    for r in rows:
+        for h, t in (r.get("inline") or {}).items():
+            a = hosts.setdefault(h, {"calls": 0, "retried": 0, "recovered": 0, "failed": 0})
+            for k in a:
+                a[k] += t.get(k, 0)
+    out = (f"{len(rows)} attempts logged, {len(fails)} failed. Recovered inline: "
+           f"{sum(t['recovered'] for t in hosts.values())} calls; job re-runs: "
+           f"{sum(1 for r in rows if r['outcome'] == 'retrying')}; real failures: "
+           f"{sum(1 for r in rows if r['outcome'] == 'stopped')}. Retried runs: {n}, of them passed in the end: {ok}"
            + (f" ({100 * ok // n}%)" if n else "") + ".\n\n")
+    worse = sorted(((h, t) for h, t in hosts.items() if t["retried"]), key=lambda x: -x[1]["retried"])[:10]
+    if worse:
+        out += ("**Inline retries by host** (a host that needs more and more of them is getting worse)\n\n"
+                "| host | calls | retried | recovered | failed |\n|---|---|---|---|---|\n"
+                + "\n".join(f"| {h} | {t['calls']} | {t['retried']} | {t['recovered']} | {t['failed']} |"
+                            for h, t in worse) + "\n\n")
     out += table("By host", Counter(r["host"] for r in fails), "host")
     out += table("By reason", Counter(f"{r['reason']} ({'transient' if r['transient'] else 'real'})" for r in fails),
                  "reason")
@@ -269,7 +309,7 @@ def record(save=save_row, jobs=None, log_of=None, dispatch=None) -> int:
     else:
         outcome = "stopped"
     row = {"time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "run_id": int(run_id), "pack": pack_name(),
-           "attempt": attempt, **v, "outcome": outcome}
+           "attempt": attempt, **v, "outcome": outcome, "inline": inline_counts(os.environ.get("INLINE_DIR"))}
     head = {"passed": f"passed on attempt {attempt}",
             "retrying": f"**{v['reason']}** (transient) at {v['job']} / {v['step']}"
                         + (f", host `{v['host']}`" if v["host"] else "")
@@ -279,7 +319,8 @@ def record(save=save_row, jobs=None, log_of=None, dispatch=None) -> int:
                        "no more retries",
             "stopped": f"**{v['reason']}** at {v['job']} / {v['step']}: a real failure, not retried. Fix the cause "
                        "and run it again"}[outcome]
-    write_summary(f"### Outcome (FEAT-314)\n\n{head}.\n")
+    write_summary(f"### Outcome (FEAT-314)\n\n{head}.\n\n{inline.caps_md()} Job re-runs: at most "
+                  f"{MAX_ATTEMPTS - 1}, after {' then '.join(str(w) for w in WAITS.values())} min.\n")
     try:
         rows, tune = save(row)
         write_summary("### Build failures so far\n\n" + summary_md(rows, tune))

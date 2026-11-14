@@ -87,7 +87,7 @@ def test_main_passes_when_every_host_answers_and_writes_the_summary(tmp_path, mo
     assert "every host answered" in capsys.readouterr().out
 
 
-def test_main_fails_on_a_required_host_and_retries_it_once(monkeypatch, capsys):
+def test_main_fails_on_a_required_host_after_the_inline_retries(monkeypatch, capsys):
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
     monkeypatch.setattr(ph.time, "sleep", lambda s: None)
     calls = []
@@ -98,7 +98,7 @@ def test_main_fails_on_a_required_host_and_retries_it_once(monkeypatch, capsys):
             return 0, b"curl: (28) Operation timed out"
         return fake({})(url, rng)
     assert ph.main([], fetch=fetch) == 1
-    assert len(calls) == 2
+    assert len(calls) == 3                     # retry.json probe.tries
     assert "unreachable: lfps.usgs.gov" in capsys.readouterr().out
 
 
@@ -152,3 +152,54 @@ def test_tuning_raises_one_hosts_tries_within_the_caps(monkeypatch, tmp_path, ca
         return fake({})(url, rng)
     assert ph.main(["--tuning", str(t)], fetch=fetch) == 1
     assert len(calls) == 4 and "tuned: lfps.usgs.gov 180 s, 4 tries" in capsys.readouterr().out
+
+
+def test_a_one_off_connect_failure_recovers_inline_and_is_logged(monkeypatch, tmp_path, capsys):
+    """FEAT-314 refinement: the Deer Valley case (Geofabrik curl 7 once) passes in the same attempt"""
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    log = tmp_path / "inline.jsonl"
+    monkeypatch.setenv("SBA_RETRY_LOG", str(log))
+    waits = []
+    monkeypatch.setattr(ph.time, "sleep", waits.append)
+    calls = []
+
+    def fetch(url, rng):
+        if "geofabrik" in url:
+            calls.append(url)
+            if len(calls) == 1:
+                return 0, b"curl: (7) Failed to connect to download.geofabrik.de port 443"
+        return fake({})(url, rng)
+    assert ph.main([], fetch=fetch) == 0
+    assert len(calls) == 2 and len(waits) == 1 and 8 <= waits[0] <= 12        # 10 s, jitter 20%
+    rows = {d["host"]: d for d in map(json.loads, log.read_text().splitlines())}
+    assert rows["download.geofabrik.de"] == {"tool": "probe", "host": "download.geofabrik.de", "calls": 1,
+                                             "retried": 1, "recovered": 1, "failed": 0}
+    assert rows["lfps.usgs.gov"]["retried"] == 0
+    assert "Recovered inline: download.geofabrik.de" in capsys.readouterr().out
+
+
+def test_a_4xx_is_not_retried_and_retry_after_is_respected(monkeypatch, capsys):
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    waits = []
+    monkeypatch.setattr(ph.time, "sleep", waits.append)
+    calls = []
+
+    def fetch(url, rng):
+        if "geofabrik" in url:
+            calls.append(url)
+            return 404, b"not found"
+        if "tiles.openskimap" in url:
+            calls.append(url)
+            return (429, b"slow down", 90) if calls.count(url) == 1 else (206, b"x")
+        return fake({})(url, rng)
+    assert ph.main([], fetch=fetch) == 1
+    assert len(calls) == 3 and len(waits) == 1 and waits[0] >= 90 * 0.8     # Retry-After 90 over the 10 s wait
+    assert "HTTP 404 (a 4xx: not retried)" in capsys.readouterr().out
+
+
+def test_the_retry_budget_caps_the_waits_of_a_whole_run(monkeypatch):
+    monkeypatch.setattr(ph.time, "sleep", lambda s: None)
+    p = ph.Probe("x", "x.org", "https://x.org/", ph.http_ok)
+    budget = [15]
+    ok, detail, _, k = ph.run_probe(p, lambda u, r: (503, b""), budget=budget)
+    assert not ok and k == 2 and "retry budget used up" in detail and budget[0] < 15    # 10 s spent, 30 s refused
