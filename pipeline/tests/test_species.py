@@ -83,6 +83,16 @@ def test_krummholz_and_limber():
     assert share(run(elev=3100, chm=8.0, ridge=True), spc.LIMBER) == 0.0
 
 
+def test_limber_class_short_trees_only():
+    # BUG-129: a limber-bristlecone class makes 80% of its short trees limber pine; a tall one is the spruce-fir split
+    short = run(elev=3350, chm=8.0, group=spc.G_LIMBER)
+    assert abs(share(short, spc.LIMBER) - 0.8) < 0.02
+    tall = run(elev=3350, chm=20.5, group=spc.G_LIMBER)
+    assert share(tall, spc.LIMBER) == 0.0
+    assert share(tall, spc.SPRUCE) + share(tall, spc.FIR) == 1.0
+    assert share(run(elev=3350, chm=spc.LIMBER_MAX_H, group=spc.G_LIMBER), spc.LIMBER) == 0.0
+
+
 def test_no_landfire_fallback():
     lo = run(elev=2900, have_evt=False)
     assert share(lo, spc.LODGEPOLE) > 0.5
@@ -352,11 +362,12 @@ def west_inputs(n=20000, seed=4):
 def test_west_species_draw_unchanged():
     """the western groups (0..5) with and without LANDFIRE give every tree the species they did before FEAT-233
     (counts and a hash of the ids from main c9f246c), in the regions of Vail, Breckenridge and Big Sky, so those
-    packs rebuild with the same species"""
+    packs rebuild with the same species. BUG-129 changed the LANDFIRE draws on purpose: a limber class's trees of
+    12 m and more are spruce or fir now (limber 1,686 -> 729 and 1,827 -> 800, the rest unchanged)"""
     import hashlib
     a, nd = west_inputs()
-    want = {(True, False): ("a13246b526834b38", [3192, 8464, 552, 3730, 1942, 434, 1686, 0]),
-            (True, True): ("3cda0f6f4b4fd8f7", [3429, 7422, 552, 4050, 2185, 535, 1827, 0]),
+    want = {(True, False): ("d12f176cda85f990", [3616, 8464, 552, 4263, 1942, 434, 729, 0]),
+            (True, True): ("6073042a5cc0e8e3", [3881, 7422, 552, 4625, 2185, 535, 800, 0]),
             (False, False): ("85b5d390a98dfbae", [5019, 3352, 552, 5936, 4923, 0, 218, 0])}
     for (have, naip), (h, counts) in want.items():
         for region in (spc.WEST, spc.region_for(-106.35, 39.6), spc.region_for(-106.08, 39.47), spc.region_for(-111.4, 45.28)):

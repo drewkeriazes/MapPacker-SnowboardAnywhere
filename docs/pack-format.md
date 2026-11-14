@@ -107,7 +107,7 @@ mask's rock, and the mean tree height per 16 m from the tree instances. The fore
 the pack's tree instances (BUG-069), so a sparse stand the lidar canopy reads as closed is not a dark patch
 around its few trees. R, the forest seen from far off, is weighted by the share of the ground under the
 detected crowns (averaged over 16 m, full weight from 0.05 up, a quarter of the 0.2 all drawn trees reach in timber;
-BUG-120: before, it counted the generated stems in expectation, which now fill closed stands only). The level's optional `stands` image (greyscale, same
+BUG-120: before, it counted the generated stems in expectation; it does not change when the stem rule does, BUG-131). The level's optional `stands` image (greyscale, same
 grid, `cover/pack-stands.png`) is the forest seen from near, where single trees show: only closed stands
 keep it (the detected trees' crown share averaged over 10 m passes 0.05 to 0.14, and the stand is at least 40 m across:
 smaller clumps are dropped, holes that size inside a stand filled; BUG-101: the generated stems do not count here,
@@ -161,7 +161,7 @@ pack and draws its hardwoods and hemlocks as spruce (see [formatVersion](#format
 | 3 | subalpine fir | the rest of spruce-fir: 50 % below 3,200 m, 40 % above, more on north and east aspects and near streams | 0.10 h |
 | 4 | lodgepole pine | lodgepole (and ponderosa) classes, 85 %; without LANDFIRE, the lower slopes below 3,250 m | 0.09 h |
 | 5 | Douglas-fir | Douglas-fir and montane mixed conifer classes below about 3,200 m | 0.17 h |
-| 6 | limber pine | limber-bristlecone and pinyon-juniper classes; half the short (< 10 m) trees on exposed crests above 3,200 m | 0.35 h |
+| 6 | limber pine | the trees under 12 m in limber-bristlecone and pinyon-juniper classes (BUG-129: a taller one is spruce or fir); half the short (< 10 m) trees on exposed crests above 3,200 m | 0.35 h |
 | 7 | snag | standing dead: CHM peak over 6 m with NAIP NDVI under 0.15 inside forest, at most 3 % of trees | 0.05 h |
 | 8 | bare hardwood | FEAT-233: eastern broadleaf classes (oak, beech-maple, ruderal, floodplain and swamp forest), the class's `hardwood` share (88 % in beech-maple to 96 % in dry oak), less on cool north and east aspects and near water; the broadleaf share of eastern spruce-fir-hardwood and oak-pine classes; in the east the no-LANDFIRE and no-group fallback below the boreal line | 0.28 h |
 | 9 | eastern hemlock | FEAT-233: the rest of an eastern hardwood or hemlock class (hemlock-hardwood 60 %), up to 1.5 times more on north and east aspects and near water; 12 % of the eastern fallback on flat dry ground | 0.17 h |
@@ -245,10 +245,17 @@ Ground height = `(R * 256 + G) / zScale + zBase` m, stored where a stem can stan
 `zBase` is the pack's lowest ground and `zScale` 32, so a pack spans at most 2,048 m of relief.
 
 The chance is the stems a closed stand needs (`K_CLOSE` crown area per m2 of canopy: canopy share / (pi r^2),
-r = the species' crown ratio times the stand height), less the detected crowns within about 6 m, times the closed-stand
-weight of the cell (BUG-120: the same test as the cover's `stands` image below, on the detected crowns; the canopy mask
-reads a sparse stand as closed, so without it the stems filled sparse stands at about 4x their detected crowns; a pack
-without lidar keeps every stem). Stems stand only
+r = the species' crown ratio times the stand height), less the detected crowns within about 6 m: this rule, from the
+canopy mask, is what a pack without lidar and the synthetic pack use. A pack with lidar (BUG-131) fills to the lidar's
+own canopy share instead (`stands.lidar_share`: canopy 3 m or taller on the 2 m grid, eroded by one cell to undo the
+build's gap closing; 0.181 and 0.257 within 250 m and 600 m of Vail's Back Bowls sign against 0.178 and 0.258 measured on
+the raw lidar): the stems owe each cell the share round it (8 m) less the detected crowns' drawn disc area, a cell holds
+one stem at most, and what a full cell cannot hold is passed to the stand's cells within about 40 m
+(`stands.stem_chance_to_share`). So the drawn crown cover, detected crowns plus stems, is the lidar's canopy: on Vail
+99% and 96% of it within 250 m and 600 m of the sign, where FEAT-074's mask rule over-filled sparse stands (the mask reads
+them about half again too dense) and BUG-120's cut of the stems to closed stands left 58% and 68%. `meta.vegetation.canopy`
+records the pack's lidar share, the drawn cover over it and its 10th / 50th / 90th percentile per 1 km cell; the build
+warns outside 90 to 105%. Closed stands of narrow trees sit under their share (a cell is full at one stem). Stems stand only
 on canopy, off truly open LANDFIRE classes, groomed runs, built-up ground, cliffs and lift lines. Stand height is
 the tallest lidar return in the 4 m cell, LANDFIRE EVH (DATA-010) where the lidar reads under 4 m, at least 3 m.
 Species come from the same rules as the trees (`species.assign_species`) at the cell centre.
