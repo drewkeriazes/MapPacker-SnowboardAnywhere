@@ -1,0 +1,25 @@
+{
+ "version": 2,
+ "slug": "jackson-hole-mountain",
+ "fetched": "2026-11-14",
+ "areas": [
+  {
+   "openskidata_id": "2b812055300b5107fc2ffed8f5ae27a4c4f94f0a",
+   "name": "Jackson Hole Mountain Resort",
+   "wikidata": null,
+   "found_by": null,
+   "wikipedia": null,
+   "infobox": false
+  }
+ ],
+ "figures": {},
+ "trails": null,
+ "why": "no English Wikipedia article with an Infobox ski area for Jackson Hole Mountain Resort",
+ "outside": [],
+ "box": [
+  508900,
+  4824100,
+  515400,
+  4829800
+ ]
+}
