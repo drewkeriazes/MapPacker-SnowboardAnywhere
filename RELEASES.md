@@ -64,6 +64,10 @@ Every published pack, grouped by resort, newest version first. The game download
 - [v2](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/vail/v2) 271 MB, 2026-11-12
 - [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/vail/v1) 236 MB, 2026-11-11
 
+## Whistler Blackcomb
+
+- [v1](https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/tag/whistler-blackcomb/v1) (latest) 197 MB, 2026-11-14
+
 ## Test packs
 
 Not in the resort picker: the game's CI downloads them (FEAT-241).

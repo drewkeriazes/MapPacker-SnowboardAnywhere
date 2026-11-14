@@ -308,6 +308,30 @@
     "content": "8bf93f42d5821e5d"
    },
    "report": "reports/vail.md"
+  },
+  {
+   "slug": "whistler-blackcomb",
+   "name": "Whistler Blackcomb",
+   "region": "British Columbia",
+   "country": "CA",
+   "lonlat": [
+    -122.92592294080599,
+    50.080646141970206
+   ],
+   "tier": "bronze",
+   "status": "preview",
+   "pack": {
+    "version": 1,
+    "formatVersion": 1,
+    "build": "20261114T090322Z-76474b",
+    "built": "2026-11-14",
+    "pipeline": "e0e0036",
+    "bytes": 197175739,
+    "sha256": "ae65b2a5d9e156d4e38f68bb8b7336a089b84a55357b4eb9c748d3f8218d6fb4",
+    "url": "https://github.com/drewkeriazes/MapPacker-SnowboardAnywhere/releases/download/whistler-blackcomb/v1/whistler-blackcomb.zip",
+    "content": "5d03769d81589752"
+   },
+   "report": "reports/whistler-blackcomb.md"
   }
  ],
  "test": [

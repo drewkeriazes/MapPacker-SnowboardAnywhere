@@ -1,0 +1,86 @@
+{
+  "slug": "whistler-blackcomb",
+  "name": "Whistler Blackcomb",
+  "country": "CA",
+  "region": "British Columbia",
+  "osm_ski_area_way": 474288286,
+  "crs": "EPSG:32610",
+  "utm_zone": "10N",
+  "lonlat_bbox": [
+    -122.993845,
+    50.0391566,
+    -122.8587272,
+    50.122077
+  ],
+  "buffer_m": 1000,
+  "utm_bbox": [
+    499400,
+    5541900,
+    511200,
+    5553300
+  ],
+  "origin": [
+    505300,
+    5547600
+  ],
+  "elevation_range_m": [
+    600,
+    2450
+  ],
+  "mid_ring": {
+    "size_m": 40000,
+    "res_m": 10,
+    "source": "Mapterhorn",
+    "zoom": 13
+  },
+  "far_ring": {
+    "size_m": 200000,
+    "mapterhorn_zoom": 11
+  },
+  "dem": {
+    "source": "Mapterhorn",
+    "res_m": 1,
+    "zoom": 15,
+    "native_zoom": 15
+  },
+  "attribution": [
+    "Elevation: Mapterhorn (mapterhorn.com) terrain tiles at z15, from Canada DTM 2018-2024, Natural Resources Canada (Open Government Licence - Canada)",
+    "Background terrain: Mapterhorn (mapterhorn.com)",
+    "Runs, lifts, buildings, roads, names: OpenStreetMap contributors (ODbL)"
+  ],
+  "start_run": null,
+  "terrain_status_url": "https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+  "osm": {
+    "geofabrik": "british-columbia",
+    "pbf": "https://download.geofabrik.de/north-america/canada/british-columbia-latest.osm.pbf"
+  },
+  "openskidata": {
+    "ids": [
+      "19291bcc85a3b6bda5a0817e6a20bf8b8b71a5c0"
+    ],
+    "names": [
+      "Whistler Blackcomb"
+    ],
+    "iso3166_2": "CA-BC",
+    "websites": [
+      "https://www.whistlerblackcomb.com"
+    ],
+    "lifts": 36,
+    "runs": 647
+  },
+  "tier": "bronze",
+  "sources": {
+    "terrain": {
+      "source": "Mapterhorn z15, 1.5 m",
+      "tier": "silver"
+    },
+    "trees": {
+      "source": "stands from ETH canopy height + WorldCover",
+      "tier": "silver"
+    },
+    "surface": {
+      "source": "WorldCover 10 m",
+      "tier": "bronze"
+    }
+  }
+}
