@@ -1,6 +1,6 @@
 # Pack report: Vail (`vail`)
 
-Build `20261113T211158Z-21531e`, pipeline `4db846b`, format 1. Report 2026-11-13T21:12:18Z by `pipeline/pack_report.py` (FEAT-175).
+Build `20261114T040023Z-55568f`, pipeline `19927b7`, format 1. Report 2026-11-14T04:00:55Z by `pipeline/pack_report.py` (FEAT-175).
 
 **Tier: gold** (FEAT-225: the weakest layer's)
 
@@ -21,7 +21,7 @@ Build `20261113T211158Z-21531e`, pipeline `4db846b`, format 1. Report 2026-11-13
 | 4 | Raw: LANDFIRE | ✅ | EVT, EVC and EVH; 0.0% of the forest in EVT classes the species rules don't name (west rules) |
 | 5 | Heights fine, mid, far | ✅ | 2409 to 3603 m, void 0.00% inside the bounds |
 | 6 | Surface: mask, AO, directions, moguls, rocks | ✅ | rock 1.1% (reference 1.1%), canopy 66% |
-| 7 | Trees and shrubs with species | ✅ | 0.52 M crowns + 2.38 M stems = 21.4 k per km2 (55% of the reference) |
+| 7 | Trees and shrubs with species | ✅ | 0.52 M crowns + 4.52 M stems = 37.2 k per km2 (95% of the reference) |
 | 8 | Far terrain: cover levels pack, mid, far | ✅ | three levels |
 | 8b | Far tree ring (lidar crowns round the resort) | ✅ | 1.31 M crowns in 363 cells |
 | 9 | features.json | ✅ | 33 lifts, 356 runs, 2000 buildings, 1408 roads, 42 water, 1321 peaks, 116 labels |
@@ -44,7 +44,7 @@ Build `20261113T211158Z-21531e`, pipeline `4db846b`, format 1. Report 2026-11-13
 | Measure | This pack | Reference |
 |---|---:|---:|
 | Area, km2 | 135.7 |  |
-| Trees (crowns + stems) per km2 | 21,394 | 39,201 |
+| Trees (crowns + stems) per km2 | 37,160 | 39,201 |
 | Rock share | 1.1% | 1.1% |
 | Canopy share | 66% | 66% |
 | Canopy on run centre lines | 3.7% | 3.7% |
@@ -58,7 +58,7 @@ Build `20261113T211158Z-21531e`, pipeline `4db846b`, format 1. Report 2026-11-13
 
 **Advanced or harder runs never over 15 deg:** Windows Road (advanced, 5 deg), Resolution (advanced, 8 deg), Windows Road (advanced, 12 deg), Ptarmigan Ridge (advanced, 14 deg)
 
-**Lifts with the most crowns on the line:** Orient Express Lift (106), Riva Bahn Express Lift (53), Skyline Express Lift (44), Northwoods Express Lift (36), High Noon Express Lift (36)
+**Lifts with the most crowns on the line:** Orient Express Lift (106), Riva Bahn Express Lift (57), Skyline Express Lift (43), High Noon Express Lift (38), Northwoods Express Lift (37)
 
 ## Published figures (gathered 2026-11-13 by published.py)
 
@@ -111,33 +111,33 @@ Build `20261113T211158Z-21531e`, pipeline `4db846b`, format 1. Report 2026-11-13
 
 | Band, m | Area, km2 | Crowns | Stems | Per km2 |
 |---|---:|---:|---:|---:|
-| 2400 | 6.34 | 11,812 | 16,239 | 4,424 |
-| 2500 | 10.0 | 24,566 | 94,355 | 11,897 |
-| 2600 | 8.35 | 28,542 | 119,664 | 17,743 |
-| 2700 | 10.03 | 41,517 | 215,417 | 25,623 |
-| 2800 | 11.94 | 53,340 | 268,802 | 26,989 |
-| 2900 | 13.43 | 59,398 | 276,989 | 25,050 |
-| 3000 | 15.39 | 64,063 | 275,264 | 22,046 |
-| 3100 | 18.2 | 71,544 | 286,810 | 19,689 |
-| 3200 | 17.8 | 72,094 | 329,592 | 22,572 |
-| 3300 | 15.26 | 61,041 | 323,798 | 25,216 |
-| 3400 | 7.54 | 29,037 | 159,495 | 24,992 |
-| 3500 | 1.39 | 4,274 | 15,996 | 14,559 |
+| 2400 | 6.34 | 11,812 | 81,114 | 14,656 |
+| 2500 | 10.0 | 24,562 | 180,766 | 20,541 |
+| 2600 | 8.35 | 28,540 | 198,739 | 27,210 |
+| 2700 | 10.03 | 41,517 | 304,055 | 34,463 |
+| 2800 | 11.94 | 53,340 | 416,012 | 39,322 |
+| 2900 | 13.43 | 59,398 | 498,759 | 41,565 |
+| 3000 | 15.39 | 64,063 | 579,573 | 41,817 |
+| 3100 | 18.2 | 71,541 | 690,845 | 41,888 |
+| 3200 | 17.8 | 72,097 | 703,160 | 43,564 |
+| 3300 | 15.26 | 61,041 | 553,295 | 40,253 |
+| 3400 | 7.54 | 29,037 | 274,265 | 40,205 |
+| 3500 | 1.39 | 4,274 | 41,545 | 32,910 |
 
 ## Layers
 
 | Layer | In meta | Files | MB | Modified |
 |---|---|---:|---:|---|
-| fine heights | yes | 529 | 143.3 | 2026-11-13 |
-| mid heights | yes | 25 | 12.0 | 2026-11-13 |
-| far heights | yes | 16 | 2.8 | 2026-11-13 |
-| mask | yes | 144 | 12.2 | 2026-11-13 |
-| AO | yes | 144 | 9.3 | 2026-11-13 |
-| piste directions | yes | 144 | 0.5 | 2026-11-13 |
-| moguls | yes | 144 | 0.3 | 2026-11-13 |
-| cover | yes | 4 | 22.3 | 2026-11-13 |
-| trees (crowns) | yes | 144 | 12.5 | 2026-11-13 |
-| stands (stems) | yes | 144 | 19.3 | 2026-11-13 |
-| far tree ring | yes | 363 | 31.4 | 2026-11-13 |
-| shrubs | yes | 144 | 1.1 | 2026-11-13 |
-| rocks | yes | 143 | 0.6 | 2026-11-13 |
+| fine heights | yes | 529 | 143.3 | 2026-11-14 |
+| mid heights | yes | 25 | 12.0 | 2026-11-14 |
+| far heights | yes | 16 | 2.8 | 2026-11-14 |
+| mask | yes | 144 | 12.2 | 2026-11-14 |
+| AO | yes | 144 | 9.3 | 2026-11-14 |
+| piste directions | yes | 144 | 0.5 | 2026-11-14 |
+| moguls | yes | 144 | 0.3 | 2026-11-14 |
+| cover | yes | 4 | 23.2 | 2026-11-14 |
+| trees (crowns) | yes | 144 | 12.5 | 2026-11-14 |
+| stands (stems) | yes | 144 | 19.4 | 2026-11-14 |
+| far tree ring | yes | 363 | 31.4 | 2026-11-14 |
+| shrubs | yes | 144 | 1.1 | 2026-11-14 |
+| rocks | yes | 142 | 0.7 | 2026-11-14 |
